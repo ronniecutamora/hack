@@ -5,7 +5,7 @@ from typing import Any
 
 from app.meta.base import ModelClient, ModelOutputError, error_from_response, parse_json_text
 
-MODEL = "meta-models/muse-spark-open-1026"
+MODEL = "meta-models/muse-spark-open"
 URL = "https://inference.baseten.co/v1/chat/completions"
 
 

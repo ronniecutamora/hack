@@ -115,7 +115,7 @@ async def test_spark_open_uses_baseten_auth_and_reads_content_after_reasoning():
     request = route.calls.last.request
     assert request.headers["authorization"] == "Api-Key bk"
     body = json.loads(request.content)
-    assert body["model"] == "meta-models/muse-spark-open-1026"
+    assert body["model"] == "meta-models/muse-spark-open"
     assert body["max_tokens"] == 8000
     assert out == {"ok": True}
 

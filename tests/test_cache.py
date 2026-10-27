@@ -29,5 +29,5 @@ def test_corrupt_entry_is_a_miss(tmp_path):
 
 def test_model_ids_with_slashes_are_safe_directory_names(tmp_path):
     cache = ResponseCache(tmp_path)
-    cache.put("meta-models/muse-spark-open-1026", "p", {"x": 1})
-    assert cache.get("meta-models/muse-spark-open-1026", "p") == {"x": 1}
+    cache.put("meta-models/muse-spark-open", "p", {"x": 1})
+    assert cache.get("meta-models/muse-spark-open", "p") == {"x": 1}
