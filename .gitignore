@@ -4,3 +4,15 @@
 !.env.example
 *.pem
 *.key
+
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+
+# Local data and raw media (never commit)
+var/
+*.wav
+*.ogg
+*.m4a
