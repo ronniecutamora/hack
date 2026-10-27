@@ -77,3 +77,39 @@ def test_transcription_slip_after_prefix_is_a_fuzzy_match():
 def test_fuzzy_match_needs_a_prefix_and_a_close_name():
     assert find_in_text("Mamplason po").barangays == ()
     assert find_in_text("barangay Sinagpulo sa sityo Malarik").barangays == ()
+
+
+def test_biñan_poblacion_is_barangay_biñan_even_without_a_prefix():
+    assert find_in_text("Baha sa Biñan Poblacion").barangays == (BY_NAME["Biñan"],)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Si Rosa Dela Paz po ang nagsabi",  # a surname
+        "ganado ang mga tao sa pagtulong",  # "eager"
+        "Pakisabi kay Jose Platero",
+        "Binaha ang San Jose parish",
+    ],
+)
+def test_surnames_words_and_buildings_are_not_barangays(text):
+    assert find_in_text(text).barangays == ()
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("Santo Niño chapel sa Brgy. Malaban, lubog", "Malaban"),
+        ("Taga Dela Paz po ako", "De La Paz"),
+        ("galing Ganado, sira ang tulay", "Ganado"),
+        ("flooding in San Jose near the river", "San Jose"),
+    ],
+)
+def test_surname_like_names_count_after_a_place_cue(text, expected):
+    assert find_in_text(text).barangay == BY_NAME[expected]
+
+
+def test_a_bare_name_counts_when_cues_are_not_required():
+    assert find_in_text("Dela Paz po ito, baha").barangays == ()  # left to the LLM's reading
+    assert find_in_text("Ganado", require_cues=False).barangay == BY_NAME["Ganado"]
+    assert find_in_text("Malamig", require_cues=False).barangays == ()  # still a common word

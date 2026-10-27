@@ -82,7 +82,7 @@ def geolocate(
         notes.append(f"{source} outside Biñan")
     ambiguous: list[str] = []
     for source, value in (("text", text), ("transcript", transcript), ("llm", llm_barangay)):
-        match = find_in_text(value)
+        match = find_in_text(value, require_cues=source != "llm")
         if match.barangay is not None:
             detail = ", ".join([*match.matched, *notes]) + (" (approximate)" if match.fuzzy else "")
             return GeoResult(match.barangay, source, detail)

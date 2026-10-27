@@ -26,6 +26,10 @@ class Barangay:
     # Names that are also common words ("malamig" = cold, "tubigan" = irrigated field) or the
     # city's own name: matched in text only after "barangay"/"brgy".
     prefix_only: tuple[str, ...] = ()
+    # Names that are also surnames, words or saints ("Rosa Dela Paz", "ganado", "Santo Niño
+    # chapel"): matched in text only after a place cue ("sa", "taga", "galing", a prefix, ...)
+    # and not when an institution word follows ("San Jose church").
+    cue_only: tuple[str, ...] = ()
 
     @property
     def names(self) -> tuple[str, ...]:
@@ -33,27 +37,38 @@ class Barangay:
 
 
 BARANGAYS: tuple[Barangay, ...] = (
-    Barangay("PH0403403001", "Biñan", ("Biñan Poblacion",), ("Biñan", "Biñan Poblacion")),
+    # "Biñan Poblacion" is unambiguous; "Biñan" alone is usually the city.
+    Barangay("PH0403403001", "Biñan", ("Biñan Poblacion",), ("Biñan",)),
     Barangay("PH0403403002", "Bungahan"),
-    Barangay("PH0403403003", "Santo Tomas", ("Sto. Tomas", "Calabuso")),
+    Barangay(
+        "PH0403403003",
+        "Santo Tomas",
+        ("Sto. Tomas", "Calabuso"),
+        cue_only=("Santo Tomas", "Sto. Tomas"),
+    ),
     Barangay("PH0403403004", "Canlalay"),
     Barangay("PH0403403005", "Casile"),
-    Barangay("PH0403403006", "De La Paz", ("Dela Paz",)),
-    Barangay("PH0403403007", "Ganado"),
-    Barangay("PH0403403008", "San Francisco", ("Halang",), ("Halang",)),
+    Barangay("PH0403403006", "De La Paz", ("Dela Paz",), cue_only=("De La Paz", "Dela Paz")),
+    Barangay("PH0403403007", "Ganado", cue_only=("Ganado",)),
+    Barangay("PH0403403008", "San Francisco", ("Halang",), ("Halang",), ("San Francisco",)),
     Barangay("PH0403403009", "Langkiwa"),
     Barangay("PH0403403011", "Loma", prefix_only=("Loma",)),
     Barangay("PH0403403012", "Malaban"),
     Barangay("PH0403403013", "Malamig", prefix_only=("Malamig",)),
     Barangay("PH0403403014", "Mamplasan", ("Mampalasan",)),
-    Barangay("PH0403403015", "Platero"),
+    Barangay("PH0403403015", "Platero", cue_only=("Platero",)),
     Barangay("PH0403403016", "Poblacion"),
-    Barangay("PH0403403018", "Santo Niño", ("Sto. Niño",)),
-    Barangay("PH0403403019", "San Antonio"),
-    Barangay("PH0403403020", "San Jose"),
-    Barangay("PH0403403021", "San Vicente"),
+    Barangay("PH0403403018", "Santo Niño", ("Sto. Niño",), cue_only=("Santo Niño", "Sto. Niño")),
+    Barangay("PH0403403019", "San Antonio", cue_only=("San Antonio",)),
+    Barangay("PH0403403020", "San Jose", cue_only=("San Jose",)),
+    Barangay("PH0403403021", "San Vicente", cue_only=("San Vicente",)),
     Barangay("PH0403403022", "Soro-soro"),
-    Barangay("PH0403403023", "Santo Domingo", ("Sto. Domingo",)),
+    Barangay(
+        "PH0403403023",
+        "Santo Domingo",
+        ("Sto. Domingo",),
+        cue_only=("Santo Domingo", "Sto. Domingo"),
+    ),
     Barangay("PH0403403024", "Timbao"),
     Barangay("PH0403403025", "Tubigan", prefix_only=("Tubigan",)),
     Barangay("PH0403403026", "Zapote"),
@@ -63,6 +78,17 @@ BY_NAME = {b.name: b for b in BARANGAYS}
 
 # Words that introduce a barangay name in Filipino reports ("Brgy. Malamig", "barangay Loma").
 _PREFIXES = ("barangay", "baranggay", "brgy", "bgy", "brg")
+# Words that mark a place in Taglish or English ("sa Dela Paz", "taga San Jose", "galing Ganado").
+_CUES = (
+    *_PREFIXES,
+    *("sa", "taga", "tiga", "dito", "diyan", "dyan", "doon", "mula", "galing", "ng"),
+    *("papunta", "papuntang", "hanggang", "at", "in", "from", "to", "near"),
+)
+# A saint's or family name followed by these is a building, not the barangay.
+_INSTITUTIONS = (
+    *("chapel", "kapilya", "church", "simbahan", "parish", "parokya", "school", "elementary"),
+    *("high", "college", "hospital", "street", "st", "avenue", "ave", "subdivision", "subd"),
+)
 # Fuzzy matches are only tried right after a prefix, and must be this similar (0..1).
 FUZZY_CUTOFF = 0.82
 _NON_WORD = re.compile(r"[^a-z0-9]+")
@@ -105,32 +131,44 @@ class TextMatch:
         return len(self.barangays) > 1
 
 
+def _any(words: tuple[str, ...]) -> str:
+    return "(?:" + "|".join(words) + ")"
+
+
 @cache
-def _patterns() -> list[tuple[re.Pattern[str], Barangay]]:
-    prefix = r"(?:" + "|".join(_PREFIXES) + r") "
+def _patterns(require_cues: bool) -> list[tuple[re.Pattern[str], Barangay]]:
+    prefix = _any(_PREFIXES) + " "
+    cue = rf"\b{_any(_CUES)} "
+    not_institution = rf"(?! {_any(_INSTITUTIONS)}\b)"
     patterns = []
     # Longest names first so "san francisco" wins over a shorter overlapping alias.
     for barangay, name in sorted(
         ((b, normalize(n)) for b in BARANGAYS for n in b.names), key=lambda x: -len(x[1])
     ):
-        lead = prefix if name in {normalize(n) for n in barangay.prefix_only} else ""
-        patterns.append((re.compile(rf"\b{lead}({re.escape(name)})\b"), barangay))
+        lead, tail = r"\b", ""
+        if name in {normalize(n) for n in barangay.prefix_only}:
+            lead = rf"\b{prefix}"
+        elif require_cues and name in {normalize(n) for n in barangay.cue_only}:
+            lead, tail = cue, not_institution
+        patterns.append((re.compile(rf"{lead}({re.escape(name)})\b{tail}"), barangay))
     return patterns
 
 
-def find_in_text(text: str | None) -> TextMatch:
+def find_in_text(text: str | None, *, require_cues: bool = True) -> TextMatch:
     """Find barangay names in a text or transcript.
 
     Exact matches (accent- and abbreviation-insensitive) are tried first. Only if there are
     none, the one to three words after "barangay"/"brgy" are fuzzy-matched, which catches
     transcription slips like "Mamplasan" -> "Mamplason" without matching ordinary words.
+    Pass require_cues=False for a value that is already just a place name (the LLM's
+    barangay_mentioned), so surname-like names need no "sa"/"taga" in front.
     """
     if not text:
         return TextMatch((), ())
     norm = normalize(text)
     hits: list[tuple[int, Barangay, str]] = []
     taken: list[range] = []
-    for pattern, barangay in _patterns():
+    for pattern, barangay in _patterns(require_cues):
         for m in pattern.finditer(norm):
             span = range(m.start(1), m.end(1))
             if any(span.start < t.stop and t.start < span.stop for t in taken):
