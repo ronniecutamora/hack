@@ -264,3 +264,31 @@ async def test_pending_ids_skip_assessed_reports(settings, engine):
     await assessor.assess(first.id)
     assert assessor.report_ids(pending_only=True) == [second.id]
     assert assessor.report_ids(pending_only=False) == [first.id, second.id]
+
+
+async def test_a_voice_note_that_was_never_transcribed_is_not_assessed(settings, engine):
+    report = await IntakeService(settings, engine).ingest_text(7, "placeholder")
+    with Session(engine) as session:
+        row = session.get(Report, report.id)
+        row.text, row.status = None, "transcription_failed"
+        session.add(row)
+        session.add(Media(report_id=report.id, kind="voice", path="media/1/a.ogg", sha256="x"))
+        session.commit()
+    assessor = service(settings, engine)
+
+    out = await assessor.assess(report.id)
+
+    assert out.status == "assessment_failed"
+    assert one(engine, Assessment).error == "voice note not transcribed"
+    assert assessor.report_ids(pending_only=True) == [report.id]  # still to do
+
+
+async def test_a_run_cut_short_while_assessing_is_picked_up_again(settings, engine):
+    report = await IntakeService(settings, engine).ingest_text(7, "baha sa Casile")
+    with Session(engine) as session:
+        row = session.get(Report, report.id)
+        row.status = "assessing"  # the process died mid-run
+        session.add(row)
+        session.commit()
+    assert service(settings, engine).report_ids(pending_only=True) == [report.id]
+

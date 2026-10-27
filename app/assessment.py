@@ -49,7 +49,13 @@ from app.photo import assess_photo
 from app.transcript_cleanup import clean_transcript
 
 logger = logging.getLogger(__name__)
-PENDING_STATUSES = (STATUS_NEW, STATUS_TRANSCRIPTION_FAILED, STATUS_ASSESSMENT_FAILED)
+# "assessing" is included so a run cut short by a crash or restart is picked up again.
+PENDING_STATUSES = (
+    STATUS_NEW,
+    STATUS_ASSESSING,
+    STATUS_TRANSCRIPTION_FAILED,
+    STATUS_ASSESSMENT_FAILED,
+)
 
 
 @dataclass(frozen=True)
@@ -153,6 +159,12 @@ class AssessmentService:
                 ).all()
                 if (self.settings.data_dir / m.path).is_file()
             ]
+            untranscribed_voice = report.transcript is None and (
+                session.exec(
+                    select(Media.id).where(Media.report_id == report_id, Media.kind == "voice")
+                ).first()
+                is not None
+            )
             report.status = STATUS_ASSESSING
             session.add(report)
             session.commit()
@@ -173,6 +185,8 @@ class AssessmentService:
             llm_barangay=(facts or {}).get("barangay_mentioned"),
         )
         errors = [e for e in (facts_error, *(o.error for o in outcomes)) if e]
+        if untranscribed_voice:  # part of the report is missing: not "assessed"
+            errors.insert(0, "voice note not transcribed")
         return self._save(report_id, transcript, facts, geo, outcomes, errors)
 
     async def _facts(self, text: str) -> tuple[dict[str, Any] | None, str | None]:
