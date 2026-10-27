@@ -27,10 +27,21 @@ _SIZE_RE = re.compile(r";w=(\d+);h=(\d+)")
 
 
 @dataclass(frozen=True)
+class Mask:
+    """A detection's mask: a width x height grid of 0/1 bytes stretched over `bounds`."""
+
+    width: int
+    height: int
+    bounds: tuple[float, float, float, float]  # left, top, right, bottom in image pixels
+    raster: bytes
+
+
+@dataclass(frozen=True)
 class Detection:
     confidence: float | None
     box: tuple[float, float, float, float]  # left, top, right, bottom in image pixels
     area_fraction: float  # share of the whole image covered by the mask (0 if no mask)
+    mask: Mask | None = field(default=None, compare=False, repr=False)
 
 
 @dataclass(frozen=True)
@@ -69,18 +80,21 @@ def parse_stream(text: str, concept: str = "") -> SamResult:
         mask = masks.get(object_id)
         confidence = box.confidence
         area_fraction = 0.0
+        decoded: Mask | None = None
         if mask is not None:
             if confidence is None:
                 confidence = mask.confidence
+            raster = decode_mask_to_raster(mask.mask)
+            bounds = (mask.bounds.left, mask.bounds.top, mask.bounds.right, mask.bounds.bottom)
+            decoded = Mask(mask.mask.width, mask.mask.height, bounds, raster)
             if image_size:
-                raster = decode_mask_to_raster(mask.mask)
                 covered = sum(raster) / max(1, mask.mask.width * mask.mask.height)
-                box_area = (mask.bounds.right - mask.bounds.left) * (
-                    mask.bounds.bottom - mask.bounds.top
-                )
+                box_area = (bounds[2] - bounds[0]) * (bounds[3] - bounds[1])
                 area_fraction = covered * box_area / (image_size[0] * image_size[1])
         detections.append(
-            Detection(confidence, (box.left, box.top, box.right, box.bottom), area_fraction)
+            Detection(
+                confidence, (box.left, box.top, box.right, box.bottom), area_fraction, decoded
+            )
         )
     return SamResult(concept, detections, image_size, len(result.diagnostics))
 
