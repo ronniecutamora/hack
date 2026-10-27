@@ -57,10 +57,13 @@ class SparkClient(ModelClient):
                 raise error_from_response(self.service, response)
             return response.json()
 
-        reply = await self._call(model, key_payload, fetch, lambda r: estimate_cost(r.get("usage")))
-        result = extract_json(reply)
-        validate(schema, result)
-        return result
+        def check(reply: dict[str, Any]) -> None:
+            validate(schema, extract_json(reply))
+
+        reply = await self._call(
+            model, key_payload, fetch, lambda r: estimate_cost(r.get("usage")), check
+        )
+        return extract_json(reply)
 
 
 def extract_json(reply: dict[str, Any]) -> dict[str, Any]:

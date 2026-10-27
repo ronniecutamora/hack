@@ -188,3 +188,36 @@ async def test_spark_open_retries_once_with_a_bigger_budget_when_reasoning_runs_
     assert out == {"ok": True}
     budgets = [json.loads(c.request.content)["max_tokens"] for c in route.calls]
     assert budgets == [8192, 16384]
+
+
+@respx.mock
+async def test_invalid_replies_are_not_cached_so_a_rerun_asks_again(cache):
+    bad = completion('{"roof_damage":"gone"}')
+    good = completion('{"roof_damage":"severe"}')
+    route = respx.post("https://api.meta.ai/v1/chat/completions").mock(
+        side_effect=[httpx.Response(200, json=bad), httpx.Response(200, json=good)]
+    )
+    client = SparkClient(api_key="k", backoff_s=0, cache=cache)
+    kwargs = {"system": "s", "user_text": "u", "schema": SCHEMA, "schema_name": "J"}
+
+    with pytest.raises(ModelOutputError):
+        await client.chat_json(**kwargs)
+    assert await client.chat_json(**kwargs) == {"roof_damage": "severe"}
+    assert await client.chat_json(**kwargs) == {"roof_damage": "severe"}  # now cached
+    assert route.call_count == 2
+
+
+@respx.mock
+async def test_spark_open_does_not_cache_a_truncated_reply(cache):
+    cut = {"choices": [{"finish_reason": "length", "message": {"content": None}}]}
+    done = {"choices": [{"finish_reason": "stop", "message": {"content": '{"ok": true}'}}]}
+    route = respx.post("https://inference.baseten.co/v1/chat/completions").mock(
+        side_effect=[httpx.Response(200, json=cut)] * 2 + [httpx.Response(200, json=done)]
+    )
+    client = SparkOpenClient(api_key="bk", backoff_s=0, cache=cache)
+    kwargs = {"system": "s", "user_text": "u", "schema": OK_SCHEMA, "schema_name": "Ok"}
+
+    with pytest.raises(ModelOutputError, match="max_tokens"):
+        await client.chat_json(**kwargs)  # both budgets truncated
+    assert await client.chat_json(**kwargs) == {"ok": True}  # asked again, not replayed
+    assert route.call_count == 3

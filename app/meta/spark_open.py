@@ -5,6 +5,7 @@ Probed 2026-10-27: the model accepts images (OpenAI-style `image_url` data URLs)
 A photo call used about 1,000 prompt and 1,900 completion tokens (1,800 of them reasoning).
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -46,8 +47,9 @@ class SparkOpenClient(ModelClient):
         model: str = MODEL,
         response_format: dict[str, Any] | None = None,
         key_payload: Any = None,
+        check: Callable[[SparkOpenReply], None] | None = None,
     ) -> SparkOpenReply:
-        """Plain chat call.
+        """Plain chat call. `check` rejects unusable replies so they are not cached.
 
         This is a reasoning model: reasoning tokens count against max_tokens, so leave
         headroom or the answer in `content` comes back empty (finish_reason == "length").
@@ -65,18 +67,12 @@ class SparkOpenClient(ModelClient):
                 raise error_from_response(self.service, response)
             return response.json()
 
+        raw_check = (lambda raw: check(parse_reply(raw))) if check else None
         # Usage is paid from Baseten credits, which Baseten tracks; no per-call price is logged.
-        reply = await self._call(model, body if key_payload is None else key_payload, fetch)
-        try:
-            choice = reply["choices"][0]
-            message = choice["message"]
-        except (KeyError, IndexError, TypeError) as exc:
-            raise ModelOutputError(f"unexpected Baseten reply shape: {str(reply)[:200]}") from exc
-        return SparkOpenReply(
-            content=(message.get("content") or "").strip(),
-            reasoning=(message.get("reasoning_content") or "").strip(),
-            finish_reason=choice.get("finish_reason"),
+        raw = await self._call(
+            model, body if key_payload is None else key_payload, fetch, check=raw_check
         )
+        return parse_reply(raw)
 
     async def chat_json(
         self,
@@ -93,26 +89,52 @@ class SparkOpenClient(ModelClient):
         messages, response_format, key_payload = json_chat_request(
             system, user_text, schema, schema_name, image, image_mime
         )
-        for budget in (max_tokens, max_tokens * LENGTH_RETRY_FACTOR):
-            reply = await self.chat(
-                messages,
-                max_tokens=budget,
-                response_format=response_format,
-                key_payload={**key_payload, "max_tokens": budget},
-            )
-            # Reasoning can use the whole budget (one Taglish note did at 8,192 tokens on
-            # 2026-10-27); one retry with a larger budget is cheaper than losing the report.
-            if reply.content or reply.finish_reason != "length":
-                break
-        if not reply.content:
-            raise ModelOutputError(
-                f"Spark Open returned no answer (finish_reason={reply.finish_reason}); "
-                "raise max_tokens so reasoning does not use the whole budget"
-            )
-        parsed = parse_json_text(reply.content, what="Muse Spark Open")
-        if not isinstance(parsed, dict):
-            raise ModelOutputError(
-                f"Muse Spark Open returned non-object JSON: {reply.content[:200]!r}"
-            )
-        validate(schema, parsed)
-        return parsed
+        budgets = (max_tokens, max_tokens * LENGTH_RETRY_FACTOR)
+        for budget in budgets:
+            try:
+                reply = await self.chat(
+                    messages,
+                    max_tokens=budget,
+                    response_format=response_format,
+                    key_payload={**key_payload, "max_tokens": budget},
+                    check=lambda r: json_answer(r, schema),
+                )
+                return json_answer(reply, schema)
+            except TruncatedReplyError:
+                # Reasoning can use the whole budget (one Taglish note did at 8,192 tokens on
+                # 2026-10-27); one retry with a larger budget beats losing the report.
+                if budget == budgets[-1]:
+                    raise
+        raise AssertionError("unreachable")
+
+
+class TruncatedReplyError(ModelOutputError):
+    """The model spent the whole token budget reasoning and gave no answer."""
+
+
+def parse_reply(raw: dict[str, Any]) -> SparkOpenReply:
+    try:
+        choice = raw["choices"][0]
+        message = choice["message"]
+    except (KeyError, IndexError, TypeError) as exc:
+        raise ModelOutputError(f"unexpected Baseten reply shape: {str(raw)[:200]}") from exc
+    return SparkOpenReply(
+        content=(message.get("content") or "").strip(),
+        reasoning=(message.get("reasoning_content") or "").strip(),
+        finish_reason=choice.get("finish_reason"),
+    )
+
+
+def json_answer(reply: SparkOpenReply, schema: dict[str, Any]) -> dict[str, Any]:
+    """The reply's JSON answer, validated; raises ModelOutputError if it is unusable."""
+    if not reply.content:
+        error = TruncatedReplyError if reply.finish_reason == "length" else ModelOutputError
+        raise error(
+            f"Spark Open returned no answer (finish_reason={reply.finish_reason}); "
+            "raise max_tokens so reasoning does not use the whole budget"
+        )
+    parsed = parse_json_text(reply.content, what="Muse Spark Open")
+    if not isinstance(parsed, dict):
+        raise ModelOutputError(f"Muse Spark Open returned non-object JSON: {reply.content[:200]!r}")
+    validate(schema, parsed)
+    return parsed

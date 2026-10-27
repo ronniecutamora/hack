@@ -125,18 +125,26 @@ class ModelClient:
         key_payload: Any,
         fetch: Callable[[], Awaitable[Any]],
         cost: Callable[[Any], float] = lambda _data: 0.0,
+        check: Callable[[Any], None] | None = None,
     ) -> Any:
-        """Return a JSON-serializable response, from cache when possible."""
+        """Return a JSON-serializable response, from cache when possible.
+
+        `check` raises ModelOutputError for a reply that is unusable (wrong schema, no answer).
+        Such replies are never cached, and one found in the cache counts as a miss, so a bad
+        answer is not replayed on every re-run.
+        """
         started = time.perf_counter()
         if self.cache is not None:
             hit = self.cache.get(model, key_payload)
-            if hit is not None:
+            if hit is not None and _passes(check, hit):
                 self._record(model, started, cached=True, cost=0.0)
                 return hit
         data = await self._with_retry(fetch)
+        self._record(model, started, cached=False, cost=cost(data))
+        if check is not None:
+            check(data)
         if self.cache is not None:
             self.cache.put(model, key_payload, data)
-        self._record(model, started, cached=False, cost=cost(data))
         return data
 
     async def _with_retry(self, fetch: Callable[[], Awaitable[Any]]) -> Any:
@@ -159,6 +167,16 @@ class ModelClient:
         if self.recorder is not None:
             latency_ms = int((time.perf_counter() - started) * 1000)
             self.recorder(CallRecord(model, latency_ms, cached, cost))
+
+
+def _passes(check: Callable[[Any], None] | None, data: Any) -> bool:
+    if check is None:
+        return True
+    try:
+        check(data)
+    except ModelOutputError:
+        return False
+    return True
 
 
 def parse_json_text(text: str, *, what: str) -> Any:
