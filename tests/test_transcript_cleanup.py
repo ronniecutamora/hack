@@ -33,6 +33,10 @@ def test_repeated_words_and_phrases_collapse(raw, clean):
         "sari sari store sa kanto",
         "may 1,500 na sako",  # a comma inside a number is not an echoed ending
         "twenty three bahay, twenty five pamilya",
+        "Soro soro po, may landslide",  # barangay Soro-soro without the hyphen
+        "Purok 5, 5 pamilya ang lumikas",  # numbers are never collapsed
+        "kanya kanya na po ng lipat",
+        "kaniya kaniyang bahay",
         "",
     ],
 )

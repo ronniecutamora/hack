@@ -11,6 +11,8 @@ The raw transcript is always kept as evidence; this cleaned text is used for ext
 
 import re
 
+from app.gazetteer import BARANGAYS, normalize
+
 MAX_PHRASE_WORDS = 4
 # Bases of common Tagalog full reduplication ("unti unti" = gradually, "isa isa" = one by
 # one, "araw araw" = every day). "umaga umaga" is deliberately absent: it appeared as an
@@ -28,6 +30,8 @@ REDUPLICATED = frozenset(
         "iba",
         "isa",
         "kani",
+        "kaniya",
+        "kanya",
         "linggo",
         "paru",
         "saan",
@@ -38,6 +42,13 @@ REDUPLICATED = frozenset(
         "tig",
         "unti",
     }
+)
+# Place names that are reduplicated words ("Soro-soro" spoken without the hyphen).
+REDUPLICATED_NAMES = frozenset(
+    words[0]
+    for barangay in BARANGAYS
+    for name in barangay.names
+    if len(words := normalize(name).split()) == 2 and words[0] == words[1]
 )
 _WORD = re.compile(r"[^\w]+")
 # "Luntian,ian": a word followed by a comma and a repeat of its own ending.
@@ -71,7 +82,9 @@ def clean_transcript(text: str) -> str:
             while i + 2 * size <= len(tokens):
                 first = [_norm(t) for t in tokens[i : i + size]]
                 second = [_norm(t) for t in tokens[i + size : i + 2 * size]]
-                protected = size == 1 and first[0] in REDUPLICATED
+                protected = (size == 1 and first[0] in REDUPLICATED | REDUPLICATED_NAMES) or any(
+                    w.isdigit() for w in first
+                )  # "5, 5 pamilya" may be two numbers; a lost count is worse than a repeat
                 if first == second and all(first) and not protected:
                     # Keep the first copy's words but the second copy's closing punctuation.
                     last = tokens[i + size - 1]
