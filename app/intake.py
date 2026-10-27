@@ -39,6 +39,26 @@ class Transcriber(Protocol):
     ) -> Transcript: ...
 
 
+async def transcribe_file(
+    transcriber: Transcriber,
+    audio_path: Path,
+    *,
+    language_bias: list[str] | None = None,
+    keywords: list[str] | None = None,
+    convert: ConvertFn | None = None,
+) -> str:
+    """Convert any audio file to WAV chunks, transcribe each and join the text."""
+    parts: list[str] = []
+    with tempfile.TemporaryDirectory() as tmp:  # converted audio is never kept
+        for chunk in await (convert or to_wav_chunks)(audio_path, Path(tmp)):
+            result = await transcriber.transcribe(
+                chunk.read_bytes(), language_bias=language_bias, keywords=keywords
+            )
+            if result.text:
+                parts.append(result.text)
+    return " ".join(parts)
+
+
 class IntakeService:
     def __init__(
         self,
@@ -141,15 +161,9 @@ class IntakeService:
     async def _transcribe(self, audio_path: Path) -> str:
         if self.transcriber is None:
             raise AudioConversionError("no transcriber configured")
-        parts: list[str] = []
-        with tempfile.TemporaryDirectory() as tmp:  # converted audio is never kept
-            for chunk in await self.convert(audio_path, Path(tmp)):
-                result = await self.transcriber.transcribe(
-                    chunk.read_bytes(), language_bias=LANGUAGE_BIAS
-                )
-                if result.text:
-                    parts.append(result.text)
-        return " ".join(parts)
+        return await transcribe_file(
+            self.transcriber, audio_path, language_bias=LANGUAGE_BIAS, convert=self.convert
+        )
 
     async def ingest_location(
         self, user_ref: int | str, lat: float, lon: float, *, channel: str = "telegram"
