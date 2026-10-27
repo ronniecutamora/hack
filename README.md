@@ -66,7 +66,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 
 ### Third-party code and assets
 
-Licenses read from each installed package's metadata. No third-party source code or assets are copied into this repository; these are installed dependencies (see `pyproject.toml` and `uv.lock`).
+Licenses read from each installed package's metadata. No third-party source code is copied into this repository; the libraries are installed dependencies (see `pyproject.toml` and `uv.lock`). The one third-party data file is listed under Data below.
 
 | Name | License | Used for |
 |---|---|---|
@@ -79,11 +79,18 @@ Licenses read from each installed package's metadata. No third-party source code
 | [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot) | LGPL-3.0-only | Telegram bot (used unmodified, as a library) |
 | [jiwer](https://github.com/jitsi/jiwer) | Apache-2.0 | Word error rate for the transcription eval |
 | [meta-sam-parser](https://pypi.org/project/meta-sam-parser/) | SAM License (Meta) | Official parser for SAM 3.1 output |
+| [Pillow](https://github.com/python-pillow/Pillow) | MIT-CMU | Photo EXIF GPS and SAM mask overlays |
 | [pytest](https://github.com/pytest-dev/pytest) | MIT | Tests (dev) |
 | [pytest-asyncio](https://github.com/pytest-dev/pytest-asyncio) | Apache-2.0 | Async tests (dev) |
 | [respx](https://github.com/lundberg/respx) | BSD-3-Clause | HTTP mocking in tests (dev) |
 | [Ruff](https://github.com/astral-sh/ruff) | MIT | Lint and format (dev) |
 | [FFmpeg](https://ffmpeg.org) (external program, not bundled) | LGPL/GPL depending on build | Voice note conversion to WAV |
+
+Data:
+
+| Name | License | Used for |
+|---|---|---|
+| [OCHA COD-AB Philippines](https://data.humdata.org/dataset/cod-ab-phl) admin level 4 (sources: PSA, NAMRIA), v03, valid on 2025-02-13 | [CC BY-IGO](https://creativecommons.org/licenses/by/3.0/igo/) | Barangay names, codes and boundaries for Biñan in `app/data/binan_barangays.geojson` (24 polygons, clipped and simplified to about 3 m). OCHA notes the boundaries are indicative, not official |
 
 ## Repo structure
 
