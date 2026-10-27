@@ -2,7 +2,7 @@
 
 > An entry for the **Meta Global AI Developer Hackathon** (Oct 27 – Nov 4, 2026), built for the Philippines with Meta's Muse models.
 
-**Status:** building; slice 1 (scaffold and intake) done. Typhoon and flood damage reporting for Philippine LGUs, plus crop and fisheries insurance claims: one agent turns photos, Taglish voice notes, and texts from barangays, farmers, and fisherfolk into an officer-approved RDANA report, a damaged-houses table, and PCIC Notices of Loss. Demo area: Biñan City, Laguna.
+**Status:** building; slice 1 (intake) and slice 2 (assessment and mapping) done. Typhoon and flood damage reporting for Philippine LGUs, plus crop and fisheries insurance claims: one agent turns photos, Taglish voice notes, and texts from barangays, farmers, and fisherfolk into an officer-approved RDANA report, a damaged-houses table, and PCIC Notices of Loss. Demo area: Biñan City, Laguna.
 
 ---
 
@@ -18,10 +18,12 @@ _TBD: the core flow in 3–5 steps._
 
 | Model | What it does in this project | Status |
 |---|---|---|
-| Muse Voice Transcribe (`muse-voice-transcribe-1.0`) | Turns Telegram voice notes (Tagalog, English, Taglish) into text for the report | Client ready, slice 1 (wired into intake) |
-| Muse Spark 1.3 (`muse-spark-1.3`) | Judges each photo as structured JSON (roof damage level, flood, debris, tarpaulin, house count) | Client ready, slice 1 |
-| SAM 3.1 (`sam-3.1`) | Locates and measures what Spark describes: roof and floodwater masks, boxes, counts, area fractions | Client ready, slice 1 |
-| Muse Spark Open (`meta-models/muse-spark-open`, Baseten) | Open-weight model for the coordination agent steps | Client ready, slice 1 |
+| Muse Voice Transcribe (`muse-voice-transcribe-1.0`) | Turns Telegram voice notes (Tagalog, English, Taglish) into text, biased toward Biñan's 24 barangay names with `keywords` | In use |
+| Muse Spark 1.3 (`muse-spark-1.3`) | The agent LLM (default): judges each photo as structured JSON (roof damage, floodwater, debris, fallen tree, tarpaulin, house count) and extracts report facts (flood depth, houses, evacuees, crops, needs) | In use |
+| Muse Spark Open (`meta-models/muse-spark-open`, Baseten) | The same agent steps on open weights, photos included: set `AGENT_LLM=muse-spark-open` | In use |
+| SAM 3.1 (`sam-3.1`) | Measures what the LLM judges: counts roofs and measures floodwater from masks, drawn on the photo as evidence | In use |
+
+Every agent LLM call (photo judgment, fact extraction) goes through one interface, so the whole agent runs on either Spark 1.3 or Spark Open. Each call is logged with the model that served it.
 
 ## Demo
 
@@ -35,9 +37,10 @@ Requires Python 3.12+, [uv](https://docs.astral.sh/uv/), and `ffmpeg` (voice not
 
 ```bash
 uv sync
-cp .env.example .env   # add META_API_KEY, TELEGRAM_BOT_TOKEN, PSEUDONYM_SALT (openssl rand -hex 32); BASETEN_API_KEY if used
+cp .env.example .env   # add META_API_KEY, TELEGRAM_BOT_TOKEN, PSEUDONYM_SALT (openssl rand -hex 32); BASETEN_API_KEY for Spark Open
+# AGENT_LLM=muse-spark-1.3 (default) or muse-spark-open (open weights on Baseten)
 uv run python -m app.bot                  # Telegram intake bot (long polling)
-uv run uvicorn app.main:app --reload      # web app: /health and /reports
+uv run uvicorn app.main:app --reload      # web app: /health, /reports and /media/<id> (localhost only: no login yet)
 uv run pytest                             # tests (all HTTP is mocked, no API calls)
 uv run ruff check . && uv run ruff format --check .
 ```
@@ -45,13 +48,17 @@ uv run ruff check . && uv run ruff format --check .
 Other commands:
 
 ```bash
-# Word error rate on your own recordings (folder OUTSIDE this repo: clip.ogg + clip.txt pairs)
-uv run python -m scripts.eval_transcribe /path/to/recordings
+# Assess reports again (the bot does this in the background); --llm compares backends
+uv run python -m app.assessment --report 12 | --pending | --all [--llm muse-spark-open]
+# Evals on your own labelled data (folders OUTSIDE this repo; each prints its cost first)
+uv run python -m scripts.eval_transcribe /path/to/recordings --keywords barangays   # WER, raw and cleaned
+uv run python -m scripts.eval_vision /path/to/photos --sam [--llm muse-spark-open]  # labels.csv + images/
+uv run python -m scripts.eval_facts /path/to/recordings [--llm muse-spark-open]     # facts.json + audio
 # Delete expired raw media once (the bot and a running web app are not required)
 uv run python -m app.retention
 ```
 
-Model responses are cached on disk under `DATA_DIR/model_cache` when `MODEL_CACHE=true`, so repeated development runs do not spend credits. Raw photos and voice notes are deleted after `RAW_MEDIA_TTL_HOURS` (default 24); reports and transcripts are kept.
+Model responses are cached on disk under `DATA_DIR/model_cache` when `MODEL_CACHE=true`, so repeated development runs do not spend credits. Raw photos, voice notes and photo overlays are deleted after `RAW_MEDIA_TTL_HOURS` (default 24); reports, transcripts and assessments are kept. Names that reporters say when introducing themselves ("Ako po si …") are redacted before any text reaches a model.
 
 ## Built during the hackathon
 
@@ -63,6 +70,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-27 | Project scope: added floods and PCIC crop/fisheries Notices of Loss as outputs of the reporting agent; chose Biñan, Laguna as the demo area and Python/FastAPI as the stack |
 | 2026-10-27 | Slice 1: Python/uv project; clients for Voice Transcribe, Spark 1.3, SAM 3.1 and Spark Open with a shared response cache and call log; SQLite storage with pseudonymous reporters; intake service and Telegram bot for text, photo, voice and location; raw-media retention purge; `/health` and `/reports` pages; transcription WER eval script; mocked-HTTP tests |
 | 2026-10-27 | Fixes from the first live bot test: voice notes were lost to a SQLite lock (the report is now committed before transcription, and WAL lets the bot and web app share the database); longer Telegram timeouts, retries for flaky Telegram connections, and a safe error reply; retention also deletes orphaned raw files |
+| 2026-10-28 | Slice 2: Biñan barangay gazetteer and boundaries (OCHA COD-AB) with point-in-polygon and name matching; transcription keywords and repeated-word cleanup; one agent-LLM interface that runs every step on Spark 1.3 or open-weight Spark Open (`AGENT_LLM`), with schema validation; photo judgment, SAM roof and floodwater measurement and evidence overlays; fact extraction with name redaction; background assessment of every report with barangay mapping from pin, photo GPS or named place; reports page with evidence; vision and fact-extraction evals for both LLMs |
 
 ### Third-party code and assets
 
@@ -102,17 +110,25 @@ pyproject.toml         Python project and tool config (uv)
 app/
   config.py            Settings from env/.env
   cache.py             Content-hash disk cache for model responses
-  meta/                Clients: transcribe.py, spark.py, sam.py, spark_open.py (+ base.py, factory.py)
-  models.py, db.py     SQLModel tables (Reporter, Report, Media, ModelCall) and SQLite setup
+  meta/                Clients: transcribe.py, spark.py, sam.py, spark_open.py; llm.py (AgentLLM switch),
+                       schema.py (output validation), base.py, factory.py
+  models.py, db.py     SQLModel tables (Reporter, Report, Media, ModelCall, Assessment, PhotoAssessment)
+  gazetteer.py         Biñan's 24 barangays: names, aliases, matching in text, transcription keywords
+  geo.py, data/        Point-in-barangay lookup on COD-AB boundaries; photo EXIF GPS
+  transcript_cleanup.py  Removes repeated-word artifacts from transcripts
+  facts.py, photo.py   Fact extraction; photo judgment, SAM measurement and evidence overlay
+  assessment.py        Assesses a report and maps it to a barangay (python -m app.assessment)
   privacy.py           HMAC pseudonymization of reporter ids
   audio.py             ffmpeg conversion and chunking for voice notes
   intake.py            Ingest text, photo, voice and location into reports
   retention.py         Purge raw media after the TTL
   bot.py               Telegram bot (python -m app.bot)
-  main.py, templates/  FastAPI app with /health and /reports
-  evaluation.py        WER helpers
+  main.py, templates/  FastAPI app with /health, /reports and /media/<id>
+  evaluation.py        WER, Cohen's kappa and F1 helpers
 scripts/
-  eval_transcribe.py   WER on a folder of your own recordings (outside the repo)
+  eval_transcribe.py   WER on your own recordings (outside the repo)
+  eval_vision.py       Photo judge and SAM vs hand labels, per agent LLM
+  eval_facts.py        Fact extraction from voice notes vs hand labels, per agent LLM
 tests/                 Mocked-HTTP tests
 ```
 
