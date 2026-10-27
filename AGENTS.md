@@ -11,7 +11,14 @@ An entry for the **Meta Global AI Developer Hackathon** (Cerebral Valley, Oct 27
 - **Builder:** Ronnie Cutamora (solo for now; teams may have up to 4 people)
 - **Track:** Indie Developer (tentative)
 - **Problem statement:** "Build for Your World" (tentative). We are building for the Philippines.
-- **Project:** **typhoon damage assessment for LGUs** (chosen 2026-10-26). Residents and barangay officials send photos, voice notes, and Taglish texts. SAM 3.1 segments damage, Voice Transcribe turns voice reports into text, and an agent (Muse Spark / Muse Spark Open on Baseten) deduplicates, geolocates, and maps the reports, then drafts the LGU's Rapid Damage Assessment and Needs Analysis (RDANA) report for an officer to approve. The coordination and reporting agent is the core of the product; the photo analysis supports it. Don't let the product drift into a "simple image analyzer". Scope and architecture are not final, so confirm before scaffolding.
+- **Project:** **typhoon and flood damage reporting for LGUs, with crop and fisheries insurance claims** (chosen 2026-10-26; claims added and scope updated 2026-10-27). Residents, barangay officials, farmers, and fisherfolk send photos, voice notes, and Taglish texts. **One agent** (Muse Spark / Muse Spark Open on Baseten) transcribes them (Voice Transcribe), judges damage (Spark vision), measures it (SAM 3.1 masks), deduplicates and geolocates the reports, tracks each area over time, and drafts two outputs for an officer to approve:
+  1. the LGU's Rapid Damage Assessment and Needs Analysis (**RDANA**) Form 1 (due within 72 hours) and a per-barangay damaged-houses table that rolls up to the DSWD DROMIC format, for the city/municipal DRRM office;
+  2. each affected farmer's or fisherfolk's **PCIC Notice of Loss**, with photo evidence, while the agent tracks the filing deadline.
+
+  The coordination and reporting agent is the core of the product; the photo analysis supports it. Both outputs come from the same pipeline, so the claim flow must not become a separate product. Don't let the product drift into a "simple image analyzer". SAM-based measurements are evidence for the officer and the PCIC adjuster, not the loss figure.
+- **Model jobs (from the 2026-10-27 kill test):** Spark judges damage and condition; SAM 3.1 localises and measures with plain object nouns ("roof", "floodwater"), never conditions ("damaged roof"). Neither detects fallen trees reliably, so the reporter or the officer confirms them.
+- **Demo area:** Biñan City, Laguna (lakeshore, with Laguna de Bay floods that last weeks). The local offices are the City DRRM Office (CDRRMO) and the Office of the City Agriculturist.
+- **Stack (decided 2026-10-27):** Python 3.12, FastAPI, SQLite, a server-rendered officer dashboard (Jinja + HTMX + Leaflet), and a Telegram bot for intake.
 
 ## Hard rules (breaking these can disqualify the entry)
 

@@ -2,7 +2,7 @@
 
 > An entry for the **Meta Global AI Developer Hackathon** (Oct 27 – Nov 4, 2026), built for the Philippines with Meta's Muse models.
 
-**Status:** planning. Typhoon damage assessment for Philippine LGUs.
+**Status:** building. Typhoon and flood damage reporting for Philippine LGUs, plus crop and fisheries insurance claims: one agent turns photos, Taglish voice notes, and texts from barangays, farmers, and fisherfolk into an officer-approved RDANA report, a damaged-houses table, and PCIC Notices of Loss. Demo area: Biñan City, Laguna.
 
 ---
 
@@ -40,6 +40,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | Date | What was built |
 |---|---|
 | 2026-10-26 | Repo scaffold: AGENTS.md, README.md |
+| 2026-10-27 | Project scope: added floods and PCIC crop/fisheries Notices of Loss as outputs of the reporting agent; chose Biñan, Laguna as the demo area and Python/FastAPI as the stack |
 
 ### Third-party code and assets
 
