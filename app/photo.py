@@ -45,7 +45,7 @@ JUDGE_SCHEMA: dict[str, Any] = {
     "additionalProperties": False,
 }
 JUDGE_SYSTEM = (
-    "You assess typhoon and flood damage in a single ground-level photo from the Philippines "
+    "You assess typhoon damage in a single ground-level photo from the Philippines "
     "for a local government damage report. Look only at what is visible. Return JSON matching "
     "the schema.\n"
     "roof_damage: none = roofs visible and no visible roof damage; partial = some roof "
@@ -60,9 +60,9 @@ JUDGE_SYSTEM = (
     "tarpaulin: true if a tarpaulin, plastic sheet or tent canvas is visible.\n"
     "house_count_estimate: number of houses (residential buildings, intact or ruined) visible; "
     "0 if none.\n"
-    "notes: one short sentence. Do not describe or identify people."
+    "notes: one short sentence."
 )
-JUDGE_PROMPT = "Assess the damage in this photo."
+JUDGE_PROMPT = "Assess this photo."
 
 ROOF_THRESHOLD = 0.5
 FLOOD_THRESHOLD = 0.7
