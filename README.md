@@ -2,7 +2,7 @@
 
 > An entry for the **Meta Global AI Developer Hackathon** (Oct 27 – Nov 4, 2026), built for the Philippines with Meta's Muse models.
 
-**Status:** choosing the problem.
+**Status:** planning. Typhoon damage assessment for Philippine LGUs.
 
 ---
 

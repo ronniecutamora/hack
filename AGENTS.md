@@ -2,6 +2,10 @@
 
 Instructions for AI coding agents (Muse Code, Claude Code, Codex, etc.) working in this repository.
 
+**Read `~/.claude/CLAUDE.md` first** (if it exists on this machine). It holds the developer's machine-wide rules, which apply here too. Rules in this file add to it.
+
+**Commit messages:** Conventional Commits, and **never** add an author or attribution footer (`Co-Authored-By:`, "Generated with …", or anything else naming an AI tool). This also applies to PR descriptions.
+
 ## What this repo is
 
 An entry for the **Meta Global AI Developer Hackathon** (Cerebral Valley, Oct 27 – Nov 4, 2026).
@@ -9,7 +13,7 @@ An entry for the **Meta Global AI Developer Hackathon** (Cerebral Valley, Oct 27
 - **Builder:** Ronnie Cutamora (solo for now; teams may have up to 4 people)
 - **Track:** Indie Developer (tentative)
 - **Problem statement:** "Build for Your World" (tentative). We are building for the Philippines.
-- **Project:** **not chosen yet.** Until a project is chosen, don't scaffold application code.
+- **Project:** **typhoon damage assessment for LGUs** (chosen 2026-10-26). Residents and barangay officials send photos, voice notes, and Taglish texts. SAM 3.1 segments damage, Voice Transcribe turns voice reports into text, and an agent (Muse Spark / Muse Spark Open on Baseten) deduplicates, geolocates, and maps the reports, then drafts the LGU's Rapid Damage Assessment and Needs Analysis (RDANA) report for an officer to approve. The coordination and reporting agent is the core of the product; the photo analysis supports it. Don't let the product drift into a "simple image analyzer". Scope and architecture are not final, so confirm before scaffolding.
 
 ## Hard rules (breaking these can disqualify the entry)
 
@@ -27,8 +31,8 @@ An entry for the **Meta Global AI Developer Hackathon** (Cerebral Valley, Oct 27
 | Muse Spark 1.2 | `muse-spark-1.2` | Audio input | — |
 | Muse Wonder | `muse-wonder-1.0` | The hardest reasoning or long agent runs only | Preview; costs $4 / $20 per 1M tokens, so use it sparingly |
 | Muse Image | `muse-image-1.0` | Image generation and editing | $0.01 per image |
-| Muse Voice Transcribe | `muse-voice-transcribe-1.0` | Streaming speech-to-text, speaker labels, code-switching | **Filipino/Taglish support not confirmed; test it.** No word-level timestamps |
-| SAM 3.1 | `sam-3.1` | Text-prompted segmentation and tracking in images and video | Returns boxes and masks; video requests bill at least 50 frames |
+| Muse Voice Transcribe | `muse-voice-transcribe-1.0` | Streaming speech-to-text, speaker labels, code-switching | **Tagalog is one of the 25 evaluated languages** (code-switching supported); Taglish quality still needs a test. **Cebuano, Waray, Bikol, Hiligaynon are not on the list.** Max 10 min per transcribe request. Turn-level timestamps only, no word-level |
+| SAM 3.1 | `sam-3.1` | Text-prompted segmentation and tracking in images and video | Returns boxes and masks. **One concept per request**; the prompt must be a short noun phrase for a concrete object ("roof", "fallen tree"), not a condition ("damaged roof"). $2.50 / 1,000 images; video requests bill at least 50 frames |
 | Muse Spark Open | Baseten `meta-models/muse-spark-open-1026` | Open-weight LLM (needed for the Open-Weight bonus prize) | Not on Meta's API. Use the `-1026` ID, not the one in Baseten's docs |
 | Muse Glimmer | Local (Ollama, LM Studio, vLLM, llama.cpp) | Small open-weight LLM (Apache 2.0, 30B) | A 4-bit build needs about 24–32 GB of GPU or unified memory |
 
