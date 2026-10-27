@@ -24,3 +24,9 @@ async def test_model_calls_are_logged_including_cache_hits(settings, cache):
     assert [c.cached for c in calls] == [False, True]
     assert {c.model for c in calls} == {"muse-voice-transcribe-1.0"}
     assert all(c.latency_ms >= 0 for c in calls)
+
+
+def test_engine_uses_wal_so_bot_and_web_can_share_the_file(settings):
+    engine = make_engine(settings)
+    with engine.connect() as conn:
+        assert conn.exec_driver_sql("PRAGMA journal_mode").scalar() == "wal"

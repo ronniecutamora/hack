@@ -6,11 +6,11 @@ import pytest
 from sqlmodel import Session, select
 
 from app.audio import AudioConversionError, to_wav_chunks
-from app.db import init_db, make_engine
+from app.db import init_db, make_engine, make_recorder
 from app.intake import LANGUAGE_BIAS, IntakeService
-from app.meta.base import ModelApiError
+from app.meta.base import CallRecord, ModelApiError
 from app.meta.transcribe import Transcript
-from app.models import Media, Report, Reporter
+from app.models import Media, ModelCall, Report, Reporter
 from app.privacy import MissingSaltError, pseudonymize
 
 TELEGRAM_USER_ID = 123456789
@@ -113,6 +113,38 @@ async def test_voice_intake_converts_transcribes_and_joins_chunks(settings, engi
     (media,) = rows(engine, Media)
     assert media.kind == "voice"
     assert (settings.data_dir / media.path).suffix == ".ogg"
+
+
+class RecordingTranscriber(FakeTranscriber):
+    """Logs each call through the real DB recorder, as the production clients do."""
+
+    def __init__(self, engine, seen_reports):
+        super().__init__(texts=["unang bahagi", "ikalawang bahagi"])
+        self.record = make_recorder(engine)
+        self.engine = engine
+        self.seen_reports = seen_reports
+
+    async def transcribe(self, wav, *, language_bias=None, keywords=None):
+        self.seen_reports.append(len(rows(self.engine, Report)))
+        self.record(CallRecord("muse-voice-transcribe-1.0", 10, False, 0.0))
+        return await super().transcribe(wav, language_bias=language_bias, keywords=keywords)
+
+
+async def test_voice_intake_holds_no_db_lock_while_transcribing(settings, engine):
+    # Regression (2026-10-27): the open report transaction locked SQLite, so the model-call
+    # log write failed with "database is locked" and every voice note was lost.
+    seen_reports = []
+    intake = IntakeService(
+        settings, engine, RecordingTranscriber(engine, seen_reports), convert=fake_convert
+    )
+
+    report = await intake.ingest_voice(TELEGRAM_USER_ID, b"OggS-fake")
+
+    assert report.transcript == "unang bahagi ikalawang bahagi"
+    assert seen_reports == [1, 1]  # the report is committed (visible to the web app) first
+    assert len(rows(engine, ModelCall)) == 2
+    (stored,) = rows(engine, Report)
+    assert stored.transcript == report.transcript
 
 
 @pytest.mark.parametrize(

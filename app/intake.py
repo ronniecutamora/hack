@@ -145,18 +145,22 @@ class IntakeService:
 
         If conversion or transcription fails the report is still saved (status
         "transcription_failed") with the raw audio kept until retention purges it.
+        The report is committed before transcribing: holding a write transaction open across
+        the model call would lock SQLite for the call log and for the web app.
         """
         with self._session() as session:
             report = self._new_report(session, user_ref, channel)
             media = self._store_media(session, report, "voice", data, ext)
-            try:
-                report.transcript = await self._transcribe(self.settings.data_dir / media.path)
-            except (MetaError, AudioConversionError) as exc:
-                logger.warning("voice transcription failed: %s", exc)
-                report.status = STATUS_TRANSCRIPTION_FAILED
+            session.commit()
+        try:
+            report.transcript = await self._transcribe(self.settings.data_dir / media.path)
+        except (MetaError, AudioConversionError) as exc:
+            logger.warning("voice transcription failed: %s", exc)
+            report.status = STATUS_TRANSCRIPTION_FAILED
+        with self._session() as session:
             session.add(report)
             session.commit()
-            return report
+        return report
 
     async def _transcribe(self, audio_path: Path) -> str:
         if self.transcriber is None:
