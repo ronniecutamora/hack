@@ -4,8 +4,6 @@ Instructions for AI coding agents (Muse Code, Claude Code, Codex, etc.) working 
 
 **Read `~/.claude/CLAUDE.md` first** (if it exists on this machine). It holds the developer's machine-wide rules, which apply here too. Rules in this file add to it.
 
-**Commit messages:** Conventional Commits, and **never** add an author or attribution footer (`Co-Authored-By:`, "Generated with …", or anything else naming an AI tool). This also applies to PR descriptions.
-
 ## What this repo is
 
 An entry for the **Meta Global AI Developer Hackathon** (Cerebral Valley, Oct 27 – Nov 4, 2026).
@@ -41,7 +39,7 @@ Docs: <https://dev.meta.ai/docs/overview>. Check against the live docs before re
 ## Secrets and config
 
 - Meta: `META_API_KEY`. Baseten: `BASETEN_API_KEY`. Read them from the environment or a git-ignored `.env`. Commit only `.env.example` with empty values.
-- **Budget:** $150 of Meta credits with a hard $150 spend limit. Use Spark 1.3 for bulk calls; cache results during development; don't loop expensive calls in tests (mock them).
+- **Budget:** $150 of Meta credits with a hard $150 spend limit, plus $100 of free Baseten usage for Muse Spark Open. Use Spark 1.3 for bulk calls; cache results during development; don't loop expensive calls in tests (mock them).
 - **Contributor tier** (`*-contributor` models) lets Meta train on the data. Only use it with synthetic or public data, never with user data.
 
 ## Privacy
