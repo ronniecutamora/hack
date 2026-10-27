@@ -292,3 +292,29 @@ async def test_a_run_cut_short_while_assessing_is_picked_up_again(settings, engi
         session.commit()
     assert service(settings, engine).report_ids(pending_only=True) == [report.id]
 
+
+async def test_an_oversized_photo_is_judged_without_an_overlay(settings, engine, monkeypatch):
+    report = await IntakeService(settings, engine).ingest_photo(7, jpeg(), caption="baha")
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 1_000)  # makes the photo a "bomb" to Pillow
+
+    out = await service(settings, engine).assess(report.id)
+
+    assert out.status == "assessed"
+    photo = one(engine, PhotoAssessment)
+    assert photo.judgment == JUDGMENT
+    assert photo.overlay_media_id is None
+
+
+class BrokenSam:
+    async def segment(self, image, concept, *, image_mime="image/jpeg", image_url=None):
+        raise RuntimeError("bug in mask parsing")
+
+
+async def test_an_unexpected_photo_error_keeps_the_rest_of_the_report(settings, engine):
+    report = await IntakeService(settings, engine).ingest_photo(7, jpeg(), caption="baha sa Casile")
+    out = await AssessmentService(settings, engine, FakeLLM(), BrokenSam()).assess(report.id)
+
+    assert out.status == "assessment_failed"
+    assert out.barangay == "Casile"  # the caption's facts and place were still saved
+    assert one(engine, Assessment).facts is not None
+    assert "RuntimeError: bug in mask parsing" in one(engine, PhotoAssessment).error

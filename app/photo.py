@@ -127,8 +127,10 @@ async def assess_photo(
         sam.segment(image, "roof", image_mime=mime),
         sam.segment(image, "floodwater", image_mime=mime),
     )
-    overlay = render_overlay(
-        image, {"roof": (roof, ROOF_THRESHOLD), "floodwater": (floodwater, FLOOD_LOW_THRESHOLD)}
+    overlay = await asyncio.to_thread(  # Pillow work would block the bot's event loop
+        render_overlay,
+        image,
+        {"roof": (roof, ROOF_THRESHOLD), "floodwater": (floodwater, FLOOD_LOW_THRESHOLD)},
     )
     return PhotoResult(judgment, measure(roof, floodwater), overlay)
 
@@ -138,8 +140,8 @@ def render_overlay(image: bytes, layers: dict[str, tuple[SamResult, float]]) -> 
     try:
         base = Image.open(io.BytesIO(image))
         base.load()
-    except (UnidentifiedImageError, OSError):
-        return None
+    except (UnidentifiedImageError, Image.DecompressionBombError, OSError):
+        return None  # the overlay is optional; the judgment and measurements still stand
     sizes = {r.image_size for r, _ in layers.values() if r.image_size}
     if sizes and base.size not in sizes:
         rotated = ImageOps.exif_transpose(base)  # SAM may have seen the EXIF-rotated photo

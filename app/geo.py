@@ -92,7 +92,7 @@ def exif_gps(data: bytes) -> tuple[float, float] | None:
     try:
         with Image.open(io.BytesIO(data)) as image:
             gps = image.getexif().get_ifd(_GPS_IFD)
-    except (UnidentifiedImageError, OSError, ValueError):
+    except (UnidentifiedImageError, Image.DecompressionBombError, OSError, ValueError):
         return None
     try:
         lat = _degrees(gps[_LAT], gps.get(_LAT_REF, "N"))

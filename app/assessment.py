@@ -197,12 +197,17 @@ class AssessmentService:
             return None, f"facts: {exc}"
 
     async def _photo(self, photo: _Photo) -> _PhotoOutcome:
-        outcome = _PhotoOutcome(photo.media_id, gps=exif_gps(photo.data))
+        outcome = _PhotoOutcome(photo.media_id)
         try:
+            outcome.gps = await asyncio.to_thread(exif_gps, photo.data)
             result = await assess_photo(self.llm, self.sam, photo.data, photo.mime)
         except MetaError as exc:
             logger.warning("photo assessment failed: %s", exc)
             outcome.error = f"photo {photo.media_id}: {exc}"
+            return outcome
+        except Exception as exc:  # one bad photo must not lose the report's other results
+            logger.exception("photo %s could not be assessed", photo.media_id)
+            outcome.error = f"photo {photo.media_id}: {type(exc).__name__}: {exc}"
             return outcome
         outcome.judgment = result.judgment
         outcome.measurement = result.measurement.as_dict()
