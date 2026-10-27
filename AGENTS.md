@@ -38,7 +38,7 @@ An entry for the **Meta Global AI Developer Hackathon** (Cerebral Valley, Oct 27
 | Muse Image | `muse-image-1.0` | Image generation and editing | $0.01 per image |
 | Muse Voice Transcribe | `muse-voice-transcribe-1.0` | Streaming speech-to-text, speaker labels, code-switching | **Tagalog is one of the 25 evaluated languages** (code-switching supported); Taglish quality still needs a test. **Cebuano, Waray, Bikol, Hiligaynon are not on the list.** Max 10 min per transcribe request. Turn-level timestamps only, no word-level |
 | SAM 3.1 | `sam-3.1` | Text-prompted segmentation and tracking in images and video | Returns boxes and masks. **One concept per request**; the prompt must be a short noun phrase for a concrete object ("roof", "fallen tree"), not a condition ("damaged roof"). $2.50 / 1,000 images; video requests bill at least 50 frames |
-| Muse Spark Open | Baseten `meta-models/muse-spark-open-1026` | Open-weight LLM (needed for the Open-Weight bonus prize) | Not on Meta's API. Use the `-1026` ID, not the one in Baseten's docs |
+| Muse Spark Open | Baseten `meta-models/muse-spark-open` (OpenAI-compatible, `https://inference.baseten.co/v1`, header `Authorization: Api-Key …`) | Open-weight LLM (needed for the Open-Weight bonus prize) | Not on Meta's API. The `-1026` ID from the participant guide is rejected (tested 2026-10-27). It's a reasoning model, so give it enough `max_tokens` for its reasoning before the answer |
 | Muse Glimmer | Local (Ollama, LM Studio, vLLM, llama.cpp) | Small open-weight LLM (Apache 2.0, 30B) | A 4-bit build needs about 24–32 GB of GPU or unified memory |
 
 Docs: <https://dev.meta.ai/docs/overview>. Check against the live docs before relying on any model ID or parameter. Don't guess endpoint URLs or request shapes.
