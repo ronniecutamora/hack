@@ -2,7 +2,14 @@ import httpx
 import pytest
 import respx
 
-from app.evaluation import corpus_word_error_rate, normalize_text, word_error_rate
+from app.evaluation import (
+    REPO_ROOT,
+    binary_scores,
+    cohen_kappa,
+    corpus_word_error_rate,
+    normalize_text,
+    word_error_rate,
+)
 from scripts import eval_transcribe
 
 
@@ -23,7 +30,7 @@ def test_corpus_wer_weights_by_reference_length():
 
 
 def test_script_refuses_folder_inside_repo(capsys):
-    assert eval_transcribe.main([str(eval_transcribe.REPO_ROOT / "tests")]) == 2
+    assert eval_transcribe.main([str(REPO_ROOT / "tests")]) == 2
     assert "outside the repository" in capsys.readouterr().err
 
 
@@ -49,3 +56,23 @@ def test_script_end_to_end_with_mocked_api(tmp_path, monkeypatch, settings, caps
     out = capsys.readouterr().out
     assert "clip.wav" in out and "orphan" not in out
     assert "33.3%" in out and "OVERALL" in out
+
+
+def test_cohen_kappa_perfect_chance_and_partial():
+    assert cohen_kappa(["a", "b", "a"], ["a", "b", "a"]) == 1.0
+    # 2x2 example: observed 0.7, expected 0.5 -> kappa 0.4
+    labels = ["y"] * 5 + ["n"] * 5
+    predictions = ["y"] * 4 + ["n"] + ["y"] * 2 + ["n"] * 3
+    assert cohen_kappa(labels, predictions) == pytest.approx(0.4)
+    assert cohen_kappa(["a", "a"], ["a", "a"]) == 1.0
+    with pytest.raises(ValueError):
+        cohen_kappa([], [])
+
+
+def test_binary_scores():
+    scores = binary_scores([True, True, False, False, True], [True, False, True, False, True])
+    assert (scores.tp, scores.fp, scores.fn, scores.tn) == (2, 1, 1, 1)
+    assert scores.precision == pytest.approx(2 / 3)
+    assert scores.recall == pytest.approx(2 / 3)
+    assert scores.f1 == pytest.approx(2 / 3)
+    assert binary_scores([False], [False]).f1 == 0.0

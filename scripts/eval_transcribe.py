@@ -14,14 +14,18 @@ import sys
 from pathlib import Path
 
 from app.config import get_settings
-from app.evaluation import corpus_word_error_rate, normalize_text, word_error_rate
+from app.evaluation import (
+    corpus_word_error_rate,
+    normalize_text,
+    outside_repo,
+    word_error_rate,
+)
 from app.gazetteer import transcription_keywords
 from app.intake import transcribe_file
 from app.meta.base import MetaError
 from app.meta.factory import make_transcriber
 from app.transcript_cleanup import clean_transcript
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
 AUDIO_SUFFIXES = {".wav", ".ogg", ".oga", ".opus", ".m4a", ".mp3", ".flac", ".aac", ".webm"}
 
 
@@ -51,15 +55,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 async def run(args: argparse.Namespace) -> int:
-    folder = args.folder.expanduser().resolve()
-    if not folder.is_dir():
-        print(f"error: {folder} is not a folder", file=sys.stderr)
-        return 2
-    if folder == REPO_ROOT or REPO_ROOT in folder.parents:
-        print(
-            "error: keep recordings outside the repository; pass a folder elsewhere",
-            file=sys.stderr,
-        )
+    try:
+        folder = outside_repo(args.folder)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
         return 2
     pairs = find_pairs(folder)
     if not pairs:
