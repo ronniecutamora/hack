@@ -5,7 +5,7 @@ import pytest
 from pydantic import SecretStr
 from sqlmodel import Session, select
 from telegram import Update
-from telegram.error import TimedOut
+from telegram.error import BadRequest, TimedOut
 
 from app import bot
 from app.config import Settings
@@ -32,6 +32,11 @@ async def one_chunk(source, out_dir):
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "chunk_000.wav").write_bytes(b"RIFF")
     return [out_dir / "chunk_000.wav"]
+
+
+@pytest.fixture(autouse=True)
+def no_retry_wait(monkeypatch):
+    monkeypatch.setattr(bot, "TELEGRAM_RETRY_DELAYS_S", (0, 0))
 
 
 @pytest.fixture
@@ -116,6 +121,27 @@ def test_application_registers_all_handlers(settings):
     assert len(application.handlers[0]) == 5
 
 
+async def test_voice_download_retries_a_flaky_connection(settings, engine):
+    # Regression (2026-10-27): a slow TLS handshake to Telegram failed the voice download.
+    voice = Downloadable(b"OggS")
+    get_file = voice.get_file
+    voice.get_file = AsyncMock(side_effect=[TimedOut(), TimedOut(), await get_file()])
+    update = make_update(voice=voice)
+
+    await bot.on_voice(update, make_context(settings, engine, FakeTranscriber()))
+
+    assert voice.get_file.await_count == 3
+    (report,) = reports(engine)
+    assert report.transcript == "may baha po"
+
+
+async def test_bad_request_is_not_retried():
+    call = AsyncMock(side_effect=BadRequest("message to reply not found"))
+    with pytest.raises(BadRequest):
+        await bot._with_retries(call)
+    assert call.await_count == 1
+
+
 async def test_error_reply_failure_is_logged_not_raised(settings, engine, caplog):
     update = Update(update_id=1)
     message = SimpleNamespace(reply_text=AsyncMock(side_effect=TimedOut()))
@@ -125,5 +151,6 @@ async def test_error_reply_failure_is_logged_not_raised(settings, engine, caplog
         mp.setattr(Update, "effective_message", property(lambda self: message))
         await bot.on_error(update, context)
 
-    message.reply_text.assert_awaited_once_with(bot.ERROR_REPLY)
+    assert message.reply_text.await_count == 1 + len(bot.TELEGRAM_RETRY_DELAYS_S)
+    message.reply_text.assert_awaited_with(bot.ERROR_REPLY)
     assert "could not send the error reply" in caplog.text

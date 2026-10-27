@@ -6,9 +6,10 @@ Run with: uv run python -m app.bot
 import asyncio
 import logging
 import sys
+from collections.abc import Awaitable, Callable
 
 from telegram import Update
-from telegram.error import TelegramError
+from telegram.error import BadRequest, NetworkError, TelegramError
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -29,6 +30,9 @@ logger = logging.getLogger(__name__)
 # replies need more headroom.
 TELEGRAM_CONNECT_TIMEOUT_S = 20
 TELEGRAM_READ_WRITE_TIMEOUT_S = 30
+# The TLS handshake to Telegram sometimes takes 1-8 s from a PH home line (measured
+# 2026-10-27), and now and then a connect fails outright, so network calls are retried.
+TELEGRAM_RETRY_DELAYS_S = (1, 3)
 
 MISSING_TOKEN_MESSAGE = (
     "TELEGRAM_BOT_TOKEN is not set. Create a bot with @BotFather on Telegram, then put the "
@@ -70,32 +74,54 @@ def _intake(context: ContextTypes.DEFAULT_TYPE) -> IntakeService:
     return context.application.bot_data["intake"]
 
 
+async def _with_retries[T](call: Callable[[], Awaitable[T]]) -> T:
+    """Run a Telegram network call, retrying transient network failures."""
+    for delay in TELEGRAM_RETRY_DELAYS_S:
+        try:
+            return await call()
+        except BadRequest:  # a subclass of NetworkError, but retrying won't fix it
+            raise
+        except NetworkError as exc:
+            logger.warning("Telegram call failed (%s); retrying in %d s", exc, delay)
+            await asyncio.sleep(delay)
+    return await call()
+
+
+async def _download(media: object) -> bytes:
+    file = await _with_retries(media.get_file)
+    return bytes(await _with_retries(file.download_as_bytearray))
+
+
+async def _reply(message: object, text: str) -> None:
+    await _with_retries(lambda: message.reply_text(text))
+
+
 async def on_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     ttl = context.application.bot_data["settings"].raw_media_ttl_hours
-    await update.effective_message.reply_text(start_text(ttl))
+    await _reply(update.effective_message, start_text(ttl))
 
 
 async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     await _intake(context).ingest_text(update.effective_user.id, message.text)
-    await message.reply_text(RECEIVED)
+    await _reply(message, RECEIVED)
 
 
 async def on_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     photo = message.photo[-1]  # Telegram lists sizes smallest to largest
-    data = bytes(await (await photo.get_file()).download_as_bytearray())
+    data = await _download(photo)
     await _intake(context).ingest_photo(
         update.effective_user.id, data, caption=message.caption, ext="jpg"
     )
-    await message.reply_text(RECEIVED)
+    await _reply(message, RECEIVED)
 
 
 async def on_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
-    data = bytes(await (await message.voice.get_file()).download_as_bytearray())
+    data = await _download(message.voice)
     report = await _intake(context).ingest_voice(update.effective_user.id, data, ext="ogg")
-    await message.reply_text(RECEIVED if report.transcript else VOICE_NOT_TRANSCRIBED)
+    await _reply(message, RECEIVED if report.transcript else VOICE_NOT_TRANSCRIBED)
 
 
 async def on_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -103,14 +129,14 @@ async def on_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await _intake(context).ingest_location(
         update.effective_user.id, message.location.latitude, message.location.longitude
     )
-    await message.reply_text(LOCATION_RECEIVED)
+    await _reply(message, LOCATION_RECEIVED)
 
 
 async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.error("update failed", exc_info=context.error)
     if isinstance(update, Update) and update.effective_message:
         try:
-            await update.effective_message.reply_text(ERROR_REPLY)
+            await _reply(update.effective_message, ERROR_REPLY)
         except TelegramError as exc:  # e.g. the network that failed the update is still down
             logger.warning("could not send the error reply: %s", exc)
 
