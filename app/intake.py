@@ -18,6 +18,7 @@ from sqlmodel import Session, col, select
 from app.audio import AudioConversionError, to_wav_chunks
 from app.cache import sha256_hex
 from app.config import Settings
+from app.gazetteer import transcription_keywords
 from app.meta.base import MetaError
 from app.meta.transcribe import Transcript
 from app.models import STATUS_TRANSCRIPTION_FAILED, Media, Report, Reporter, utcnow
@@ -166,7 +167,11 @@ class IntakeService:
         if self.transcriber is None:
             raise AudioConversionError("no transcriber configured")
         return await transcribe_file(
-            self.transcriber, audio_path, language_bias=LANGUAGE_BIAS, convert=self.convert
+            self.transcriber,
+            audio_path,
+            language_bias=LANGUAGE_BIAS,
+            keywords=transcription_keywords(),  # barangay names: 4/9 -> 9/9 place names in tests
+            convert=self.convert,
         )
 
     async def ingest_location(

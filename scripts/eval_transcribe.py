@@ -15,9 +15,11 @@ from pathlib import Path
 
 from app.config import get_settings
 from app.evaluation import corpus_word_error_rate, normalize_text, word_error_rate
+from app.gazetteer import transcription_keywords
 from app.intake import transcribe_file
 from app.meta.base import MetaError
 from app.meta.factory import make_transcriber
+from app.transcript_cleanup import clean_transcript
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 AUDIO_SUFFIXES = {".wav", ".ogg", ".oga", ".opus", ".m4a", ".mp3", ".flac", ".aac", ".webm"}
@@ -41,7 +43,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         dest="languages",
         help="language bias, repeatable (default: Tagalog and English)",
     )
-    parser.add_argument("--keywords", help="comma-separated terms to bias toward")
+    parser.add_argument(
+        "--keywords",
+        help='comma-separated terms to bias toward, or "barangays" for the gazetteer names',
+    )
     return parser.parse_args(argv)
 
 
@@ -62,10 +67,15 @@ async def run(args: argparse.Namespace) -> int:
         return 2
 
     languages = args.languages or ["Tagalog", "English"]
-    keywords = [k.strip() for k in args.keywords.split(",") if k.strip()] if args.keywords else None
+    if args.keywords == "barangays":
+        keywords = transcription_keywords()
+    elif args.keywords:
+        keywords = [k.strip() for k in args.keywords.split(",") if k.strip()]
+    else:
+        keywords = None
     transcriber = make_transcriber(get_settings())
     scored: list[tuple[str, str]] = []
-    print(f"{'file':40} {'WER':>6}  words")
+    print(f"{'file':40} {'WER':>6} {'clean':>6}  words")
     try:
         for audio, reference_file in pairs:
             reference = reference_file.read_text(encoding="utf-8").strip()
@@ -81,7 +91,9 @@ async def run(args: argparse.Namespace) -> int:
                 continue
             scored.append((reference, hypothesis))
             words = len(normalize_text(reference).split())
-            print(f"{audio.name:40} {word_error_rate(reference, hypothesis):6.1%}  {words}")
+            raw_wer = word_error_rate(reference, hypothesis)
+            clean_wer = word_error_rate(reference, clean_transcript(hypothesis))
+            print(f"{audio.name:40} {raw_wer:6.1%} {clean_wer:6.1%}  {words}")
     finally:
         await transcriber.aclose()
 
@@ -90,7 +102,9 @@ async def run(args: argparse.Namespace) -> int:
         return 1
     total_words = sum(len(normalize_text(ref).split()) for ref, _ in scored)
     overall = corpus_word_error_rate(scored)
-    print(f"{'OVERALL':40} {overall:6.1%}  {total_words}  ({len(scored)} files)")
+    cleaned = corpus_word_error_rate([(ref, clean_transcript(hyp)) for ref, hyp in scored])
+    print(f"{'OVERALL':40} {overall:6.1%} {cleaned:6.1%}  {total_words}  ({len(scored)} files)")
+    print("clean = after app.transcript_cleanup (repeated-word artifacts removed)")
     return 0
 
 

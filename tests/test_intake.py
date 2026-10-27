@@ -7,6 +7,7 @@ from sqlmodel import Session, select
 
 from app.audio import AudioConversionError, to_wav_chunks
 from app.db import init_db, make_engine, make_recorder
+from app.gazetteer import transcription_keywords
 from app.intake import LANGUAGE_BIAS, IntakeService
 from app.meta.base import CallRecord, ModelApiError
 from app.meta.transcribe import Transcript
@@ -23,7 +24,7 @@ class FakeTranscriber:
         self.calls = []
 
     async def transcribe(self, wav, *, language_bias=None, keywords=None):
-        self.calls.append({"wav": wav, "language_bias": language_bias})
+        self.calls.append({"wav": wav, "language_bias": language_bias, "keywords": keywords})
         if self.error:
             raise self.error
         return Transcript(text=self.texts.pop(0), audio_duration_ms=1000)
@@ -109,6 +110,8 @@ async def test_voice_intake_converts_transcribes_and_joins_chunks(settings, engi
     assert report.transcript == "unang bahagi ikalawang bahagi"
     assert report.status == "new"
     assert [c["language_bias"] for c in transcriber.calls] == [LANGUAGE_BIAS] * 2
+    assert all(c["keywords"] == transcription_keywords() for c in transcriber.calls)
+    assert "De La Paz" in transcriber.calls[0]["keywords"]
     assert [c["wav"] for c in transcriber.calls] == [b"RIFF\x00", b"RIFF\x01"]
     (media,) = rows(engine, Media)
     assert media.kind == "voice"
