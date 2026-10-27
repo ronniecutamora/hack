@@ -45,7 +45,7 @@ def purge_expired(settings: Settings, engine: Engine, now: datetime | None = Non
 
 def purge_orphans(settings: Settings, engine: Engine, cutoff: datetime) -> int:
     """Delete files under media/ that no Media row points to and are older than the cutoff."""
-    media_dir = settings.data_dir / "media"
+    media_dir = settings.media_dir
     if not media_dir.is_dir():
         return 0
     with Session(engine) as session:

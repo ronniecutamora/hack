@@ -5,40 +5,113 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Reports</title>
   <style>
-    body { font-family: system-ui, sans-serif; margin: 2rem auto; max-width: 64rem; padding: 0 1rem; color: #1b1f24; }
+    body { font-family: system-ui, sans-serif; margin: 2rem auto; max-width: 76rem; padding: 0 1rem; color: #1b1f24; }
     table { border-collapse: collapse; width: 100%; }
-    th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid #d8dde3; vertical-align: top; }
+    th, td { text-align: left; padding: .55rem .6rem; border-bottom: 1px solid #d8dde3; vertical-align: top; }
     th { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: #57606a; }
     code { font-size: .85rem; }
-    .muted { color: #57606a; }
+    .muted { color: #57606a; font-size: .9rem; }
     .empty { padding: 2rem; border: 1px dashed #b6bec7; border-radius: .5rem; text-align: center; }
+    .chips { display: flex; flex-wrap: wrap; gap: .3rem; margin: .35rem 0; padding: 0; list-style: none; }
+    .chip { background: #eef1f4; border-radius: 1rem; padding: .1rem .55rem; font-size: .82rem; }
+    .chip.warn { background: #fff1d6; }
+    .chip.alert { background: #ffe1e1; }
+    .summary { margin: .25rem 0; }
+    .evidence { display: flex; gap: .6rem; align-items: flex-start; margin-bottom: .5rem; }
+    .evidence img { width: 11rem; border-radius: .3rem; border: 1px solid #d8dde3; }
+    .status-assessed { color: #1a7f37; }
+    .status-assessment_failed, .status-transcription_failed { color: #b42318; }
+    .status-assessing, .status-new { color: #9a6700; }
+    .error { color: #b42318; font-size: .85rem; }
+    details summary { cursor: pointer; color: #57606a; font-size: .85rem; }
+    header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 1rem; }
   </style>
 </head>
 <body>
-  <h1>Reports</h1>
+  <header>
+    <h1>Reports</h1>
+    <p class="muted">Agent LLM: <code>{{ agent_llm }}</code> · photo judgment by the agent LLM, measurements by SAM 3.1</p>
+  </header>
   {% if not items %}
     <p class="empty">No reports yet. Send a photo, voice note or text to the Telegram bot and it will show up here.</p>
   {% else %}
-    <p class="muted">{{ items|length }} most recent report{{ "s" if items|length != 1 }}, newest first. Times are Philippine time (GMT+8).</p>
+    <p class="muted">{{ items|length }} most recent report{{ "s" if items|length != 1 }}, newest first. Times are Philippine time (GMT+8). Measurements are evidence for the officer, not official counts.</p>
     <table>
       <thead>
-        <tr><th>Time</th><th>Channel</th><th>Reporter</th><th>Report</th><th>Media</th><th>Status</th></tr>
+        <tr><th>Time</th><th>Barangay</th><th>Report</th><th>Photo evidence</th><th>Status</th></tr>
       </thead>
       <tbody>
       {% for item in items %}
         {% set r = item.report %}
+        {% set a = item.assessment %}
         <tr>
-          <td>{{ r.received_at|manila_time }}</td>
-          <td>{{ r.channel }}</td>
-          <td><code>{{ item.reporter }}</code></td>
+          <td>{{ r.received_at|manila_time }}<div class="muted"><code>{{ item.reporter }}</code> · {{ r.channel }}</div></td>
+          <td>
+            {% if r.barangay %}<strong>{{ r.barangay }}</strong>{% else %}<span class="muted">—</span>{% endif %}
+            {% if a %}
+              <div class="muted">{{ GEO_SOURCES.get(a.geo_source, a.geo_source) }}{% if a.geo_detail %}: {{ a.geo_detail }}{% endif %}</div>
+            {% endif %}
+            {% if r.lat is not none %}<div class="muted">{{ "%.5f"|format(r.lat) }}, {{ "%.5f"|format(r.lon) }}</div>{% endif %}
+          </td>
           <td>
             {% if r.text %}<div>{{ r.text }}</div>{% endif %}
-            {% if r.transcript %}<div><span class="muted">Voice:</span> {{ r.transcript }}</div>{% endif %}
-            {% if r.lat is not none %}<div class="muted">{{ "%.5f"|format(r.lat) }}, {{ "%.5f"|format(r.lon) }}</div>{% endif %}
-            {% if not r.text and not r.transcript and r.lat is none %}<span class="muted">(no text)</span>{% endif %}
+            {% if a and a.transcript_clean %}
+              <div><span class="muted">Voice:</span> {{ a.transcript_clean }}</div>
+              {% if r.transcript != a.transcript_clean %}
+                <details><summary>Raw transcript</summary>{{ r.transcript }}</details>
+              {% endif %}
+            {% elif r.transcript %}
+              <div><span class="muted">Voice:</span> {{ r.transcript }}</div>
+            {% elif item.media|selectattr("kind", "equalto", "voice")|list %}
+              <div class="muted">Voice note not transcribed.</div>
+            {% endif %}
+            {% if a and a.facts %}
+              <p class="summary"><span class="muted">Agent:</span> {{ a.facts.summary_en }}</p>
+              <ul class="chips">
+                {% for line in fact_lines(a.facts) %}<li class="chip{% if line.startswith('CORRECTION') %} warn{% endif %}">{{ line }}</li>{% endfor %}
+              </ul>
+            {% endif %}
+            {% if not r.text and not r.transcript and r.lat is none and not item.photos %}<span class="muted">(no text)</span>{% endif %}
           </td>
-          <td>{{ item.media_count }}</td>
-          <td>{{ r.status }}</td>
+          <td>
+            {% for p in item.photos %}
+              {% set pa = p.assessment %}
+              <div class="evidence">
+                {% if p.overlay and p.overlay.purged_at is none %}
+                  <a href="/media/{{ p.overlay.id }}"><img src="/media/{{ p.overlay.id }}" alt="Photo with SAM masks: roofs orange, floodwater blue" loading="lazy"></a>
+                {% elif p.photo and p.photo.purged_at is none %}
+                  <a href="/media/{{ p.photo.id }}"><img src="/media/{{ p.photo.id }}" alt="Reported photo" loading="lazy"></a>
+                {% else %}
+                  <span class="muted">Photo deleted after {{ ttl_hours }} h (privacy); results kept.</span>
+                {% endif %}
+                <div>
+                  {% if pa.judgment %}
+                    {% set j = pa.judgment %}
+                    <ul class="chips">
+                      <li class="chip{% if j.roof_damage == 'severe' %} alert{% elif j.roof_damage == 'partial' %} warn{% endif %}">roof damage: {{ j.roof_damage }}</li>
+                      {% if j.floodwater %}<li class="chip warn">floodwater</li>{% endif %}
+                      {% if j.debris %}<li class="chip">debris</li>{% endif %}
+                      {% if j.tarpaulin %}<li class="chip">tarpaulin</li>{% endif %}
+                      {% if j.fallen_tree %}<li class="chip warn">fallen tree (needs confirmation)</li>{% endif %}
+                      <li class="chip">~{{ j.house_count_estimate }} houses visible</li>
+                    </ul>
+                    <div class="muted">{{ j.notes }}</div>
+                  {% endif %}
+                  {% if pa.measurement %}
+                    {% set m = pa.measurement %}
+                    <div class="muted">SAM measured: {{ m.roof_count }} roof{{ "s" if m.roof_count != 1 }}{% if m.floodwater_present %}, floodwater over {{ "%.0f"|format(m.floodwater_fraction * 100) }}% of the photo{% else %}, no floodwater{% endif %}</div>
+                  {% endif %}
+                  {% if pa.error %}<div class="error">{{ pa.error }}</div>{% endif %}
+                  <div class="muted">by <code>{{ pa.llm_model }}</code></div>
+                </div>
+              </div>
+            {% endfor %}
+          </td>
+          <td>
+            <span class="status-{{ r.status }}">{{ r.status|replace("_", " ") }}</span>
+            {% if a and a.error %}<div class="error">{{ a.error }}</div>{% endif %}
+            {% if a %}<div class="muted">by <code>{{ a.llm_model }}</code></div>{% endif %}
+          </td>
         </tr>
       {% endfor %}
       </tbody>

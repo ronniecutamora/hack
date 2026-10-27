@@ -1,8 +1,14 @@
+from datetime import timedelta
+
 import pytest
 from fastapi.testclient import TestClient
+from sqlmodel import Session, select
 
+from app.assessment import AssessmentService
 from app.intake import IntakeService
-from app.main import create_app
+from app.main import create_app, fact_lines
+from app.models import Media
+from tests.test_assessment import FakeLLM, FakeSam, facts, jpeg
 
 
 @pytest.fixture
@@ -40,4 +46,87 @@ async def test_reports_lists_text_voice_and_media_counts(settings, client):
     assert "14.33061, 121.08072" in html
     assert "telegram" in html
     assert "111" not in html.replace("14.33061", "").replace("121.08072", "")  # no raw ids
-    assert html.count("<td>1</td>") == 2  # the two photo reports have one media file each
+
+
+async def assessed_photo_report(settings, client, **fact_fields):
+    engine = client.app.state.engine
+    report = await IntakeService(settings, engine).ingest_photo(
+        111, jpeg(), caption="Baha po sa Brgy. Malaban"
+    )
+    llm = FakeLLM(facts(**fact_fields))
+    await AssessmentService(settings, engine, llm, FakeSam()).assess(report.id)
+    with Session(engine) as session:
+        return session.exec(select(Media).where(Media.kind == "overlay")).one()
+
+
+async def test_assessed_report_shows_barangay_facts_and_evidence(settings, client):
+    overlay = await assessed_photo_report(
+        settings,
+        client,
+        flood_depth="knee",
+        houses_flooded=23,
+        needs=["water"],
+        summary_en="23 houses flooded knee-deep.",
+    )
+
+    html = client.get("/reports").text
+
+    assert "<strong>Malaban</strong>" in html
+    assert "named in text: malaban" in html
+    assert "23 houses flooded knee-deep." in html
+    assert "flood knee-deep" in html and "23 houses flooded" in html and "needs: water" in html
+    assert f'src="/media/{overlay.id}"' in html
+    assert "roof damage: partial" in html
+    assert "SAM measured: 2 roofs, floodwater over" in html
+    assert "Agent LLM: <code>muse-spark-1.3</code>" in html
+    assert "assessed" in html
+
+
+async def test_media_route_serves_files_until_purged(settings, client):
+    overlay = await assessed_photo_report(settings, client)
+
+    response = client.get(f"/media/{overlay.id}")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/jpeg"
+    assert response.content.startswith(b"\xff\xd8")
+
+    with Session(client.app.state.engine) as session:  # retention purges photo and overlay
+        for row in session.exec(select(Media)).all():
+            row.purged_at = row.created_at + timedelta(hours=24)
+            session.add(row)
+        session.commit()
+    assert client.get(f"/media/{overlay.id}").status_code == 404
+    assert "Photo deleted after 24 h" in client.get("/reports").text
+
+
+def test_unknown_media_is_404(client):
+    assert client.get("/media/999").status_code == 404
+    assert client.get("/media/abc").status_code == 422
+
+
+async def test_media_paths_outside_the_media_folder_are_never_served(settings, client):
+    (settings.data_dir / "secret.txt").write_text("x")
+    with Session(client.app.state.engine) as session:
+        media = Media(report_id=1, kind="photo", path="media/../secret.txt", sha256="x")
+        session.add(media)
+        session.commit()
+        media_id = media.id
+    assert client.get(f"/media/{media_id}").status_code == 404
+
+
+def test_fact_lines_skip_unstated_fields_and_flag_corrections():
+    lines = fact_lines(
+        facts(
+            is_correction=True,
+            houses_totally_damaged=4,
+            houses_partially_damaged=15,
+            crop="corn",
+            crop_area_hectares=2.5,
+            crop_damage_percent=70,
+        )
+    )
+    assert lines[0] == "CORRECTION of an earlier report"
+    assert "4 houses totally damaged" in lines and "15 houses partially damaged" in lines
+    assert "corn, 2.5 ha, 70% damaged" in lines
+    assert not any("None" in line for line in lines)
+    assert fact_lines(None) == []
