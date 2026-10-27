@@ -8,6 +8,7 @@ import logging
 import sys
 
 from telegram import Update
+from telegram.error import TelegramError
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -23,6 +24,11 @@ from app.meta.factory import make_transcriber
 from app.retention import purge_loop
 
 logger = logging.getLogger(__name__)
+
+# Telegram's library defaults (5 s) time out on slow home connections; voice downloads and
+# replies need more headroom.
+TELEGRAM_CONNECT_TIMEOUT_S = 20
+TELEGRAM_READ_WRITE_TIMEOUT_S = 30
 
 MISSING_TOKEN_MESSAGE = (
     "TELEGRAM_BOT_TOKEN is not set. Create a bot with @BotFather on Telegram, then put the "
@@ -103,7 +109,10 @@ async def on_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.error("update failed", exc_info=context.error)
     if isinstance(update, Update) and update.effective_message:
-        await update.effective_message.reply_text(ERROR_REPLY)
+        try:
+            await update.effective_message.reply_text(ERROR_REPLY)
+        except TelegramError as exc:  # e.g. the network that failed the update is still down
+            logger.warning("could not send the error reply: %s", exc)
 
 
 def add_handlers(application: Application) -> None:
@@ -131,6 +140,10 @@ def build_application(settings: Settings) -> Application:
     application = (
         Application.builder()
         .token(settings.telegram_bot_token.get_secret_value())
+        .connect_timeout(TELEGRAM_CONNECT_TIMEOUT_S)
+        .read_timeout(TELEGRAM_READ_WRITE_TIMEOUT_S)
+        .write_timeout(TELEGRAM_READ_WRITE_TIMEOUT_S)
+        .get_updates_connect_timeout(TELEGRAM_CONNECT_TIMEOUT_S)
         .post_init(post_init)
         .post_shutdown(post_shutdown)
         .build()

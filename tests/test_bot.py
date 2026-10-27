@@ -4,6 +4,8 @@ from unittest.mock import AsyncMock
 import pytest
 from pydantic import SecretStr
 from sqlmodel import Session, select
+from telegram import Update
+from telegram.error import TimedOut
 
 from app import bot
 from app.config import Settings
@@ -112,3 +114,16 @@ def test_application_registers_all_handlers(settings):
     configured = settings.model_copy(update={"telegram_bot_token": SecretStr("123456:ABC-test")})
     application = bot.build_application(configured)
     assert len(application.handlers[0]) == 5
+
+
+async def test_error_reply_failure_is_logged_not_raised(settings, engine, caplog):
+    update = Update(update_id=1)
+    message = SimpleNamespace(reply_text=AsyncMock(side_effect=TimedOut()))
+    context = SimpleNamespace(error=RuntimeError("boom"))
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(Update, "effective_message", property(lambda self: message))
+        await bot.on_error(update, context)
+
+    message.reply_text.assert_awaited_once_with(bot.ERROR_REPLY)
+    assert "could not send the error reply" in caplog.text
