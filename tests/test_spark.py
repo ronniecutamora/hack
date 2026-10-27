@@ -172,3 +172,19 @@ async def test_both_backends_reject_json_that_breaks_the_schema():
 def test_both_backends_name_their_model():
     assert SparkClient.model == "muse-spark-1.3"
     assert SparkOpenClient.model == "meta-models/muse-spark-open"
+
+
+@respx.mock
+async def test_spark_open_retries_once_with_a_bigger_budget_when_reasoning_runs_out():
+    cut = {"choices": [{"finish_reason": "length", "message": {"content": None}}]}
+    done = {"choices": [{"finish_reason": "stop", "message": {"content": '{"ok": true}'}}]}
+    route = respx.post("https://inference.baseten.co/v1/chat/completions").mock(
+        side_effect=[httpx.Response(200, json=cut), httpx.Response(200, json=done)]
+    )
+    client = SparkOpenClient(api_key="bk", backoff_s=0)
+
+    out = await client.chat_json(system="s", user_text="u", schema=OK_SCHEMA, schema_name="Ok")
+
+    assert out == {"ok": True}
+    budgets = [json.loads(c.request.content)["max_tokens"] for c in route.calls]
+    assert budgets == [8192, 16384]

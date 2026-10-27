@@ -21,6 +21,7 @@ MODEL = "meta-models/muse-spark-open"
 URL = "https://inference.baseten.co/v1/chat/completions"
 # Reasoning tokens count against max_tokens; a photo judgment used ~1,900 completion tokens.
 JSON_MAX_TOKENS = 8192
+LENGTH_RETRY_FACTOR = 2
 
 
 @dataclass(frozen=True)
@@ -92,12 +93,17 @@ class SparkOpenClient(ModelClient):
         messages, response_format, key_payload = json_chat_request(
             system, user_text, schema, schema_name, image, image_mime
         )
-        reply = await self.chat(
-            messages,
-            max_tokens=max_tokens,
-            response_format=response_format,
-            key_payload={**key_payload, "max_tokens": max_tokens},
-        )
+        for budget in (max_tokens, max_tokens * LENGTH_RETRY_FACTOR):
+            reply = await self.chat(
+                messages,
+                max_tokens=budget,
+                response_format=response_format,
+                key_payload={**key_payload, "max_tokens": budget},
+            )
+            # Reasoning can use the whole budget (one Taglish note did at 8,192 tokens on
+            # 2026-10-27); one retry with a larger budget is cheaper than losing the report.
+            if reply.content or reply.finish_reason != "length":
+                break
         if not reply.content:
             raise ModelOutputError(
                 f"Spark Open returned no answer (finish_reason={reply.finish_reason}); "
