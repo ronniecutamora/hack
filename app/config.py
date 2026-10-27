@@ -6,6 +6,8 @@ from pathlib import Path
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.meta.llm import AgentLLMName
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
@@ -14,6 +16,9 @@ class Settings(BaseSettings):
     baseten_api_key: SecretStr = SecretStr("")
     telegram_bot_token: SecretStr = SecretStr("")
     pseudonym_salt: SecretStr = SecretStr("")
+
+    # Which LLM runs the agent: Meta's Spark 1.3 or open-weight Spark Open on Baseten.
+    agent_llm: AgentLLMName = "muse-spark-1.3"
 
     data_dir: Path = Path("./var")
     model_cache: bool = True

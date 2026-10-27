@@ -3,6 +3,7 @@
 from app.cache import ResponseCache
 from app.config import Settings
 from app.meta.base import Recorder
+from app.meta.llm import AgentLLM
 from app.meta.sam import SamClient
 from app.meta.spark import SparkClient
 from app.meta.spark_open import SparkOpenClient
@@ -39,3 +40,10 @@ def make_spark_open(settings: Settings, recorder: Recorder | None = None) -> Spa
         cache=make_cache(settings),
         recorder=recorder,
     )
+
+
+def make_agent_llm(settings: Settings, recorder: Recorder | None = None) -> AgentLLM:
+    """The LLM selected by AGENT_LLM."""
+    if settings.agent_llm == "muse-spark-open":
+        return make_spark_open(settings, recorder)
+    return make_spark(settings, recorder)

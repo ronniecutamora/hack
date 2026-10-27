@@ -16,6 +16,14 @@ SCHEMA = {
 }
 
 
+OK_SCHEMA = {
+    "type": "object",
+    "properties": {"ok": {"type": "boolean"}},
+    "required": ["ok"],
+    "additionalProperties": False,
+}
+
+
 def completion(content, finish="stop", usage=None):
     return {
         "choices": [
@@ -110,13 +118,18 @@ async def test_spark_open_uses_baseten_auth_and_reads_content_after_reasoning():
     )
     client = SparkOpenClient(api_key="bk", backoff_s=0)
 
-    out = await client.chat_json([{"role": "user", "content": "Return JSON."}], max_tokens=8000)
+    out = await client.chat_json(
+        system="sys", user_text="Return JSON.", schema=OK_SCHEMA, schema_name="Ok", image=b"img"
+    )
 
     request = route.calls.last.request
     assert request.headers["authorization"] == "Api-Key bk"
     body = json.loads(request.content)
     assert body["model"] == "meta-models/muse-spark-open"
-    assert body["max_tokens"] == 8000
+    assert body["max_tokens"] == 8192
+    assert body["response_format"]["json_schema"] == {"name": "Ok", "schema": OK_SCHEMA}
+    image_part = body["messages"][1]["content"][1]
+    assert image_part["image_url"]["url"].startswith("data:image/jpeg;base64,")
     assert out == {"ok": True}
 
 
@@ -132,4 +145,30 @@ async def test_spark_open_truncated_reasoning_gives_actionable_error():
     )
     client = SparkOpenClient(api_key="bk", backoff_s=0)
     with pytest.raises(ModelOutputError, match="max_tokens"):
-        await client.chat_json([{"role": "user", "content": "x"}], max_tokens=10)
+        await client.chat_json(
+            system="s", user_text="x", schema=OK_SCHEMA, schema_name="Ok", max_tokens=10
+        )
+
+
+@respx.mock
+async def test_both_backends_reject_json_that_breaks_the_schema():
+    respx.post("https://api.meta.ai/v1/chat/completions").mock(
+        return_value=httpx.Response(200, json=completion('{"roof_damage":"gone"}'))
+    )
+    bad_open = {"choices": [{"finish_reason": "stop", "message": {"content": '{"ok": "yes"}'}}]}
+    respx.post("https://inference.baseten.co/v1/chat/completions").mock(
+        return_value=httpx.Response(200, json=bad_open)
+    )
+    with pytest.raises(ModelOutputError, match="roof_damage"):
+        await SparkClient(api_key="k", backoff_s=0).chat_json(
+            system="s", user_text="u", schema=SCHEMA, schema_name="J"
+        )
+    with pytest.raises(ModelOutputError, match=r"\$\.ok: expected boolean"):
+        await SparkOpenClient(api_key="bk", backoff_s=0).chat_json(
+            system="s", user_text="u", schema=OK_SCHEMA, schema_name="Ok"
+        )
+
+
+def test_both_backends_name_their_model():
+    assert SparkClient.model == "muse-spark-1.3"
+    assert SparkOpenClient.model == "meta-models/muse-spark-open"

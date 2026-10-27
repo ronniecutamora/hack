@@ -10,7 +10,7 @@ from typing import Any
 
 import httpx
 
-from app.cache import ResponseCache
+from app.cache import ResponseCache, sha256_hex
 
 # Reads can be slow (SAM took up to ~76 s and Spark ~32 s in testing), connects should not be.
 DEFAULT_TIMEOUT = httpx.Timeout(connect=10.0, read=180.0, write=60.0, pool=10.0)
@@ -175,3 +175,34 @@ def parse_json_text(text: str, *, what: str) -> Any:
 
 def data_url(data: bytes, mime: str) -> str:
     return f"data:{mime};base64,{base64.b64encode(data).decode()}"
+
+
+def json_chat_request(
+    system: str,
+    user_text: str,
+    schema: dict[str, Any],
+    schema_name: str,
+    image: bytes | None,
+    image_mime: str,
+) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
+    """Messages, response_format and cache-key payload for a schema-constrained chat call.
+
+    Both Spark backends use the OpenAI-style format: an image is an `image_url` content part
+    holding a base64 data URL. The cache key uses the image's hash, not its bytes.
+    """
+    content: list[dict[str, Any]] = [{"type": "text", "text": user_text}]
+    if image is not None:
+        content.append({"type": "image_url", "image_url": {"url": data_url(image, image_mime)}})
+    messages = [{"role": "system", "content": system}, {"role": "user", "content": content}]
+    response_format = {
+        "type": "json_schema",
+        "json_schema": {"name": schema_name, "schema": schema},
+    }
+    key_payload = {
+        "system": system,
+        "user_text": user_text,
+        "schema": schema,
+        "schema_name": schema_name,
+        "image": sha256_hex(image) if image is not None else None,
+    }
+    return messages, response_format, key_payload

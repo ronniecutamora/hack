@@ -2,14 +2,14 @@
 
 from typing import Any
 
-from app.cache import sha256_hex
 from app.meta.base import (
     ModelClient,
     ModelOutputError,
-    data_url,
     error_from_response,
+    json_chat_request,
     parse_json_text,
 )
+from app.meta.schema import validate
 
 MODEL = "muse-spark-1.3"
 URL = "https://api.meta.ai/v1/chat/completions"
@@ -27,6 +27,7 @@ def estimate_cost(usage: dict[str, Any] | None) -> float:
 
 class SparkClient(ModelClient):
     service = "Muse Spark"
+    model = MODEL  # the AgentLLM backend name, logged with every call
 
     async def chat_json(
         self,
@@ -39,25 +40,15 @@ class SparkClient(ModelClient):
         image_mime: str = "image/jpeg",
         model: str = MODEL,
     ) -> dict[str, Any]:
-        """Ask for output matching a JSON schema and return it parsed.
+        """Ask for output matching a JSON schema and return it parsed and validated.
 
         Spark reasons before answering (about 1.5k reasoning tokens per call in testing), so
         calls take 10 seconds or more.
         """
-        content: list[dict[str, Any]] = [{"type": "text", "text": user_text}]
-        if image is not None:
-            content.append({"type": "image_url", "image_url": {"url": data_url(image, image_mime)}})
-        body = {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": content},
-            ],
-            "response_format": {
-                "type": "json_schema",
-                "json_schema": {"name": schema_name, "schema": schema},
-            },
-        }
+        messages, response_format, key_payload = json_chat_request(
+            system, user_text, schema, schema_name, image, image_mime
+        )
+        body = {"model": model, "messages": messages, "response_format": response_format}
         headers = self.auth_headers()
 
         async def fetch() -> dict[str, Any]:
@@ -66,15 +57,10 @@ class SparkClient(ModelClient):
                 raise error_from_response(self.service, response)
             return response.json()
 
-        key_payload = {
-            "system": system,
-            "user_text": user_text,
-            "schema": schema,
-            "schema_name": schema_name,
-            "image": sha256_hex(image) if image is not None else None,
-        }
         reply = await self._call(model, key_payload, fetch, lambda r: estimate_cost(r.get("usage")))
-        return extract_json(reply)
+        result = extract_json(reply)
+        validate(schema, result)
+        return result
 
 
 def extract_json(reply: dict[str, Any]) -> dict[str, Any]:
