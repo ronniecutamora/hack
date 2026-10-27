@@ -12,7 +12,7 @@ from app.config import Settings
 from app.db import init_db, make_engine
 from app.intake import IntakeService
 from app.meta.transcribe import Transcript
-from app.models import Report
+from app.models import Media, Report
 
 
 class Downloadable:
@@ -118,7 +118,8 @@ def test_main_explains_missing_token(monkeypatch, capsys):
 def test_application_registers_all_handlers(settings):
     configured = settings.model_copy(update={"telegram_bot_token": SecretStr("123456:ABC-test")})
     application = bot.build_application(configured)
-    assert len(application.handlers[0]) == 5
+    assert len(application.handlers[0]) == 6
+    assert application.bot_data["assessor"].llm.model == "muse-spark-1.3"
 
 
 async def test_voice_download_retries_a_flaky_connection(settings, engine):
@@ -154,3 +155,73 @@ async def test_error_reply_failure_is_logged_not_raised(settings, engine, caplog
     assert message.reply_text.await_count == 1 + len(bot.TELEGRAM_RETRY_DELAYS_S)
     message.reply_text.assert_awaited_with(bot.ERROR_REPLY)
     assert "could not send the error reply" in caplog.text
+
+
+class FakeAssessor:
+    def __init__(self):
+        self.assessed = []
+
+    async def assess(self, report_id):
+        self.assessed.append(report_id)
+
+
+def context_with_assessor(settings, engine):
+    context = make_context(settings, engine, FakeTranscriber())
+    assessor = FakeAssessor()
+    tasks = []
+
+    def create_task(coroutine, name=None):
+        tasks.append(name)
+        coroutine.close()  # the real app runs it in the background; here we only record it
+        assessor.assessed.append(name)
+
+    context.application.bot_data["assessor"] = assessor
+    context.application.create_task = create_task
+    return context, assessor
+
+
+def image_document(mime, size=1000, data=b"\xff\xd8jpeg"):
+    document = Downloadable(data)
+    document.mime_type = mime
+    document.file_size = size
+    return document
+
+
+async def test_every_report_is_queued_for_assessment_after_the_reply(settings, engine):
+    context, assessor = context_with_assessor(settings, engine)
+    await bot.on_text(make_update(text="baha sa Casile"), context)
+    await bot.on_photo(make_update(photo=[Downloadable(b"jpg")], caption=None), context)
+    await bot.on_voice(make_update(voice=Downloadable(b"OggS")), context)
+    location = SimpleNamespace(latitude=14.3383, longitude=121.0843)
+    await bot.on_location(make_update(location=location), context)
+    ids = [r.id for r in reports(engine)]
+    assert assessor.assessed == [f"assess-{i}" for i in (ids[0], ids[1], ids[2], ids[2])]
+
+
+async def test_image_sent_as_a_file_is_stored_with_its_type(settings, engine):
+    context, assessor = context_with_assessor(settings, engine)
+    update = make_update(document=image_document("image/png"), caption="Brgy. Loma")
+    await bot.on_image_document(update, context)
+    (report,) = reports(engine)
+    assert report.text == "Brgy. Loma"
+    update.effective_message.reply_text.assert_awaited_once_with(bot.RECEIVED)
+    assert assessor.assessed == [f"assess-{report.id}"]
+    with Session(engine) as session:
+        (media,) = session.exec(select(Media)).all()
+    assert media.path.endswith(".png")
+
+
+@pytest.mark.parametrize(
+    ("document", "reply"),
+    [
+        (image_document("image/heic"), bot.UNSUPPORTED_IMAGE),
+        (image_document("image/jpeg", size=25 * 1024 * 1024), bot.TOO_LARGE),
+    ],
+)
+async def test_unreadable_or_huge_files_are_refused_politely(settings, engine, document, reply):
+    context, assessor = context_with_assessor(settings, engine)
+    update = make_update(document=document, caption=None)
+    await bot.on_image_document(update, context)
+    assert reports(engine) == []
+    assert assessor.assessed == []
+    update.effective_message.reply_text.assert_awaited_once_with(reply)

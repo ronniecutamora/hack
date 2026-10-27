@@ -18,10 +18,12 @@ from telegram.ext import (
     filters,
 )
 
+from app.assessment import make_assessor
 from app.config import Settings, get_settings
 from app.db import init_db, make_engine, make_recorder
 from app.intake import IntakeService
 from app.meta.factory import make_transcriber
+from app.models import Report
 from app.retention import purge_loop
 
 logger = logging.getLogger(__name__)
@@ -64,6 +66,17 @@ VOICE_NOT_TRANSCRIBED = (
     "Natanggap ang voice note pero hindi pa ito na-transcribe. Subukan ulit o mag-text. / "
     "Voice note received but not transcribed yet. Please try again or send text."
 )
+UNSUPPORTED_IMAGE = (
+    "Hindi mabasa ang file na ito. Paki-send bilang JPEG o PNG, o bilang karaniwang photo. / "
+    "This file type can't be read. Please send it as a JPEG or PNG, or as a normal photo."
+)
+TOO_LARGE = (
+    "Masyadong malaki ang file (max 20 MB). Paki-send bilang karaniwang photo. / "
+    "The file is too large (max 20 MB). Please send it as a normal photo."
+)
+# Images sent as files keep their EXIF GPS (normal photos are stripped by Telegram).
+IMAGE_DOCUMENT_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
+MAX_DOWNLOAD_BYTES = 20 * 1024 * 1024  # Bot API download limit
 ERROR_REPLY = (
     "May problema sa pagproseso. Subukan ulit mamaya. / "
     "Something went wrong. Please try again later."
@@ -96,6 +109,13 @@ async def _reply(message: object, text: str) -> None:
     await _with_retries(lambda: message.reply_text(text))
 
 
+def _assess_later(context: ContextTypes.DEFAULT_TYPE, report: Report) -> None:
+    """Assess in the background so the reporter gets "received" without waiting on models."""
+    assessor = context.application.bot_data.get("assessor")
+    if assessor is not None:
+        context.application.create_task(assessor.assess(report.id), name=f"assess-{report.id}")
+
+
 async def on_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     ttl = context.application.bot_data["settings"].raw_media_ttl_hours
     await _reply(update.effective_message, start_text(ttl))
@@ -103,18 +123,38 @@ async def on_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
-    await _intake(context).ingest_text(update.effective_user.id, message.text)
+    report = await _intake(context).ingest_text(update.effective_user.id, message.text)
     await _reply(message, RECEIVED)
+    _assess_later(context, report)
 
 
 async def on_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     photo = message.photo[-1]  # Telegram lists sizes smallest to largest
     data = await _download(photo)
-    await _intake(context).ingest_photo(
+    report = await _intake(context).ingest_photo(
         update.effective_user.id, data, caption=message.caption, ext="jpg"
     )
     await _reply(message, RECEIVED)
+    _assess_later(context, report)
+
+
+async def on_image_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    document = message.document
+    ext = IMAGE_DOCUMENT_TYPES.get(document.mime_type or "")
+    if ext is None:  # e.g. HEIC from iPhones: neither Pillow nor the models read it here
+        await _reply(message, UNSUPPORTED_IMAGE)
+        return
+    if (document.file_size or 0) > MAX_DOWNLOAD_BYTES:
+        await _reply(message, TOO_LARGE)
+        return
+    data = await _download(document)
+    report = await _intake(context).ingest_photo(
+        update.effective_user.id, data, caption=message.caption, ext=ext
+    )
+    await _reply(message, RECEIVED)
+    _assess_later(context, report)
 
 
 async def on_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -122,14 +162,16 @@ async def on_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     data = await _download(message.voice)
     report = await _intake(context).ingest_voice(update.effective_user.id, data, ext="ogg")
     await _reply(message, RECEIVED if report.transcript else VOICE_NOT_TRANSCRIBED)
+    _assess_later(context, report)
 
 
 async def on_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
-    await _intake(context).ingest_location(
+    report = await _intake(context).ingest_location(
         update.effective_user.id, message.location.latitude, message.location.longitude
     )
     await _reply(message, LOCATION_RECEIVED)
+    _assess_later(context, report)  # re-maps a report that was assessed before the pin came
 
 
 async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -146,6 +188,7 @@ def add_handlers(application: Application) -> None:
     application.add_handler(CommandHandler("start", on_start, filters=private))
     application.add_handler(MessageHandler(private & filters.TEXT & ~filters.COMMAND, on_text))
     application.add_handler(MessageHandler(private & filters.PHOTO, on_photo))
+    application.add_handler(MessageHandler(private & filters.Document.IMAGE, on_image_document))
     application.add_handler(MessageHandler(private & filters.VOICE, on_voice))
     application.add_handler(MessageHandler(private & filters.LOCATION, on_location))
     application.add_error_handler(on_error)
@@ -154,7 +197,9 @@ def add_handlers(application: Application) -> None:
 def build_application(settings: Settings) -> Application:
     engine = make_engine(settings)
     init_db(engine)
-    transcriber = make_transcriber(settings, make_recorder(engine))
+    recorder = make_recorder(engine)
+    transcriber = make_transcriber(settings, recorder)
+    assessor = make_assessor(settings, engine, recorder)
 
     async def post_init(application: Application) -> None:
         application.bot_data["purge_task"] = asyncio.create_task(purge_loop(settings, engine))
@@ -162,6 +207,8 @@ def build_application(settings: Settings) -> Application:
     async def post_shutdown(application: Application) -> None:
         application.bot_data["purge_task"].cancel()
         await transcriber.aclose()
+        await assessor.llm.aclose()
+        await assessor.sam.aclose()
 
     application = (
         Application.builder()
@@ -176,6 +223,7 @@ def build_application(settings: Settings) -> Application:
     )
     application.bot_data["settings"] = settings
     application.bot_data["intake"] = IntakeService(settings, engine, transcriber)
+    application.bot_data["assessor"] = assessor
     add_handlers(application)
     return application
 

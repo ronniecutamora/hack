@@ -1,13 +1,18 @@
 """Database tables. Times are naive UTC. No names, phone numbers or raw Telegram ids are stored."""
 
 from datetime import UTC, datetime
+from typing import Any
 
 from pydantic import NaiveDatetime
+from sqlalchemy import JSON, Column
 from sqlmodel import Field, SQLModel
 
 # Report.status values
 STATUS_NEW = "new"
 STATUS_TRANSCRIPTION_FAILED = "transcription_failed"
+STATUS_ASSESSING = "assessing"
+STATUS_ASSESSED = "assessed"
+STATUS_ASSESSMENT_FAILED = "assessment_failed"  # partial results are still saved
 
 
 def utcnow() -> datetime:
@@ -36,7 +41,7 @@ class Report(SQLModel, table=True):
 class Media(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     report_id: int = Field(foreign_key="report.id", index=True)
-    kind: str  # "photo" | "voice"
+    kind: str  # "photo" | "voice" | "overlay" (SAM masks drawn on a photo; purged like raw media)
     path: str  # relative to DATA_DIR
     sha256: str
     created_at: NaiveDatetime = Field(default_factory=utcnow)
@@ -53,3 +58,35 @@ class ModelCall(SQLModel, table=True):
     latency_ms: int
     cached: bool
     cost_estimate: float = 0.0  # USD, 0 for cache hits or when the price is unknown
+
+
+class Assessment(SQLModel, table=True):
+    """The agent's reading of a report: cleaned transcript, extracted facts and barangay."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    report_id: int = Field(foreign_key="report.id", unique=True, index=True)
+    llm_model: str  # which agent LLM produced the facts (Spark 1.3 or Spark Open)
+    transcript_clean: str | None = None  # Report.transcript stays raw, as evidence
+    facts: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON))
+    # How the barangay was found: pin | exif | text | transcript | llm | ambiguous | none
+    geo_source: str = "none"
+    geo_detail: str | None = None  # matched words, or the candidates when ambiguous
+    error: str | None = None
+    updated_at: NaiveDatetime = Field(default_factory=utcnow)
+
+
+class PhotoAssessment(SQLModel, table=True):
+    """One photo's damage judgment (agent LLM) and measurements (SAM 3.1)."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    report_id: int = Field(foreign_key="report.id", index=True)
+    media_id: int = Field(foreign_key="media.id", unique=True)
+    overlay_media_id: int | None = Field(default=None, foreign_key="media.id")
+    llm_model: str
+    judgment: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON))
+    measurement: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON))
+    # GPS from the photo's EXIF (only when it was sent as a file); used if there is no pin.
+    gps_lat: float | None = None
+    gps_lon: float | None = None
+    error: str | None = None
+    updated_at: NaiveDatetime = Field(default_factory=utcnow)
