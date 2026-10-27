@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reports</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem auto; max-width: 64rem; padding: 0 1rem; color: #1b1f24; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid #d8dde3; vertical-align: top; }
+    th { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: #57606a; }
+    code { font-size: .85rem; }
+    .muted { color: #57606a; }
+    .empty { padding: 2rem; border: 1px dashed #b6bec7; border-radius: .5rem; text-align: center; }
+  </style>
+</head>
+<body>
+  <h1>Reports</h1>
+  {% if not items %}
+    <p class="empty">No reports yet. Send a photo, voice note or text to the Telegram bot and it will show up here.</p>
+  {% else %}
+    <p class="muted">{{ items|length }} most recent report{{ "s" if items|length != 1 }}, newest first. Times are Philippine time (GMT+8).</p>
+    <table>
+      <thead>
+        <tr><th>Time</th><th>Channel</th><th>Reporter</th><th>Report</th><th>Media</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+      {% for item in items %}
+        {% set r = item.report %}
+        <tr>
+          <td>{{ r.received_at|manila_time }}</td>
+          <td>{{ r.channel }}</td>
+          <td><code>{{ item.reporter }}</code></td>
+          <td>
+            {% if r.text %}<div>{{ r.text }}</div>{% endif %}
+            {% if r.transcript %}<div><span class="muted">Voice:</span> {{ r.transcript }}</div>{% endif %}
+            {% if r.lat is not none %}<div class="muted">{{ "%.5f"|format(r.lat) }}, {{ "%.5f"|format(r.lon) }}</div>{% endif %}
+            {% if not r.text and not r.transcript and r.lat is none %}<span class="muted">(no text)</span>{% endif %}
+          </td>
+          <td>{{ item.media_count }}</td>
+          <td>{{ r.status }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</body>
+</html>
