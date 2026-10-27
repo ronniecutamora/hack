@@ -12,6 +12,12 @@ MODEL = "muse-voice-transcribe-1.0"
 URL = "https://api.meta.ai/v1/asr/transcribe"
 MAX_AUDIO_BYTES = 32 * 1024 * 1024  # documented limit per request
 MAX_AUDIO_SECONDS = 10 * 60  # documented limit per request
+# Estimate only: USD per hour of audio. Check dev.meta.ai/docs for current prices.
+PRICE_PER_AUDIO_HOUR = 0.18
+
+
+def estimate_cost(body: dict[str, Any]) -> float:
+    return int(body.get("audioDurationMs", 0)) / 3_600_000 * PRICE_PER_AUDIO_HOUR
 
 
 @dataclass(frozen=True)
@@ -89,5 +95,6 @@ class TranscribeClient(ModelClient):
                 raise error_from_response(self.service, response)
             return response.json()
 
-        body = await self._call(MODEL, {"request": request, "audio": sha256_hex(wav)}, fetch)
+        key_payload = {"request": request, "audio": sha256_hex(wav)}
+        body = await self._call(MODEL, key_payload, fetch, estimate_cost)
         return Transcript.from_api(body)

@@ -105,3 +105,7 @@ async def test_cache_hit_skips_network_and_is_logged(cache):
     assert first == second
     assert [c.cached for c in calls] == [False, True]
     assert all(c.model == "muse-voice-transcribe-1.0" for c in calls)
+    # $0.18 per audio hour, billed on the live call only
+    expected = API_REPLY["audioDurationMs"] / 3_600_000 * 0.18
+    assert calls[0].cost_estimate == pytest.approx(expected)
+    assert calls[1].cost_estimate == 0.0
