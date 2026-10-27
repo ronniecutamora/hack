@@ -85,8 +85,18 @@ FACTS_SYSTEM = (
 # Names are removed before the text reaches any model (RA 10173: collect the minimum). Best
 # effort: it catches self-introductions, not every name in free text.
 _SELF_INTRO = re.compile(
-    r"(\b(?:ako|ito)\s+(?:po\s+)?(?:ay\s+)?si|^\s*si|[.!?]\s*si)\s+((?:[^\W\d_][\w'-]*\s*){1,3})",
+    r"(\b(?:ako|ito)\s+(?:po\s+)?(?:ay\s+)?si|^\s*si|[.!?]\s*si"
+    r"|\bmy\s+name\s+is|\b(?:ang\s+)?pangalan\s+ko(?:\s+po)?(?:\s+ay)?(?:\s+si)?)"
+    r"\s+((?:[^\W\d_][\w'.-]*\s*){1,4})",
     re.IGNORECASE | re.MULTILINE,
+)
+# Titles kept before the placeholder ("si Kap. [pangalan]": the role is useful, the name is not).
+_TITLES = frozenset(
+    [
+        *("kap", "kapitan", "kapt", "capt", "kgd", "kag", "kagawad", "konsehal", "mayor"),
+        *("aling", "mang", "kuya", "ate", "lolo", "lola", "tatay", "nanay"),
+        *("mr", "mrs", "ms", "dr", "engr", "sir", "maam", "gng", "bb"),
+    ]
 )
 # Words that end a name ("si Nena Salindap po ito", "ako si Rodel, rice farmer").
 _AFTER_NAME = frozenset(
@@ -110,6 +120,10 @@ _AFTER_NAME = frozenset(
         "the",
         "a",
         "here",
+        "and",
+        "is",
+        "isang",
+        "ako",
     ]
 )
 NAME_PLACEHOLDER = "[pangalan]"
@@ -118,19 +132,24 @@ NAME_PLACEHOLDER = "[pangalan]"
 def redact_self_introductions(text: str) -> str:
     def replace(match: re.Match[str]) -> str:
         words = match.group(2).split()
+        titles: list[str] = []
         name: list[str] = []
         for word in words:
-            if word.lower().strip(",.;:!?") in _AFTER_NAME:
+            bare = word.lower().strip(",.;:!?'")
+            if not name and bare in _TITLES:
+                titles.append(word)  # "Kap." must not end the name: "Kap. Reyes" leaked Reyes
+                continue
+            if bare in _AFTER_NAME:
                 break
             name.append(word)
-            if word[-1] in ",.;:!?":
+            if word[-1] in ",;:!?" or (word[-1] == "." and len(bare) > 1):  # "P." continues
                 break
         if not name:
             return match.group(0)
         punct = name[-1][-1] if name[-1][-1] in ",.;:!?" else ""
-        rest = words[len(name) :]
+        rest = words[len(titles) + len(name) :]
         trailing = " " if match.group(2).endswith((" ", "\n")) else ""
-        return " ".join([match.group(1), NAME_PLACEHOLDER + punct, *rest]) + trailing
+        return " ".join([match.group(1), *titles, NAME_PLACEHOLDER + punct, *rest]) + trailing
 
     return _SELF_INTRO.sub(replace, text)
 

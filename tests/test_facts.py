@@ -25,6 +25,13 @@ from app.meta.schema import validate
             "Barangay official po ito ng Barangay Sinagpulo.",
         ),
         ("Baha na po hanggang tuhod", "Baha na po hanggang tuhod"),
+        ("Si Kap. Reyes po ito, baha na", "Si Kap. [pangalan] po ito, baha na"),
+        ("ito po si Kagawad Ana Lim, sa purok 2", "ito po si Kagawad [pangalan], sa purok 2"),
+        ("My name is Joel Santos, a fisherman", "My name is [pangalan], a fisherman"),
+        ("Ang pangalan ko po ay Rina Cruz.", "Ang pangalan ko po ay [pangalan]."),
+        ("pangalan ko po Lito Bautista taga Malaban", "pangalan ko po [pangalan] taga Malaban"),
+        ("Si Juan P. Dela Cruz po ito", "Si [pangalan] po ito"),
+        ("Ako si Lando. Baha na po", "Ako si [pangalan]. Baha na po"),
     ],
 )
 def test_self_introduced_names_are_redacted(text, redacted):
