@@ -1,5 +1,7 @@
 """Retention: delete raw photos and voice notes after RAW_MEDIA_TTL_HOURS.
 
+Files under DATA_DIR/media with no Media row (left behind when a write failed after the file
+was saved) are deleted on the same schedule, so the privacy promise holds for them too.
 Only the raw files go. Reports, transcripts, captions and later assessments are kept, and
 Media rows stay (with purged_at set) so the record shows what existed and when it was removed.
 """
@@ -7,7 +9,7 @@ Media rows stay (with purged_at set) so the record shows what existed and when i
 import asyncio
 import contextlib
 import logging
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import Engine
 from sqlmodel import Session, col, select
@@ -38,6 +40,27 @@ def purge_expired(settings: Settings, engine: Engine, now: datetime | None = Non
             session.add(media)
             purged += 1
         session.commit()
+    return purged + purge_orphans(settings, engine, cutoff)
+
+
+def purge_orphans(settings: Settings, engine: Engine, cutoff: datetime) -> int:
+    """Delete files under media/ that no Media row points to and are older than the cutoff."""
+    media_dir = settings.data_dir / "media"
+    if not media_dir.is_dir():
+        return 0
+    with Session(engine) as session:
+        known = {settings.data_dir / path for path in session.exec(select(Media.path)).all()}
+    purged = 0
+    for file in media_dir.glob("*/*"):
+        if not file.is_file() or file in known:
+            continue
+        modified = datetime.fromtimestamp(file.stat().st_mtime, UTC).replace(tzinfo=None)
+        if modified < cutoff:  # naive UTC, like utcnow()
+            file.unlink()
+            with contextlib.suppress(OSError):
+                file.parent.rmdir()
+            logger.info("purged orphaned raw media file %s", file.name)
+            purged += 1
     return purged
 
 

@@ -1,4 +1,5 @@
-from datetime import timedelta
+import os
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlmodel import Session, select
@@ -56,3 +57,21 @@ async def test_purge_tolerates_already_missing_file(settings, engine):
 
     later = utcnow() + timedelta(hours=settings.raw_media_ttl_hours + 1)
     assert purge_expired(settings, engine, now=later) == 1
+
+
+async def test_purge_removes_orphaned_files_after_the_ttl(settings, engine):
+    # A file saved before a failed DB write has no Media row; it must still be deleted.
+    await IntakeService(settings, engine).ingest_photo(1, b"tracked")
+    orphan_dir = settings.data_dir / "media" / "99"
+    orphan_dir.mkdir(parents=True)
+    old_orphan, fresh_orphan = orphan_dir / "old.ogg", orphan_dir / "fresh.ogg"
+    old_orphan.write_bytes(b"voice")
+    fresh_orphan.write_bytes(b"voice")
+    old = (datetime.now(UTC) - timedelta(hours=25)).timestamp()
+    os.utime(old_orphan, (old, old))
+
+    assert purge_expired(settings, engine) == 1
+
+    assert not old_orphan.exists()
+    assert fresh_orphan.exists()  # still inside the TTL
+    assert len(list((settings.data_dir / "media").glob("*/*"))) == 2  # tracked + fresh
