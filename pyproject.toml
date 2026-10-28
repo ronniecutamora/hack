@@ -26,6 +26,8 @@ dev = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# Agent skill notes are Markdown references, not project source.
+extend-exclude = [".agents/skills"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
