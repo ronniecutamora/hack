@@ -6,6 +6,7 @@ additionalProperties: false), array (items), string (enum), integer, number (min
 maximum), boolean, null, and a list of types such as ["integer", "null"].
 """
 
+import math
 from typing import Any
 
 from app.meta.base import ModelOutputError
@@ -33,6 +34,8 @@ def validate(schema: dict[str, Any], value: Any, path: str = "$") -> None:
     if "enum" in schema and value not in schema["enum"]:
         raise ModelOutputError(f"{path}: {value!r:.80} is not one of {schema['enum']}")
     if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if not math.isfinite(value):
+            raise ModelOutputError(f"{path}: expected a finite number")
         if "minimum" in schema and value < schema["minimum"]:
             raise ModelOutputError(f"{path}: {value} is below {schema['minimum']}")
         if "maximum" in schema and value > schema["maximum"]:

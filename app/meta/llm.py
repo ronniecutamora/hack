@@ -1,15 +1,10 @@
-"""The agent's LLM: one interface, two backends, chosen with the AGENT_LLM setting.
-
-- "muse-spark-1.3": Meta Model API (default)
-- "muse-spark-open": Muse Spark Open, open weights served on Baseten
-
-Every agent step that needs an LLM (fact extraction, photo judging, later dedupe and drafting)
-goes through this interface, so the whole agent can run on open weights.
-"""
+"""One structured chat interface for agent steps and the independently configured pair judge."""
 
 from typing import Any, Literal, Protocol
 
-AgentLLMName = Literal["muse-spark-1.3", "muse-spark-open"]
+AgentLLMName = Literal[
+    "muse-spark-1.3", "muse-spark-open", "muse-spark-open-fireworks", "muse-glimmer"
+]
 
 
 class AgentLLM(Protocol):
