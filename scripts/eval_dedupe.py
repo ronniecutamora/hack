@@ -76,7 +76,9 @@ async def evaluate(pairs: list[dict[str, Any]], judge: AgentLLM, *, threshold: f
                 [context_for_judge(c) for c in pair["incident_context"]],
                 context_for_judge(pair["new_report"]),
             )
-            review = reply["decision"] == "unsure" or reply["confidence"] < threshold
+            review = reply["decision"] == "unsure" or (
+                reply["decision"] == "same" and reply["confidence"] < threshold
+            )
             prediction = reply["decision"] == "same" and not review
             unsure += review
             if review or prediction != labels[-1]:

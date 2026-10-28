@@ -270,7 +270,8 @@ class IncidentService:
                         chosen = incident_id
                         break
                     if judgment["decision"] == "unsure" or (
-                        judgment["confidence"] < self.settings.pair_merge_threshold
+                        judgment["decision"] == "same"
+                        and judgment["confidence"] < self.settings.pair_merge_threshold
                     ):
                         needs_officer = True
                         break
@@ -322,7 +323,8 @@ class IncidentService:
             for compared_id, compared_report, judgment in comparisons:
                 merged = chosen == compared_id
                 uncertain = judgment["decision"] == "unsure" or (
-                    judgment["confidence"] < self.settings.pair_merge_threshold
+                    judgment["decision"] == "same"
+                    and judgment["confidence"] < self.settings.pair_merge_threshold
                 )
                 session.add(
                     AgentDecision(

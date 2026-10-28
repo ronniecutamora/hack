@@ -32,17 +32,29 @@ PAIR_SYSTEM = (
 # Location strings are the only free-text input. Strip personal references as well as
 # self-introductions. Summaries and photo captions below are regenerated from typed fields,
 # so upstream free-text summaries/notes cannot leak a name into a second model call.
+# Stop at place words/prepositions so redacting an owner preserves the useful landmark.
+_NAME_WORD = (
+    r"(?!(?:purok|sitio|street|lane|block|road|chapel|covered|court|store|bahay|"
+    r"tapat|malapit|likod|sa|ng|near|beside|behind|in|on|the|po|ito)\b)"
+    r"[^\W\d_][\w'.-]*"
+)
 _PERSON = re.compile(
-    r"\b(?:si|sina|Mr\.?|Mrs\.?|Ms\.?|Mang|Aling|owner|farmer|resident|reported by)"
-    r"\s+(?:[^\W\d_][\w'.-]*(?:\s+|$)){1,4}",
+    r"\b(?:si|sina|ni|nina|kay|kina|Kap\.?|Kapitan|Kagawad|Kgd\.?|"
+    r"Mr\.?|Mrs\.?|Ms\.?|Mang|Aling|owner|farmer|resident|reported by)"
+    rf"\s+{_NAME_WORD}(?:\s+(?:(?:at|and)\s+)?{_NAME_WORD}){{0,5}}",
     re.IGNORECASE,
+)
+# A capitalised name (with optional surname particles) before an English possessive.
+_POSSESSIVE_PERSON = re.compile(
+    r"\b[^\W\d_a-z][\w.-]*(?:\s+(?:dela|de|del|la|van|von|[^\W\d_a-z][\w.-]*))*['’]s\b"
 )
 
 
 def redacted_place(value: Any) -> str | None:
     if not isinstance(value, str):
         return None
-    return _PERSON.sub("[redacted] ", redact_self_introductions(value))[:180]
+    value = _POSSESSIVE_PERSON.sub("[redacted]", redact_self_introductions(value))
+    return _PERSON.sub("[redacted]", value)[:180]
 
 
 def safe_facts(facts: dict[str, Any] | None) -> dict[str, Any]:

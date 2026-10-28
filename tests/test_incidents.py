@@ -28,7 +28,7 @@ from app.models import (
     Report,
     Reporter,
 )
-from app.pair_judge import PAIR_SCHEMA, report_context
+from app.pair_judge import PAIR_SCHEMA, redacted_place, report_context
 from tests.test_assessment import FakeLLM, FakeSam, facts
 from tests.test_geo import CENTRES
 
@@ -143,7 +143,6 @@ async def test_three_reports_become_two_incidents_and_repeat_changes_nothing(set
     [
         {"decision": "unsure", "confidence": 0.8, "reason": "Location is unclear."},
         {"decision": "same", "confidence": 0.6, "reason": "Possibly the same street."},
-        {"decision": "different", "confidence": 0.6, "reason": "Possibly another street."},
     ],
 )
 async def test_uncertainty_never_merges(settings, engine, reply):
@@ -214,6 +213,60 @@ async def test_different_tries_next_candidate(settings, engine):
     assert third.incident_id == first.incident_id
     assert len(judge.calls) == 3
     assert len([d for d in rows(engine, AgentDecision) if d.kind == "kept_separate"]) == 2
+
+
+@pytest.mark.parametrize("confidence", [0.0, 0.8, 1.0])
+async def test_different_at_any_confidence_tries_older_candidate(settings, engine, confidence):
+    judge = FakeJudge(
+        DIFFERENT, {**DIFFERENT, "confidence": confidence}, {**SAME, "confidence": 0.95}
+    )
+    service = IncidentService(settings, engine, judge)
+    older = await service.group(add_report(engine))
+    newer = await service.group(add_report(engine, at=AT + timedelta(hours=1)))
+    third = await service.group(add_report(engine, at=AT + timedelta(hours=2)))
+    assert third.incident_id == older.incident_id != newer.incident_id
+    assert third.grouping_needs_officer is False
+    assert len(judge.calls) == 3
+    compared = [d for d in rows(engine, AgentDecision) if d.report_id == third.id]
+    assert [(d.kind, d.compared_incident_id) for d in compared] == [
+        ("kept_separate", newer.incident_id),
+        ("merged", older.incident_id),
+    ]
+    assert all(i.status == "open" for i in rows(engine, Incident))
+
+
+@pytest.mark.parametrize(
+    "place,names",
+    [
+        ("tapat ng bahay ni Pedro Santos, Purok 3", ["Pedro", "Santos"]),
+        ("nina Jose at Maria", ["Jose", "Maria"]),
+        ("kay Kapitan Reyes", ["Reyes"]),
+        ("kina Aling Nena", ["Nena"]),
+        ("Juan dela Cruz's store", ["Juan", "dela", "Cruz"]),
+        ("beside Juan dela Cruz’s sari-sari store", ["Juan", "dela", "Cruz"]),
+        *[
+            (f"{title} Reyes, Purok 3", ["Reyes"])
+            for title in ("Kap.", "Kapitan", "Kagawad", "Kgd.", "Aling", "Mang", "Mr", "Mrs", "Ms")
+        ],
+    ],
+)
+def test_place_personal_references_are_redacted(place, names):
+    result = redacted_place(place)
+    context = json.dumps(
+        report_context(barangay="Malaban", facts={"place_detail": place}, judgments=[])
+    )
+    for name in names:
+        assert name not in result
+        assert name not in context
+    if "Purok 3" in place:
+        assert "Purok 3" in result
+    if "store" in place:
+        assert "store" in result
+
+
+@pytest.mark.parametrize("place", ["Purok 3", "tapat ng chapel", "malapit sa covered court"])
+def test_place_landmarks_survive_redaction(place):
+    assert redacted_place(place) == place
 
 
 async def test_model_failure_is_visible_idempotent_and_explicitly_retryable(settings, engine):
