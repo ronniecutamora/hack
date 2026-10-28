@@ -1,3 +1,4 @@
+from app.demo import SCENARIO_PATH
 from app.demo.scenario import (
     LANDFALL_AT,
     STREET_SERIES,
@@ -6,7 +7,6 @@ from app.demo.scenario import (
     received_at,
     validate,
 )
-from app.demo import SCENARIO_PATH
 from app.gazetteer import BY_NAME, find_in_text
 
 SCENARIO = load_scenario(SCENARIO_PATH)
@@ -28,9 +28,7 @@ def test_report_count_reporters_and_window():
 
 
 def test_flooded_street_series_rises_then_falls():
-    members = sorted(
-        (r for r in SCENARIO if r.series == STREET_SERIES), key=received_at
-    )
+    members = sorted((r for r in SCENARIO if r.series == STREET_SERIES), key=received_at)
     assert len(members) >= 3
     assert {r.barangay for r in members} == {"Malaban"}
     assert len({r.reporter for r in members}) >= 3
@@ -51,9 +49,7 @@ def test_two_barangay_report_is_unpinned_and_ambiguous():
 
 
 def test_placeless_report_names_no_barangay():
-    assert any(
-        r.barangay is None and not find_in_text(r.text).barangays for r in SCENARIO
-    )
+    assert any(r.barangay is None and not find_in_text(r.text).barangays for r in SCENARIO)
 
 
 def test_fisherfolk_and_fake_name_beats():

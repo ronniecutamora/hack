@@ -1,0 +1,26 @@
+[
+  {
+    "key": "k1",
+    "reporter": "demo-01",
+    "day": 0,
+    "hour": 19,
+    "text": "Baha na po dito sa Malaban, hanggang bukung-bukong na po.",
+    "photo_prompt": "Flooded residential street in a Philippine lakeshore town, ankle-deep water",
+    "barangay": "Malaban"
+  },
+  {
+    "key": "k2",
+    "reporter": "demo-02",
+    "day": 1,
+    "hour": 8,
+    "text": "Natuklap po yung yero namin dito sa Casile.",
+    "barangay": "Casile"
+  },
+  {
+    "key": "k3",
+    "reporter": "demo-03",
+    "day": 2,
+    "hour": 9,
+    "text": "Ubos na po yung bigas at tubig namin."
+  }
+]

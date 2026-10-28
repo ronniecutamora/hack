@@ -95,8 +95,8 @@ def _rises_then_falls(depths: list[int]) -> bool:
     peak = depths.index(max(depths))
     if peak == 0 or peak == len(depths) - 1:
         return False  # the peak must sit between a rise and a fall
-    rising = all(a < b for a, b in zip(depths[:peak], depths[1 : peak + 1]))
-    falling = all(a > b for a, b in zip(depths[peak:], depths[peak + 1 :]))
+    rising = all(a < b for a, b in zip(depths[:peak], depths[1 : peak + 1], strict=False))
+    falling = all(a > b for a, b in zip(depths[peak:], depths[peak + 1 :], strict=False))
     return rising and falling
 
 
@@ -115,13 +115,9 @@ def _validate_story_beats(
             errors.append(f"{r.key}: a correction must come after {r.corrects}")
     if not any(len(find_in_text(r.text).barangays) >= 2 for r in reports if not r.barangay):
         errors.append("need an unpinned report naming two barangays")
-    if not any(
-        r.barangay is None and not find_in_text(r.text).barangays for r in reports
-    ):
+    if not any(r.barangay is None and not find_in_text(r.text).barangays for r in reports):
         errors.append("need a report with no place at all")
-    if not any(
-        "fish cage" in r.text.lower() or "fish pen" in r.text.lower() for r in reports
-    ):
+    if not any("fish cage" in r.text.lower() or "fish pen" in r.text.lower() for r in reports):
         errors.append("need a fisherfolk report about damaged fish cages/pens")
     if not any("juan dela cruz" in r.text.lower() for r in reports):
         errors.append("need a reporter introducing themself with an obviously fake name")

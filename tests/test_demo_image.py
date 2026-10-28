@@ -34,7 +34,7 @@ def test_extract_image_plain_and_errors():
     with pytest.raises(ModelOutputError, match="empty"):
         extract_image({"data": [{"b64_json": ""}]})
     with pytest.raises(ModelOutputError, match="base64"):
-        extract_image(reply("!!!not-base64!!!" ))
+        extract_image(reply("!!!not-base64!!!"))
 
 
 @respx.mock
@@ -145,9 +145,7 @@ def test_stamp_keeps_size_and_marks_the_bottom_left_corner():
     ]
     assert dark, "the corner region must carry the dark label box"
     plain = Image.open(io.BytesIO(gray_jpeg())).convert("RGB")
-    assert all(
-        sum(plain.getpixel((x, y))) >= 90 for x in range(4, 200, 7) for y in (450, 465)
-    )
+    assert all(sum(plain.getpixel((x, y))) >= 90 for x in range(4, 200, 7) for y in (450, 465))
 
 
 def test_stamp_label_text_names_the_source():

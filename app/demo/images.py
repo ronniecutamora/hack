@@ -66,16 +66,18 @@ def stamp_label(data: bytes) -> bytes:
     text_w, text_h = right - left, bottom - top
     box = (pad, height - text_h - 3 * pad, text_w + 3 * pad, height - pad)
     draw.rectangle(box, fill=(0, 0, 0))
-    draw.text((2 * pad - left, height - text_h - 2 * pad - top), LABEL_TEXT,
-              font=font, fill=(255, 255, 255))
+    draw.text(
+        (2 * pad - left, height - text_h - 2 * pad - top),
+        LABEL_TEXT,
+        font=font,
+        fill=(255, 255, 255),
+    )
     buffer = io.BytesIO()
     image.save(buffer, "JPEG")
     return buffer.getvalue()
 
 
-async def ensure_images(
-    jobs: list[ImageJob], make_client: Callable[[], ImageClient]
-) -> list[Path]:
+async def ensure_images(jobs: list[ImageJob], make_client: Callable[[], ImageClient]) -> list[Path]:
     """Generate every uncached job image (stamped) and return the new files."""
     todo = [job for job in jobs if not job.path.is_file()]
     if not todo:
