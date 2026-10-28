@@ -103,6 +103,10 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-28 | Cached pair-judge eval CLI with cost confirmation, precision/recall/F1 and review-rate reporting, plus 64 synthetic labelled pairs (paraphrased places and near-identical hard negatives; exact string matching scores 62.5%) and fake-judge verification; source lint/format excludes the read-only provider skill references; no paid eval run |
 | 2026-10-28 | Fixes from a review of the incident work: a grouping error no longer marks the assessment failed; a "different" verdict moves on to older incidents; names after ni/nina/kay/kina and titles are redacted from places; the client refactor keeps the old cache keys and accepts complete answers that end at the token limit |
 | 2026-10-28 | Synthetic demo scenario: a Muse Image client, 17 Taglish reports over two weeks after landfall (a street flooding and receding, a correction, an ambiguous and a placeless report, a fisherfolk's broken fish cages), labelled synthetic photos, and a loader into a separate demo database through the real intake and assessment pipeline |
+| 2026-10-28 | Demo geolocation fix: ambiguous text or transcript stays unresolved despite a single model-suggested barangay; valid pins and photo GPS retain precedence, with offline regression tests |
+| 2026-10-28 | Demo place anchors: optional shared places keep deterministic report pins within 30 m of one anchor inside their barangay; scenario validation requires each series to share a place and barangay, with offline geometry and intake tests |
+| 2026-10-28 | Demo place descriptions: varied Taglish names one synthetic Malaban corner, one Casile purok and one Poblacion evacuation court across follow-ups; the ankle-to-waist-to-ankle story and unpinned two-barangay report are regression-tested |
+| 2026-10-28 | Demo fisherfolk correction: both reports now name and pin De La Paz with a shared synthetic lakeshore fish-pen place; the photo prompt is unchanged and scenario checks cover the location |
 
 ### Third-party code and assets
 
