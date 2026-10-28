@@ -172,12 +172,20 @@ def load_command(
         return 2
     if reset and data_dir.exists():
         if not assume_yes:
-            answer = input(f"Delete '{data_dir}' and reload the demo from scratch? [y/N] ")
+            answer = input(
+                f"Delete demo data in '{data_dir}' (keeps generated images) and reload? [y/N] "
+            )
             if answer.strip().lower() not in ("y", "yes"):
                 print("Cancelled; demo data left alone.")
                 return 0
-        shutil.rmtree(data_dir)
-        print(f"Deleted {data_dir}.")
+        for path in data_dir.iterdir():
+            if path.name == "images" and path.is_dir():
+                continue
+            if path.is_dir() and not path.is_symlink():
+                shutil.rmtree(path)
+            else:
+                path.unlink()
+        print(f"Deleted demo data in {data_dir}; kept generated images.")
     engine = make_engine(settings)
     init_db(engine)
     reports = load_scenario(scenario_path)
@@ -207,7 +215,9 @@ def load_command(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Load the demo scenario into a demo database.")
-    parser.add_argument("--reset", action="store_true", help="delete the demo data dir first")
+    parser.add_argument(
+        "--reset", action="store_true", help="delete the demo data (keeps generated images)"
+    )
     parser.add_argument("--yes", action="store_true", help="delete without asking")
     args = parser.parse_args(argv)
     return load_command(get_settings(), reset=args.reset, assume_yes=args.yes)

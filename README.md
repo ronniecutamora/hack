@@ -107,6 +107,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-28 | Demo place anchors: optional shared places keep deterministic report pins within 30 m of one anchor inside their barangay; scenario validation requires each series to share a place and barangay, with offline geometry and intake tests |
 | 2026-10-28 | Demo place descriptions: varied Taglish names one synthetic Malaban corner, one Casile purok and one Poblacion evacuation court across follow-ups; the ankle-to-waist-to-ankle story and unpinned two-barangay report are regression-tested |
 | 2026-10-28 | Demo fisherfolk correction: both reports now name and pin De La Paz with a shared synthetic lakeshore fish-pen place; the photo prompt is unchanged and scenario checks cover the location |
+| 2026-10-28 | Demo reset preserves generated Muse Image photos while clearing databases, uploads and manifests; updated CLI messages and offline regression coverage |
 
 ### Third-party code and assets
 

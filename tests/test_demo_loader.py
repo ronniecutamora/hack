@@ -164,36 +164,47 @@ def test_loader_needs_images_first(tmp_path, capsys):
     assert len(reports(make_engine(settings))) == 0
 
 
-def test_reset_deletes_only_the_demo_dir(tmp_path):
+def test_reset_keeps_images_and_deletes_other_demo_data(tmp_path, capsys, monkeypatch, respx_mock):
     settings = demo_settings(tmp_path)
-    engine = engine_for(settings)
-    (settings.data_dir / "sentinel.txt").write_text("wipe me")
+    write_fixture_images(settings.data_dir)
+    images = {path: path.read_bytes() for path in (settings.data_dir / "images").iterdir()}
+    settings.db_path.write_text("stale database; must be deleted before loading")
+    stale_files = [
+        settings.data_dir / name
+        for name in ("stale.db", "stale.db-wal", "stale.db-shm", "sentinel.txt")
+    ]
+    for path in stale_files:
+        path.write_text("wipe me")
+    (settings.data_dir / MANIFEST_NAME).write_text('{"stale": 999}')
+    stale_upload = settings.data_dir / "uploads" / "nested" / "old.jpg"
+    stale_upload.parent.mkdir(parents=True)
+    stale_upload.write_bytes(b"old upload")
     other = tmp_path / "other"
     other.mkdir()
     (other / "keep.txt").write_text("mine")
+    monkeypatch.setattr(
+        "app.demo.loader.make_assessor",
+        lambda settings, engine, recorder: assessor_for(settings, engine),
+    )
 
-    # Reset wipes the whole demo dir (images included), so the load stops there.
     assert (
         load_command(
             settings,
             reset=True,
             assume_yes=True,
             scenario_path=FIXTURE,
-            assessor=assessor_for(settings, engine),
         )
-        == 1
+        == 0
     )
-    assert not (settings.data_dir / "sentinel.txt").exists()
+    assert all(path.read_bytes() == data for path, data in images.items())
+    assert all(not path.exists() for path in stale_files)
+    assert not stale_upload.parent.exists()
+    assert len(reports(make_engine(settings))) == 3
+    manifest = json.loads((settings.data_dir / MANIFEST_NAME).read_text())
+    assert set(manifest) == {report.key for report in load_scenario(FIXTURE)}
     assert (other / "keep.txt").is_file()
-
-    # Regenerate the images, then the load succeeds on the fresh dir.
-    write_fixture_images(settings.data_dir)
-    fresh = engine_for(settings)
-    assert (
-        load_command(settings, scenario_path=FIXTURE, assessor=assessor_for(settings, fresh)) == 0
-    )
-    assert (settings.data_dir / MANIFEST_NAME).is_file()
-    assert (other / "keep.txt").is_file()
+    assert "kept generated images" in capsys.readouterr().out
+    assert not respx_mock.calls
 
 
 def test_reset_asks_first(tmp_path, capsys, monkeypatch):
@@ -201,11 +212,13 @@ def test_reset_asks_first(tmp_path, capsys, monkeypatch):
     engine_for(settings)
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     (settings.data_dir / "sentinel.txt").write_text("stay")
-    monkeypatch.setattr("builtins.input", lambda _prompt: "n")
+    prompts = []
+    monkeypatch.setattr("builtins.input", lambda prompt: prompts.append(prompt) or "n")
 
     assert load_command(settings, reset=True, scenario_path=FIXTURE) == 0
 
     assert (settings.data_dir / "sentinel.txt").is_file()
+    assert "keeps generated images" in prompts[0]
     assert "Cancelled" in capsys.readouterr().out
 
 

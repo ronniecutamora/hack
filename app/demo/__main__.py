@@ -14,7 +14,9 @@ def main(argv: list[str] | None = None) -> int:
     images = which.add_parser("images", help="generate the scenario's photos")
     images.add_argument("--yes", action="store_true", help="generate without asking")
     load = which.add_parser("load", help="feed the scenario through intake and assessment")
-    load.add_argument("--reset", action="store_true", help="delete the demo data dir first")
+    load.add_argument(
+        "--reset", action="store_true", help="delete the demo data (keeps generated images)"
+    )
     load.add_argument("--yes", action="store_true", help="delete without asking")
     args = parser.parse_args(argv)
     settings = get_settings()
