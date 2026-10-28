@@ -73,7 +73,6 @@ create an on-demand deployment (see below).
 1. Model IDs are full paths (`accounts/fireworks/models/...`). Short names fail.
 2. Validate structured replies against your schema **before caching them**. Never cache truncated or invalid output.
 3. Mock HTTP in tests (e.g. `respx`), and never loop paid calls in a test suite.
-4. Fireworks also has an Anthropic-compatible endpoint (`https://api.fireworks.ai/inference`). Use the OpenAI one unless the code is built around the other.
 
 ## Checklist
 

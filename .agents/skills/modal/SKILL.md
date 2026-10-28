@@ -107,7 +107,7 @@ reads a local `.env`. Never commit that file.
 
 ## Agent skills from Modal
 
-`modal skills install [-g] [--no-docs] [-y]` installs Modal's own agent skills into `.agents/` (or `--claude` for `.claude/`) ✅.
+`modal skills install [-g] [--no-docs] [-y]` installs Modal's own agent skills into `.agents/` ✅.
 Prefer `-g` (home directory) over installing into a project you don't want to change.
 
 ## Checklist before deploying
