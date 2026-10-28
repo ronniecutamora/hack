@@ -21,7 +21,7 @@ from sqlmodel import Session, col, select
 
 from app.config import Settings, get_settings
 from app.db import init_db, make_engine
-from app.models import Assessment, Media, PhotoAssessment, Report, Reporter
+from app.models import AgentDecision, Assessment, Incident, Media, PhotoAssessment, Report, Reporter
 
 MANILA = timezone(timedelta(hours=8))  # Philippine time, no daylight saving
 REPORT_LIMIT = 200
@@ -159,6 +159,67 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "ttl_hours": settings.raw_media_ttl_hours,
         }
         return templates.TemplateResponse(request, "reports.html", context)
+
+    @app.get("/incidents", response_class=HTMLResponse)
+    def incidents(request: Request) -> HTMLResponse:
+        with Session(request.app.state.engine) as session:
+            items = session.exec(
+                select(Incident)
+                .where(Incident.active == True)  # noqa: E712
+                .order_by(col(Incident.last_seen).desc(), col(Incident.id).desc())
+            ).all()
+        return templates.TemplateResponse(request, "incidents.html", {"items": items})
+
+    @app.get("/incidents/{incident_id}", response_class=HTMLResponse)
+    def incident_detail(request: Request, incident_id: int) -> HTMLResponse:
+        with Session(request.app.state.engine) as session:
+            incident = session.get(Incident, incident_id)
+            if incident is None:
+                raise HTTPException(404, "incident not found")
+            reports = session.exec(
+                select(Report)
+                .where(Report.incident_id == incident_id)
+                .order_by(Report.received_at, Report.id)
+            ).all()
+            ids = [r.id for r in reports]
+            assessments = {
+                a.report_id: a
+                for a in session.exec(
+                    select(Assessment).where(col(Assessment.report_id).in_(ids))
+                ).all()
+            }
+            media: defaultdict[int, list[Media]] = defaultdict(list)
+            for item in session.exec(select(Media).where(col(Media.report_id).in_(ids))).all():
+                if item.kind in ("photo", "overlay"):
+                    media[item.report_id].append(item)
+            decisions = session.exec(
+                select(AgentDecision)
+                .where(
+                    (AgentDecision.incident_id == incident_id)
+                    | (AgentDecision.compared_incident_id == incident_id)
+                )
+                .order_by(AgentDecision.created_at, AgentDecision.id)
+            ).all()
+        items = []
+        for report in reports:
+            available = [m for m in media[report.id] if m.purged_at is None]
+            items.append(
+                {
+                    "report": report,
+                    "assessment": assessments.get(report.id),
+                    "media": [m for m in available if m.kind == "overlay"] or available,
+                    "had_photos": bool(media[report.id]),
+                }
+            )
+        return templates.TemplateResponse(
+            request,
+            "incident.html",
+            {
+                "incident": incident,
+                "items": items,
+                "decisions": decisions,
+            },
+        )
 
     @app.get("/media/{media_id}")
     def media_file(request: Request, media_id: int) -> FileResponse:

@@ -1,33 +1,5 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Reports</title>
-  <style>
-    body { font-family: system-ui, sans-serif; margin: 2rem auto; max-width: 76rem; padding: 0 1rem; color: #1b1f24; }
-    table { border-collapse: collapse; width: 100%; }
-    th, td { text-align: left; padding: .55rem .6rem; border-bottom: 1px solid #d8dde3; vertical-align: top; }
-    th { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: #57606a; }
-    code { font-size: .85rem; }
-    .muted { color: #57606a; font-size: .9rem; }
-    .empty { padding: 2rem; border: 1px dashed #b6bec7; border-radius: .5rem; text-align: center; }
-    .chips { display: flex; flex-wrap: wrap; gap: .3rem; margin: .35rem 0; padding: 0; list-style: none; }
-    .chip { background: #eef1f4; border-radius: 1rem; padding: .1rem .55rem; font-size: .82rem; }
-    .chip.warn { background: #fff1d6; }
-    .chip.alert { background: #ffe1e1; }
-    .summary { margin: .25rem 0; }
-    .evidence { display: flex; gap: .6rem; align-items: flex-start; margin-bottom: .5rem; }
-    .evidence img { width: 11rem; border-radius: .3rem; border: 1px solid #d8dde3; }
-    .status-assessed { color: #1a7f37; }
-    .status-assessment_failed, .status-transcription_failed { color: #b42318; }
-    .status-assessing, .status-new { color: #9a6700; }
-    .error { color: #b42318; font-size: .85rem; }
-    details summary { cursor: pointer; color: #57606a; font-size: .85rem; }
-    header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 1rem; }
-  </style>
-</head>
-<body>
+{% extends "base.html" %}
+{% block content %}
   <header>
     <h1>Reports</h1>
     <p class="muted">Agent LLM: <code>{{ agent_llm }}</code> · photo judgment by the agent LLM, measurements by SAM 3.1</p>
@@ -44,8 +16,8 @@
       {% for item in items %}
         {% set r = item.report %}
         {% set a = item.assessment %}
-        <tr>
-          <td>{{ r.received_at|manila_time }}<div class="muted"><code>{{ item.reporter }}</code> · {{ r.channel }}</div></td>
+        <tr id="report-{{ r.id }}">
+          <td>{{ r.received_at|manila_time }}<div class="muted"><code>{{ item.reporter }}</code> · {{ r.channel }}</div>{% if r.channel == "demo" %}<span class="chip warn">Synthetic demo</span>{% endif %}</td>
           <td>
             {% if r.barangay %}<strong>{{ r.barangay }}</strong>{% else %}<span class="muted">—</span>{% endif %}
             {% if a %}
@@ -109,6 +81,8 @@
           </td>
           <td>
             <span class="status-{{ r.status }}">{{ r.status|replace("_", " ") }}</span>
+            {% if r.incident_id %}<div><a href="/incidents/{{ r.incident_id }}">Incident #{{ r.incident_id }}</a></div>{% else %}<div class="muted">Not grouped yet</div>{% endif %}
+            {% if r.grouping_error %}<div class="error">Grouping needs officer review: {{ r.grouping_error }}</div>{% endif %}
             {% if a and a.error %}<div class="error">{{ a.error }}</div>{% endif %}
             {% if a %}<div class="muted">by <code>{{ a.llm_model }}</code></div>{% endif %}
           </td>
@@ -117,5 +91,4 @@
       </tbody>
     </table>
   {% endif %}
-</body>
-</html>
+{% endblock %}

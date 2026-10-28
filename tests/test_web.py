@@ -7,7 +7,7 @@ from sqlmodel import Session, select
 from app.assessment import AssessmentService
 from app.intake import IntakeService
 from app.main import create_app, fact_lines
-from app.models import Media
+from app.models import Assessment, Media
 from tests.test_assessment import FakeLLM, FakeSam, facts, jpeg
 
 
@@ -130,3 +130,91 @@ def test_fact_lines_skip_unstated_fields_and_flag_corrections():
     assert "corn, 2.5 ha, 70% damaged" in lines
     assert not any("None" in line for line in lines)
     assert fact_lines(None) == []
+
+
+def test_incidents_empty_and_missing(client):
+    assert "No incidents yet" in client.get("/incidents").text
+    assert client.get("/incidents/999").status_code == 404
+    assert client.get("/incidents/nope").status_code == 422
+
+
+async def test_incident_list_timeline_why_and_report_links(settings, client):
+    from app.incidents import IncidentService
+    from app.models import AgentDecision, Incident, Report
+    from tests.test_incidents import AT, SAME, FakeJudge, add_report
+
+    engine = client.app.state.engine
+    service = IncidentService(settings, engine, FakeJudge())
+    first_id = add_report(engine, flood_depth="knee")
+    first = await service.group(first_id)
+    second_id = add_report(engine, at=AT + timedelta(days=1), flood_depth="waist")
+    await service.group(second_id)
+    await service.group(add_report(engine, barangay="Casile", at=AT + timedelta(days=2)))
+    listing = client.get("/incidents").text
+    assert listing.index("Casile") < listing.index("Malaban")
+    assert f"/incidents/{first.incident_id}" in listing
+    assert "Latest: waist" in listing and "Max: waist" in listing
+    detail = client.get(f"/incidents/{first.incident_id}").text
+    assert detail.index(f"Report #{first_id}") < detail.index(f"Report #{second_id}")
+    assert "Why the agent grouped these" in detail
+    assert SAME["reason"] in detail and "fake-pair-judge" in detail and "97%" in detail
+    assert "Synthetic demo" in detail and "double-count" in detail
+    assert "knee" in detail and "waist" in detail
+    reports = client.get("/reports").text
+    assert f'href="/incidents/{first.incident_id}"' in reports
+    assert "Synthetic demo" in reports
+    # Rendering reads stored decisions even if report facts have since changed.
+    with Session(engine) as session:
+        for assessment in session.exec(select(Assessment)).all():
+            assessment.facts = {"summary_en": "changed after grouping"}
+            session.add(assessment)
+        session.commit()
+    assert SAME["reason"] in client.get(f"/incidents/{first.incident_id}").text
+    with Session(engine) as session:
+        for decision in session.exec(select(AgentDecision)).all():
+            session.delete(decision)
+        for report in session.exec(select(Report)).all():
+            report.incident_id = None
+            session.add(report)
+        session.commit()
+    empty = client.get(f"/incidents/{first.incident_id}").text
+    assert "No reports currently linked" in empty and "No grouping decisions recorded" in empty
+    assert len(client.get("/incidents").text) > 0
+    with Session(engine) as session:
+        assert session.get(Incident, first.incident_id) is not None
+
+
+async def test_incident_timeline_evidence_and_expiry(settings, client):
+    from app.models import Report
+
+    overlay = await assessed_photo_report(settings, client)
+    with Session(client.app.state.engine) as session:
+        report = session.get(Report, overlay.report_id)
+        incident_id = report.incident_id
+    detail = client.get(f"/incidents/{incident_id}").text
+    assert f'src="/media/{overlay.id}"' in detail
+    with Session(client.app.state.engine) as session:
+        for media in session.exec(select(Media)).all():
+            media.purged_at = media.created_at
+            session.add(media)
+        session.commit()
+    detail = client.get(f"/incidents/{incident_id}").text
+    assert f'src="/media/{overlay.id}"' not in detail
+    assert "Photo evidence deleted" in detail
+
+
+async def test_incident_uncertainty_badge_and_escaping(settings, client):
+    from app.incidents import IncidentService
+    from tests.test_incidents import FakeJudge, add_report
+
+    engine = client.app.state.engine
+    judge = FakeJudge(
+        {"decision": "unsure", "confidence": 0.5, "reason": "<script>unsafe</script>"}
+    )
+    service = IncidentService(settings, engine, judge)
+    await service.group(add_report(engine))
+    second = await service.group(add_report(engine))
+    assert "needs officer" in client.get("/incidents").text
+    detail = client.get(f"/incidents/{second.incident_id}").text
+    assert "&lt;script&gt;unsafe&lt;/script&gt;" in detail
+    assert "<script>unsafe" not in detail

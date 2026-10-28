@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Incidents{% endblock %}
+{% block content %}
+  <header><h1>Incidents</h1><p class="muted">Newest activity first · Philippine time (GMT+8)</p></header>
+  {% if not items %}
+    <p class="empty">No incidents yet. Successfully assessed reports are grouped here.</p>
+  {% else %}
+    <table>
+      <thead><tr><th>Last activity</th><th>Barangay and incident</th><th>Reports</th><th>Flood depth</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for i in items %}
+        <tr>
+          <td>{{ i.last_seen|manila_time }}</td>
+          <td><strong>{{ i.barangay or "Location unknown" }}</strong><div><a href="/incidents/{{ i.id }}">{{ i.title }}</a></div></td>
+          <td>{{ i.latest_facts.get("report_count", 0) }}</td>
+          <td>Latest: {{ i.latest_facts.get("latest_depth", "unknown")|replace("_", " ") }}<br>Max: {{ i.latest_facts.get("max_depth", "unknown")|replace("_", " ") }}</td>
+          <td><span class="chip{% if i.status == 'needs_officer' %} warn{% endif %}">{{ i.status|replace("_", " ") }}</span></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+{% endblock %}

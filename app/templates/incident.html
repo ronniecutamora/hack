@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Incident #{{ incident.id }}{% endblock %}
+{% block content %}
+  <header>
+    <h1>{{ incident.title }}</h1>
+    <span class="chip{% if incident.status == 'needs_officer' %} warn{% endif %}">{{ incident.status|replace("_", " ") }}</span>
+  </header>
+  {% if not incident.active %}<p class="muted">Retired grouping. Reports were re-linked; its decision history is preserved.</p>{% endif %}
+  <p>{{ incident.barangay or "Location unknown" }} · First seen {{ incident.first_seen|manila_time }} · Last seen {{ incident.last_seen|manila_time }}</p>
+  <p>Latest flood depth: <strong>{{ incident.latest_facts.get("latest_depth", "unknown")|replace("_", " ") }}</strong> · Maximum seen: <strong>{{ incident.latest_facts.get("max_depth", "unknown")|replace("_", " ") }}</strong></p>
+  <ul class="chips">
+    {% for key, value in incident.latest_facts.get("totals", {}).items() %}
+      {% if value is not none %}<li class="chip">{{ key|replace("_", " ") }}: {{ value }}</li>{% endif %}
+    {% endfor %}
+  </ul>
+  <p class="muted">{{ incident.latest_facts.get("caveat", "Totals may double-count reports; officer verification required.") }}</p>
+  <h2>Timeline</h2>
+  {% if not items %}<p class="empty">No reports currently linked to this incident.</p>{% endif %}
+  <ol>
+  {% for item in items %}
+    {% set r = item.report %}{% set a = item.assessment %}
+    <li id="report-{{ r.id }}">
+      <p><time>{{ r.received_at|manila_time }}</time> · <a href="/reports#report-{{ r.id }}">Report #{{ r.id }}</a>
+        {% if r.channel == "demo" %}<span class="chip warn">Synthetic demo</span>{% endif %}
+      </p>
+      {% if a and a.facts %}
+        <p>Flood depth: <strong>{{ a.facts.get("flood_depth", "unknown")|replace("_", " ") }}</strong> · {{ a.facts.get("summary_en", "") }}</p>
+        <ul class="chips">{% for line in fact_lines(a.facts) %}<li class="chip">{{ line }}</li>{% endfor %}</ul>
+      {% else %}<p class="muted">No extracted facts available.</p>{% endif %}
+      <div class="evidence">
+        {% for m in item.media %}<a href="/media/{{ m.id }}"><img src="/media/{{ m.id }}" alt="Report photo evidence{% if m.kind == 'overlay' %} with measurement overlay{% endif %}" loading="lazy"></a>{% endfor %}
+      </div>
+      {% if item.had_photos and not item.media %}<p class="muted">Photo evidence deleted after retention; assessment kept.</p>{% endif %}
+      {% if r.grouping_error %}<p class="error">{{ r.grouping_error }}</p>{% endif %}
+    </li>
+  {% endfor %}
+  </ol>
+  <h2>Why the agent grouped these</h2>
+  {% if not decisions %}<p class="empty">No grouping decisions recorded yet.</p>{% endif %}
+  {% for d in decisions %}
+    <article>
+      <p><strong>{{ d.kind|replace("_", " ") }}</strong> · report #{{ d.report_id }} · {{ d.created_at|manila_time }}</p>
+      <p>Model: <code>{{ d.judge_model or "Deterministic rule (no model call)" }}</code> · Decision: {{ d.decision }} · Confidence: {% if d.confidence is not none %}{{ "%.0f%%"|format(d.confidence * 100) }}{% else %}not scored{% endif %}</p>
+      <p>{{ d.reason }}</p>
+      {% if d.compared_incident_id %}<p class="muted">Compared with <a href="/incidents/{{ d.compared_incident_id }}">incident #{{ d.compared_incident_id }}</a>{% if d.compared_report_id %}, report #{{ d.compared_report_id }}{% endif %}.</p>{% endif %}
+    </article>
+  {% endfor %}
+{% endblock %}
