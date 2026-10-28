@@ -105,6 +105,7 @@ Data:
 
 ```
 AGENTS.md              Instructions for AI coding agents (Muse Code, Claude Code, …)
+.agents/skills/        Provider notes for coding agents: baseten, fireworks, modal (SKILL.md each)
 README.md              This file
 pyproject.toml         Python project and tool config (uv)
 .env.example           Names of the environment variables (no secrets)
