@@ -1,0 +1,153 @@
+[
+  {
+    "key": "r01",
+    "reporter": "demo-01",
+    "day": 0,
+    "hour": 19,
+    "text": "Baha na po dito sa kanto namin sa Malaban, hanggang bukung-bukong na po yung tubig. Papasok na po sa mga bahay sa baba. Ingat po tayong lahat!",
+    "photo_prompt": "Flooded residential street in a Philippine lakeshore town at dusk, ankle-deep murky floodwater reflecting small concrete houses with corrugated GI-sheet roofs, a blue tarpaulin awning, scattered floating debris",
+    "barangay": "Malaban",
+    "series": "malaban-street",
+    "flood_cm": 20
+  },
+  {
+    "key": "r02",
+    "reporter": "demo-02",
+    "day": 1,
+    "hour": 8,
+    "text": "Grabe po yung hangin kagabi dito sa San Antonio, natuklap po yung kalahati ng yero namin. Tumutulo na po sa loob, sana po matulungan kami.",
+    "photo_prompt": "Damaged small concrete house with a half-torn corrugated GI-sheet roof, exposed wooden rafters, debris scattered in a muddy yard, overcast morning light",
+    "barangay": "San Antonio"
+  },
+  {
+    "key": "r03",
+    "reporter": "demo-03",
+    "day": 1,
+    "hour": 15,
+    "text": "Ako po si Juan dela Cruz, taga Dela Paz po. Baha pa rin po sa likod ng bahay namin, hanggang tuhod pa rin po. Wala pa pong kuryente simula kagabi.",
+    "barangay": "De La Paz"
+  },
+  {
+    "key": "r04",
+    "reporter": "demo-04",
+    "day": 2,
+    "hour": 9,
+    "text": "Dito po sa Casile, lima pong bahay ang nasira ang bubong sa lakas ng hangin. Kailangan po namin ng trapal at pako.",
+    "barangay": "Casile"
+  },
+  {
+    "key": "r05",
+    "reporter": "demo-05",
+    "day": 2,
+    "hour": 14,
+    "text": "Mangingisda po ako dito sa Bungahan. Sira po yung mga fish cage namin sa lawa, nabali po yung mga kawayan at inanod po yung lambat. Paano na po kami?",
+    "photo_prompt": "Bamboo fish cages on a wide calm lake, broken bamboo poles leaning at angles, torn nets half-submerged, grey stormy sky, distant shoreline houses",
+    "barangay": "Bungahan"
+  },
+  {
+    "key": "r06",
+    "reporter": "demo-06",
+    "day": 3,
+    "hour": 8,
+    "text": "Tumataas pa rin po yung baha dito sa kanto namin sa Malaban, hanggang tuhod na po ngayong umaga. Hindi na po madaanan ng tricycle.",
+    "photo_prompt": "Flooded residential street in a Philippine lakeshore town, knee-deep brown floodwater halfway up a concrete wall, sandbags piled at a doorway, GI-sheet roofs, floating plastic debris",
+    "barangay": "Malaban",
+    "series": "malaban-street",
+    "flood_cm": 60
+  },
+  {
+    "key": "r07",
+    "reporter": "demo-07",
+    "day": 4,
+    "hour": 11,
+    "text": "Nasa evacuation center na po kami sa Poblacion, maayos naman po dito. Kailangan lang po ng dagdag na banig at tubig na maiinom para sa mga bata.",
+    "barangay": "Poblacion"
+  },
+  {
+    "key": "r08",
+    "reporter": "demo-08",
+    "day": 5,
+    "hour": 9,
+    "text": "Wala pa pong dumarating na tulong dito sa amin. Ubos na po yung bigas at tubig namin, may dalawang bata pa naman kami. Sana po may makapunta ngayong gabi."
+  },
+  {
+    "key": "r09",
+    "reporter": "demo-09",
+    "day": 6,
+    "hour": 10,
+    "text": "Galing po ako kanina mula Malaban hanggang San Antonio, lubog pa rin po yung daan sa dalawang lugar. Yung jeep po hindi na tumutuloy."
+  },
+  {
+    "key": "r10",
+    "reporter": "demo-10",
+    "day": 7,
+    "hour": 9,
+    "text": "Pinakamataas na po yung baha dito sa kanto namin sa Malaban, hanggang bewang na po! Pumasok na po sa lahat ng bahay sa baba. Kailangan na po namin ng rescue!",
+    "photo_prompt": "Residential street under waist-deep floodwater in a Philippine lakeshore town, only upper walls and GI-sheet roofs above water, one house covered with a blue tarpaulin, floating wood and debris, overcast noon light",
+    "barangay": "Malaban",
+    "series": "malaban-street",
+    "flood_cm": 90
+  },
+  {
+    "key": "r11",
+    "reporter": "demo-04",
+    "day": 7,
+    "hour": 18,
+    "text": "Mali po yung sinabi ko kanina, tatlo pala ang bahay na nasira dito sa Casile, hindi lima. Pasensya na po, yung dalawa po pala trapal lang ang kailangan.",
+    "barangay": "Casile",
+    "corrects": "r04"
+  },
+  {
+    "key": "r12",
+    "reporter": "demo-11",
+    "day": 9,
+    "hour": 8,
+    "text": "Dito po sa Dela Paz, yung bubong po ng kapitbahay namin nilipad, kumalso po sa puno. Kami po nagtatapal muna ng trapal habang umuulan pa rin.",
+    "photo_prompt": "Small concrete house with a blue tarpaulin patched over part of its roof, fallen branches in a flooded yard, spare GI sheets leaning against a wall, wet overcast daylight",
+    "barangay": "De La Paz"
+  },
+  {
+    "key": "r13",
+    "reporter": "demo-12",
+    "day": 10,
+    "hour": 15,
+    "text": "Update po dito sa San Antonio, humuhupa na po yung tubig pero maputik pa rin po yung daan. Yung yero po namin kailangan pa ring maayos.",
+    "barangay": "San Antonio"
+  },
+  {
+    "key": "r14",
+    "reporter": "demo-13",
+    "day": 11,
+    "hour": 9,
+    "text": "Bumababa na po yung baha dito sa kanto namin sa Malaban, hanggang bukung-bukong na lang po ulit. Linis na po kami ng putik sa loob ng bahay.",
+    "photo_prompt": "Receding flood on a residential street in a Philippine lakeshore town, ankle-deep muddy water, thick mud lines on concrete walls, debris swept to the side, bright morning light",
+    "barangay": "Malaban",
+    "series": "malaban-street",
+    "flood_cm": 40
+  },
+  {
+    "key": "r15",
+    "reporter": "demo-14",
+    "day": 12,
+    "hour": 10,
+    "text": "Follow-up lang po, mangingisda po dito sa Bungahan. Hindi pa rin po namin naaayos yung mga fish pen sa lawa, kailangan po namin ng lambat at kawayan.",
+    "barangay": "Bungahan"
+  },
+  {
+    "key": "r16",
+    "reporter": "demo-15",
+    "day": 13,
+    "hour": 9,
+    "text": "Dito po sa covered court sa Poblacion, nakahanda na po yung mga relief goods para sa mga pamilya. Salamat po sa mga tumutulong!",
+    "photo_prompt": "Covered basketball court with stacked relief boxes and sacks of rice along the wall, empty court, daylight coming through the open sides",
+    "barangay": "Poblacion"
+  },
+  {
+    "key": "r17",
+    "reporter": "demo-16",
+    "day": 14,
+    "hour": 10,
+    "text": "Okay na po dito sa Casile, wala na pong baha. Yung tatlong bahay po na nasira ang bubong, dalawa na po ang naayos. Maraming salamat po!",
+    "barangay": "Casile"
+  }
+]
