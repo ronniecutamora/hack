@@ -5,6 +5,8 @@ import pytest
 import respx
 
 from app.meta.base import ModelOutputError, parse_json_text
+from app.meta.fireworks import FireworksSparkOpenClient
+from app.meta.openai_compatible import TruncatedReplyError
 from app.meta.spark import SparkClient, extract_json
 from app.meta.spark_open import SparkOpenClient
 
@@ -221,3 +223,66 @@ async def test_spark_open_does_not_cache_a_truncated_reply(cache):
         await client.chat_json(**kwargs)  # both budgets truncated
     assert await client.chat_json(**kwargs) == {"ok": True}  # asked again, not replayed
     assert route.call_count == 3
+
+
+@pytest.mark.parametrize("image", [None, b"synthetic image"])
+@respx.mock
+async def test_spark_open_hits_pre_refactor_cache_key(cache, image):
+    from app.cache import sha256_hex
+
+    # Payload used by SparkOpenClient.chat_json at commit 4bcf167.
+    payload = {
+        "system": "s",
+        "user_text": "u",
+        "schema": OK_SCHEMA,
+        "schema_name": "Ok",
+        "image": sha256_hex(image) if image is not None else None,
+        "max_tokens": 8192,
+    }
+    cache.put(SparkOpenClient.model, payload, completion('{"ok": true}'))
+    route = respx.post(SparkOpenClient.url).mock(
+        return_value=httpx.Response(200, json=completion('{"ok": false}'))
+    )
+    records = []
+    client = SparkOpenClient(api_key="bk", cache=cache, recorder=records.append)
+    try:
+        assert await client.chat_json(
+            system="s", user_text="u", schema=OK_SCHEMA, schema_name="Ok", image=image
+        ) == {"ok": True}
+        assert route.call_count == 0
+        assert len(records) == 1 and records[0].cached
+    finally:
+        await client.aclose()
+
+
+@pytest.mark.parametrize("client_type", [SparkOpenClient, FireworksSparkOpenClient])
+@respx.mock
+async def test_complete_length_reply_is_accepted_and_cached(client_type, cache):
+    route = respx.post(client_type.url).mock(
+        return_value=httpx.Response(200, json=completion('{"ok": true}', finish="length"))
+    )
+    client = client_type(api_key="test", cache=cache, backoff_s=0)
+    kwargs = dict(system="s", user_text="u", schema=OK_SCHEMA, schema_name="Ok")
+    try:
+        assert await client.chat_json(**kwargs) == {"ok": True}
+        assert await client.chat_json(**kwargs) == {"ok": True}
+        assert route.call_count == 1
+    finally:
+        await client.aclose()
+
+
+@pytest.mark.parametrize("client_type", [SparkOpenClient, FireworksSparkOpenClient])
+@pytest.mark.parametrize("content", [None, '{"ok":', '{"ok": "wrong"}', "[]"])
+@respx.mock
+async def test_invalid_length_reply_retries_and_is_not_cached(client_type, content, cache):
+    route = respx.post(client_type.url).mock(
+        return_value=httpx.Response(200, json=completion(content, finish="length"))
+    )
+    client = client_type(api_key="test", cache=cache, backoff_s=0)
+    try:
+        with pytest.raises(TruncatedReplyError, match="max_tokens"):
+            await client.chat_json(system="s", user_text="u", schema=OK_SCHEMA, schema_name="Ok")
+        assert [json.loads(c.request.content)["max_tokens"] for c in route.calls] == [8192, 16384]
+        assert list(cache.root.rglob("*.json")) == []
+    finally:
+        await client.aclose()

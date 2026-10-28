@@ -25,16 +25,18 @@ async def test_provider_auth_schema_cache_and_length_retry(client_type, cache):
             httpx.Response(200, json=completion('{"ok": "wrong"}')),
             httpx.Response(200, json=completion('{"ok":', finish="length")),
             httpx.Response(200, json=completion('{"ok": true}')),
+            httpx.Response(200, json=completion('{"ok":', finish="length")),
         ]
     )
     with pytest.raises(ModelOutputError):
         await client.chat_json(**KWARGS)
     assert await client.chat_json(**KWARGS) == {"ok": True}
     assert await client.chat_json(**KWARGS) == {"ok": True}
-    assert route.call_count == 3
+    # The larger-budget answer has its own cache key, as before the client refactor.
+    assert route.call_count == 4
     assert route.calls.last.request.headers["authorization"] == f"{client.auth_scheme} test"
     bodies = [json.loads(c.request.content) for c in route.calls]
-    assert [b["max_tokens"] for b in bodies] == [8192, 8192, 16384]
+    assert [b["max_tokens"] for b in bodies] == [8192, 8192, 16384, 8192]
     assert all(b["model"] == client.model for b in bodies)
     assert bodies[-1]["response_format"]["json_schema"]["schema"] == OK_SCHEMA
     await client.aclose()

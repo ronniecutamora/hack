@@ -91,7 +91,7 @@ class OpenAICompatibleClient(ModelClient):
                     messages,
                     max_tokens=budget,
                     response_format=response_format,
-                    key_payload=key_payload,
+                    key_payload={**key_payload, "max_tokens": budget},
                     check=lambda r: json_answer(r, schema),
                 )
                 return json_answer(reply, schema)
@@ -104,7 +104,7 @@ class OpenAICompatibleClient(ModelClient):
 
 
 class TruncatedReplyError(ModelOutputError):
-    """The model spent the whole token budget reasoning and gave no answer."""
+    """The model exhausted its token budget without a usable JSON answer."""
 
 
 def parse_reply(raw: dict[str, Any], service: str = "OpenAI-compatible") -> ChatReply:
@@ -122,15 +122,19 @@ def parse_reply(raw: dict[str, Any], service: str = "OpenAI-compatible") -> Chat
 
 def json_answer(reply: ChatReply, schema: dict[str, Any]) -> dict[str, Any]:
     """The reply's JSON answer, validated; raises ModelOutputError if it is unusable."""
-    if reply.finish_reason == "length":
-        raise TruncatedReplyError("Reply truncated; raise max_tokens and retry.")
     if not reply.content:
-        raise ModelOutputError(
+        error = TruncatedReplyError if reply.finish_reason == "length" else ModelOutputError
+        raise error(
             f"Model returned no answer (finish_reason={reply.finish_reason}); "
             "raise max_tokens so reasoning does not use the whole budget"
         )
-    parsed = parse_json_text(reply.content, what="Model")
-    if not isinstance(parsed, dict):
-        raise ModelOutputError(f"Model returned non-object JSON: {reply.content[:200]!r}")
-    validate(schema, parsed)
+    try:
+        parsed = parse_json_text(reply.content, what="Model")
+        if not isinstance(parsed, dict):
+            raise ModelOutputError(f"Model returned non-object JSON: {reply.content[:200]!r}")
+        validate(schema, parsed)
+    except ModelOutputError as exc:
+        if reply.finish_reason == "length":
+            raise TruncatedReplyError("Reply truncated; raise max_tokens and retry.") from exc
+        raise
     return parsed
