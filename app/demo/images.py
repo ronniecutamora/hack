@@ -22,7 +22,12 @@ from app.meta.factory import make_cache
 from app.meta.image import PRICE_PER_IMAGE, ImageClient
 
 LABEL_TEXT = "AI-generated (Muse Image) · synthetic demo"
-STYLE = "Photorealistic phone-camera photo, overcast daylight."
+# Biñan is flat lowland on the Laguna de Bay shore: a first test image (2026-10-28) showed
+# mountains, which no Biñan street has.
+STYLE = (
+    "Photorealistic phone-camera photo, overcast daylight. Flat, low-lying lakeshore town on a"
+    " wide lake; no mountains or hills anywhere in view."
+)
 SAFETY = "No people, no faces, no readable text, no signs, no logos, no license plates."
 
 
