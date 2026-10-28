@@ -77,6 +77,7 @@ def geolocate(
 
     A point outside Biñan is noted but does not stop a name match (a reporter may send the
     pin from elsewhere). Several names in one text are ambiguous: no barangay is guessed.
+    The LLM name is only a fallback when neither text nor transcript names a barangay.
     """
     notes: list[str] = []
     for source, point in (("pin", pin), ("exif", exif)):
@@ -86,16 +87,19 @@ def geolocate(
         if barangay is not None:
             return GeoResult(barangay, source)
         notes.append(f"{source} outside Biñan")
-    ambiguous: list[str] = []
-    for source, value in (("text", text), ("transcript", transcript), ("llm", llm_barangay)):
-        match = find_in_text(value, require_cues=source != "llm")
+    named_places = [
+        (source, find_in_text(value))
+        for source, value in (("text", text), ("transcript", transcript))
+    ]
+    for _, match in named_places:
+        if match.ambiguous:
+            return GeoResult(None, "ambiguous", " or ".join(b.name for b in match.barangays))
+    for source, match in [*named_places, ("llm", find_in_text(llm_barangay, require_cues=False))]:
         if match.barangay is not None:
             detail = ", ".join([*match.matched, *notes]) + (" (approximate)" if match.fuzzy else "")
             return GeoResult(match.barangay, source, detail)
         if match.ambiguous:
-            ambiguous = [b.name for b in match.barangays]
-    if ambiguous:
-        return GeoResult(None, "ambiguous", " or ".join(ambiguous))
+            return GeoResult(None, "ambiguous", " or ".join(b.name for b in match.barangays))
     return GeoResult(None, "none", ", ".join(notes) or None)
 
 

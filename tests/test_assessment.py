@@ -128,6 +128,38 @@ def test_two_names_are_ambiguous_not_guessed():
     assert (geo.barangay, geo.source, geo.detail) == (None, "ambiguous", "Malaban or Casile")
 
 
+@pytest.mark.parametrize("source", ["text", "transcript"])
+def test_llm_cannot_resolve_ambiguous_evidence(source):
+    evidence = {"text": None, "transcript": None}
+    evidence[source] = "Galing po ako kanina mula Malaban hanggang San Antonio, lubog pa rin."
+    geo = geolocate(pin=None, exif=None, llm_barangay="Malaban", **evidence)
+    assert (geo.barangay, geo.source, geo.detail) == (None, "ambiguous", "Malaban or San Antonio")
+
+
+def test_ambiguous_transcript_cannot_be_resolved_by_single_name_in_text():
+    geo = geolocate(
+        pin=None,
+        exif=None,
+        text="sa Malaban",
+        transcript="mula Malaban hanggang San Antonio",
+        llm_barangay="Malaban",
+    )
+    assert (geo.barangay, geo.source, geo.detail) == (None, "ambiguous", "Malaban or San Antonio")
+
+
+@pytest.mark.parametrize("source", ["pin", "exif"])
+def test_gps_still_wins_over_ambiguous_text(source):
+    points = {"pin": None, "exif": None}
+    points[source] = POBLACION
+    geo = geolocate(
+        **points,
+        text="mula Malaban hanggang San Antonio",
+        transcript=None,
+        llm_barangay="Malaban",
+    )
+    assert (geo.barangay, geo.source) == (BY_NAME["Poblacion"], source)
+
+
 # the service
 
 
