@@ -2,6 +2,8 @@
 
 Files under DATA_DIR/media with no Media row (left behind when a write failed after the file
 was saved) are deleted on the same schedule, so the privacy promise holds for them too.
+Spend-cap holds keep raw files for at most HELD_MEDIA_MAX_HOURS from media creation;
+blocked holds use the normal TTL. Assessments are skipped only during a one-hour grace period.
 Only the raw files go. Reports, transcripts, captions and later assessments are kept, and
 Media rows stay (with purged_at set) so the record shows what existed and when it was removed.
 """
@@ -11,25 +13,49 @@ import contextlib
 import logging
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import Engine
+from sqlalchemy import Engine, case, or_
 from sqlmodel import Session, col, select
 
 from app.config import Settings, get_settings
 from app.db import init_db, make_engine
-from app.models import Media, utcnow
+from app.models import STATUS_ASSESSING, STATUS_HELD, Media, Report, Reporter, utcnow
+from app.trust import HOLD_SPEND
 
 logger = logging.getLogger(__name__)
 PURGE_INTERVAL_S = 3600
+ASSESSING_GRACE_HOURS = 1
 
 
 def purge_expired(settings: Settings, engine: Engine, now: datetime | None = None) -> int:
     """Delete raw media older than the TTL. Returns the number of files purged."""
     now = now or utcnow()
     cutoff = now - timedelta(hours=settings.raw_media_ttl_hours)
+    held_cutoff = now - timedelta(hours=settings.held_media_max_hours)
+    assessing_cutoff = now - timedelta(hours=ASSESSING_GRACE_HOURS)
     purged = 0
     with Session(engine) as session:
         expired = session.exec(
-            select(Media).where(col(Media.purged_at).is_(None), Media.created_at < cutoff)
+            select(Media)
+            .join(Report, Report.id == Media.report_id)
+            .join(Reporter, Reporter.id == Report.reporter_id)
+            .where(
+                col(Media.purged_at).is_(None),
+                or_(
+                    Report.status != STATUS_ASSESSING,
+                    col(Report.assessing_started_at).is_(None),
+                    Report.assessing_started_at <= assessing_cutoff,
+                ),
+                Media.created_at
+                < case(
+                    (
+                        (Report.status == STATUS_HELD)
+                        & (Report.hold_reason == HOLD_SPEND)
+                        & (Reporter.blocked == False),  # noqa: E712
+                        held_cutoff,
+                    ),
+                    else_=cutoff,
+                ),
+            )
         ).all()
         for media in expired:
             file = settings.data_dir / media.path

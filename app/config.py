@@ -2,8 +2,9 @@
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Self
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.meta.llm import AgentLLMName
@@ -25,9 +26,22 @@ class Settings(BaseSettings):
     incident_window_days: int = Field(default=14, gt=0)
     pair_merge_threshold: float = Field(default=0.85, ge=0, le=1)
 
+    reports_per_hour: int = Field(default=20, gt=0)
+    reports_per_day: int = Field(default=60, gt=0)
+    daily_spend_cap_usd: float = Field(default=10.0, gt=0, allow_inf_nan=False)
+    photo_max_age_days: int = Field(default=3, ge=0)
+    photo_hash_max_distance: int = Field(default=6, ge=0, le=64)
+
     data_dir: Path = Path("./var")
     model_cache: bool = True
     raw_media_ttl_hours: int = 24
+    held_media_max_hours: int = Field(default=72, gt=0)
+
+    @model_validator(mode="after")
+    def validate_retention_periods(self) -> Self:
+        if self.held_media_max_hours < self.raw_media_ttl_hours:
+            raise ValueError("held_media_max_hours must be >= raw_media_ttl_hours")
+        return self
 
     @property
     def db_path(self) -> Path:

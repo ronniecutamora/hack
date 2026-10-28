@@ -1,0 +1,19 @@
+{% macro signal_chips(assessment, related_incidents) %}
+  {% if assessment and assessment.signals %}
+    <ul class="chips" aria-label="Trust signals">
+    {% for signal in assessment.signals %}
+      <li class="chip{% if signal.severity == 'high' %} alert{% elif signal.severity == 'medium' %} warn{% endif %}">
+        {{ signal.code|replace('_', ' ') }}: {{ signal.detail }}{% if signal.related_report_id %}
+        {% set incident_id = related_incidents.get(signal.related_report_id) %}
+        {% if incident_id %}<a href="/incidents/{{ incident_id }}#report-{{ signal.related_report_id }}">report #{{ signal.related_report_id }}</a>{% else %}report #{{ signal.related_report_id }}{% endif %}{% endif %}
+      </li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+{% endmacro %}
+
+{% macro incident_trust(summary) %}
+  {% if summary.reporter_count is not none %}<span>{{ summary.reporter_count }} reporter{{ 's' if summary.reporter_count != 1 }}</span>{% else %}<span class="muted">Reporter count unavailable</span>{% endif %}
+  {% if summary.reporter_count == 1 %}<span class="chip warn">single source</span>{% endif %}
+  {% if summary.flagged_report_count > 0 %}<div class="chip warn">{{ summary.flagged_report_count }} flagged report{{ 's' if summary.flagged_report_count != 1 }} (high/medium trust signals)</div>{% endif %}
+{% endmacro %}

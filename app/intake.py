@@ -5,14 +5,17 @@ written under DATA_DIR/media and deleted later by app.retention. The raw user id
 to derive the pseudonym and is never stored or logged.
 """
 
+import asyncio
 import logging
 import tempfile
 from collections.abc import Awaitable, Callable
 from datetime import timedelta
+from enum import StrEnum
 from pathlib import Path
 from typing import Protocol
+from weakref import WeakValueDictionary
 
-from sqlalchemy import Engine
+from sqlalchemy import Engine, func
 from sqlmodel import Session, col, select
 
 from app.audio import AudioConversionError, to_wav_chunks
@@ -21,8 +24,18 @@ from app.config import Settings
 from app.gazetteer import transcription_keywords
 from app.meta.base import MetaError
 from app.meta.transcribe import Transcript
-from app.models import STATUS_TRANSCRIPTION_FAILED, Media, Report, Reporter, utcnow
+from app.models import (
+    STATUS_ASSESSED,
+    STATUS_HELD,
+    STATUS_NEW,
+    STATUS_TRANSCRIPTION_FAILED,
+    Media,
+    Report,
+    Reporter,
+    utcnow,
+)
 from app.privacy import pseudonymize
+from app.trust import HASH_UNAVAILABLE, HOLD_BLOCKED, hold_reason, photo_hash
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +45,12 @@ LANGUAGE_BIAS = ["Tagalog", "English"]
 LOCATION_JOIN_WINDOW = timedelta(minutes=15)
 
 ConvertFn = Callable[[Path, Path], Awaitable[list[Path]]]
+
+
+class Admission(StrEnum):
+    OK = "ok"
+    RATE_LIMITED = "rate_limited"
+    BLOCKED = "blocked"
 
 
 class Transcriber(Protocol):
@@ -72,6 +91,60 @@ class IntakeService:
         self.engine = engine
         self.transcriber = transcriber
         self.convert = convert
+        # Serialize admission through storage, including slow downloads, for Telegram albums.
+        self._admission_locks: WeakValueDictionary[str, asyncio.Lock] = WeakValueDictionary()
+
+    def admission_lock(self, user_ref: int | str) -> asyncio.Lock:
+        key = pseudonymize(self.settings.pseudonym_salt.get_secret_value(), user_ref)
+        lock = self._admission_locks.get(key)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._admission_locks[key] = lock
+        return lock
+
+    def admit(self, user_ref: int | str) -> Admission:
+        """Bot-only volume guard. Direct ingest (demo, imports, tests) stays unrestricted."""
+        pseudonym = pseudonymize(self.settings.pseudonym_salt.get_secret_value(), user_ref)
+        with self._session() as session:
+            reporter = session.exec(select(Reporter).where(Reporter.pseudonym == pseudonym)).first()
+            if reporter is None:
+                return Admission.OK
+            now = utcnow()
+            for window, limit in (
+                (timedelta(hours=1), self.settings.reports_per_hour),
+                (timedelta(days=1), self.settings.reports_per_day),
+            ):
+                count = session.exec(
+                    select(func.count(Report.id)).where(
+                        Report.reporter_id == reporter.id, Report.received_at > now - window
+                    )
+                ).one()
+                if count >= limit:
+                    return Admission.RATE_LIMITED
+            if reporter.blocked:
+                return Admission.BLOCKED
+        return Admission.OK
+
+    def _location_target(self, session: Session, reporter_id: int) -> Report | None:
+        return session.exec(
+            select(Report)
+            .where(
+                Report.reporter_id == reporter_id,
+                col(Report.lat).is_(None),
+                Report.received_at >= utcnow() - LOCATION_JOIN_WINDOW,
+            )
+            .order_by(col(Report.received_at).desc(), col(Report.id).desc())
+        ).first()
+
+    def can_attach_location(self, user_ref: int | str) -> bool:
+        pseudonym = pseudonymize(self.settings.pseudonym_salt.get_secret_value(), user_ref)
+        with self._session() as session:
+            reporter = session.exec(select(Reporter).where(Reporter.pseudonym == pseudonym)).first()
+            return (
+                reporter is not None
+                and not reporter.blocked
+                and self._location_target(session, reporter.id) is not None
+            )
 
     def _session(self) -> Session:
         return Session(self.engine, expire_on_commit=False)
@@ -91,18 +164,35 @@ class IntakeService:
         reporter = self._reporter(session, user_ref)
         assert reporter.id is not None
         report = Report(reporter_id=reporter.id, channel=channel, **fields)
+        if reporter.blocked:
+            report.status, report.hold_reason = STATUS_HELD, HOLD_BLOCKED
         session.add(report)
         session.flush()
         return report
 
-    def _store_media(self, session: Session, report: Report, kind: str, data: bytes, ext: str):
+    def _store_media(
+        self,
+        session: Session,
+        report: Report,
+        kind: str,
+        data: bytes,
+        ext: str,
+        *,
+        phash: str | None = None,
+    ):
         assert report.id is not None
         digest = sha256_hex(data)
         relative = Path("media") / str(report.id) / f"{digest[:16]}.{ext.lstrip('.').lower()}"
         target = self.settings.data_dir / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(data)
-        media = Media(report_id=report.id, kind=kind, path=str(relative), sha256=digest)
+        media = Media(
+            report_id=report.id,
+            kind=kind,
+            path=str(relative),
+            sha256=digest,
+            phash=phash,
+        )
         session.add(media)
         return media
 
@@ -126,11 +216,12 @@ class IntakeService:
         ext: str = "jpg",
         channel: str = "telegram",
     ) -> Report:
+        phash = await asyncio.to_thread(photo_hash, data) or HASH_UNAVAILABLE
         with self._session() as session:
             report = self._new_report(
                 session, user_ref, channel, text=(caption or "").strip() or None
             )
-            self._store_media(session, report, "photo", data, ext)
+            self._store_media(session, report, "photo", data, ext, phash=phash)
             session.commit()
             return report
 
@@ -152,7 +243,13 @@ class IntakeService:
         with self._session() as session:
             report = self._new_report(session, user_ref, channel)
             media = self._store_media(session, report, "voice", data, ext)
+            reason = hold_reason(session, report, self.settings)
+            if reason:
+                report.status, report.hold_reason = STATUS_HELD, reason
+                session.add(report)
             session.commit()
+        if reason:
+            return report
         try:
             report.transcript = await self._transcribe(self.settings.data_dir / media.path)
         except (MetaError, AudioConversionError) as exc:
@@ -182,18 +279,12 @@ class IntakeService:
             raise ValueError("latitude or longitude out of range")
         with self._session() as session:
             reporter = self._reporter(session, user_ref)
-            cutoff = utcnow() - LOCATION_JOIN_WINDOW
-            report = session.exec(
-                select(Report)
-                .where(
-                    Report.reporter_id == reporter.id,
-                    col(Report.lat).is_(None),
-                    Report.received_at >= cutoff,
-                )
-                .order_by(col(Report.received_at).desc())
-            ).first()
+            report = None if reporter.blocked else self._location_target(session, reporter.id)
             if report is None:
                 report = self._new_report(session, user_ref, channel)
+            elif report.status == STATUS_ASSESSED:
+                # A new pin needs remapping even when the spend gate delays processing.
+                report.status = STATUS_NEW
             report.lat, report.lon = lat, lon
             session.add(report)
             session.commit()

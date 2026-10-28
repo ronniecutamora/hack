@@ -2,7 +2,7 @@
 
 > An entry for the **Meta Global AI Developer Hackathon** (Oct 27 – Nov 4, 2026), built for the Philippines with Meta's Muse models.
 
-**Status:** building; slices 1–3a (intake, assessment/mapping, incident coordination) implemented and locally tested. Typhoon and flood damage reporting for Philippine LGUs, plus crop and fisheries insurance claims: one agent turns photos, Taglish voice notes, and texts from barangays, farmers, and fisherfolk into an officer-approved RDANA report, a damaged-houses table, and PCIC Notices of Loss. Demo area: Biñan City, Laguna.
+**Status:** building; slices 1–3c (intake, assessment/mapping, incident coordination, abuse guards) implemented and locally tested. Typhoon and flood damage reporting for Philippine LGUs, plus crop and fisheries insurance claims: one agent turns photos, Taglish voice notes, and texts from barangays, farmers, and fisherfolk into an officer-approved RDANA report, a damaged-houses table, and PCIC Notices of Loss. Demo area: Biñan City, Laguna.
 
 ---
 
@@ -34,6 +34,31 @@ Every LLM call goes through `AgentLLM`. `AGENT_LLM` selects fact extraction and 
 Incident candidates share a barangay and activity within `INCIDENT_WINDOW_DAYS` (14 by default). GPS within 500 m can add candidates when a barangay is missing, and distance vetoes distant pairs when both sides have points. Known different barangays never match. Only `same` at or above `PAIR_MERGE_THRESHOLD` (0.85 by default) merges; unsure and low-confidence results remain separate with `needs_officer`. These are configurable policy choices, not calibrated accuracy claims. Pair prompts use typed facts, regenerated summaries and photo captions, and redacted place details; they omit raw text, transcripts, reporter pseudonyms, images and free-form photo notes.
 
 Grouping runs after successful assessment under the same per-report lock, without a database transaction across a model call. A changed late pin re-links the report; an empty old group is retired from the list while its audit remains readable. Unchanged grouping is a no-op. `AgentDecision` stores the actual judge model, compared incident/report, confidence and reason; pages do not regenerate explanations. Judge failures stay visible for officer review and can be retried explicitly. Existing slice-2 SQLite files receive grouping columns on startup without losing reports.
+
+## Spam and fake reports
+
+Ulat never sends aid or files a claim by itself: every output is a draft an officer approves, and PCIC
+adjusters validate losses in the field. So the risks are **credit drain**, **officer overload**,
+**poisoned incident numbers** and **insurance fraud**. The agent handles them in layers, without extra
+model calls:
+
+| Layer | What happens | Default |
+|---|---|---|
+| Rate limit | Each pseudonymous reporter is checked *before* a file is downloaded. Over the limit, the bot replies (Tagalog / English) to try later and to call 911 for emergencies | 20 reports per hour, 60 per 24 h (`REPORTS_PER_HOUR`, `REPORTS_PER_DAY`) |
+| Spend cap | Model costs logged in the last 24 h are checked before every assessment. Over the cap, new reports are stored as `held` and assessed later by `python -m app.assessment --pending` | $10 (`DAILY_SPEND_CAP_USD`) |
+| Block list | `python -m app.trust block <pseudonym-prefix>` (and `unblock`). Messages are still stored as `held` for the officer but never reach a model | — |
+| Trust signals | Rule-based flags on each report, shown as red / amber / grey chips: **photo reused** by another reporter (SHA-256 or a 64-bit difference hash, so resized or recompressed copies match), **old photo** (EXIF capture time), **pin outside Biñan**, **pin and text name different barangays** | Photo older than 3 days (`PHOTO_MAX_AGE_DAYS`) |
+| Corroboration | Each incident shows how many *different* reporters it has; one reporter is labelled **single source** | — |
+
+Reporter ids and trust signals never enter a model prompt. Raw media of held reports follows the
+retention rule below (spend-cap holds are kept up to `HELD_MEDIA_MAX_HOURS`, 72 h by default, and
+the bot's `/start` notice says so).
+
+**Limits:** one person with several Telegram accounts can still corroborate themselves; EXIF can be
+edited or stripped (Telegram strips it from normal photos); AI-generated or staged photos are not
+detected; the spend cap uses estimated costs, so in-flight work can overshoot it a little. The officer
+and the PCIC adjuster remain the final check. A next step is verified reporters (barangay officials
+enrolled by the CDRRMO).
 
 ## Demo
 
@@ -82,7 +107,7 @@ uv run python -m scripts.eval_facts /path/to/recordings [--llm muse-spark-open] 
 uv run python -m app.retention
 ```
 
-Model responses are cached on disk under `DATA_DIR/model_cache` when `MODEL_CACHE=true`, so repeated development runs do not spend credits. Raw photos, voice notes and photo overlays are deleted after `RAW_MEDIA_TTL_HOURS` (default 24); reports, transcripts and assessments are kept. Names that reporters say when introducing themselves ("Ako po si …") are redacted before any text reaches a model.
+Model responses are cached on disk under `DATA_DIR/model_cache` when `MODEL_CACHE=true`, so repeated development runs do not spend credits. Raw photos, voice notes and photo overlays are deleted after `RAW_MEDIA_TTL_HOURS` (default 24), or up to `HELD_MEDIA_MAX_HOURS` (default 72 from media creation) while processing is paused by the spend cap. Blocked reporters use the normal TTL. Retention runs hourly and skips active assessments until processing finishes. Reports, transcripts and assessments are kept. The bot's bilingual `/start` privacy notice states both configured retention periods. Names that reporters say when introducing themselves ("Ako po si …") are redacted before any text reaches a model.
 
 ## Built during the hackathon
 
@@ -108,6 +133,9 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-28 | Demo place descriptions: varied Taglish names one synthetic Malaban corner, one Casile purok and one Poblacion evacuation court across follow-ups; the ankle-to-waist-to-ankle story and unpinned two-barangay report are regression-tested |
 | 2026-10-28 | Demo fisherfolk correction: both reports now name and pin De La Paz with a shared synthetic lakeshore fish-pen place; the photo prompt is unchanged and scenario checks cover the location |
 | 2026-10-28 | Demo reset preserves generated Muse Image photos while clearing databases, uploads and manifests; updated CLI messages and offline regression coverage |
+| 2026-10-29 | Spam and fake-report guards (slice 3c): per-reporter rate limits checked before download, a rolling 24 h model-spend cap that holds reports for later, an officer block list, and additive database upgrades |
+| 2026-10-29 | Trust signals: reused or near-duplicate photos across reporters (SHA-256 and difference hash), old EXIF photos, pins outside Biñan or contradicting the text, and per-incident reporter counts with a "single source" label, shown as dashboard chips |
+| 2026-10-29 | Review fixes for slice 3c: held reports keep their media for at most 72 h, blocked reporters' media follows the normal 24 h rule, late pins and partial evidence are not lost, photo hashing stays out of database writes |
 
 ### Third-party code and assets
 

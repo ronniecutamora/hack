@@ -22,6 +22,7 @@ from sqlmodel import Session, col, select
 from app.config import Settings, get_settings
 from app.db import init_db, make_engine
 from app.models import AgentDecision, Assessment, Incident, Media, PhotoAssessment, Report, Reporter
+from app.trust import model_spend
 
 MANILA = timezone(timedelta(hours=8))  # Philippine time, no daylight saving
 REPORT_LIMIT = 200
@@ -96,6 +97,29 @@ templates.env.globals["fact_lines"] = fact_lines
 templates.env.globals["GEO_SOURCES"] = GEO_SOURCES
 
 
+def incident_trust(incident: Incident) -> dict[str, int | None]:
+    """The rollup owns trust counts; legacy incidents show unknown until refreshed."""
+    return {
+        "reporter_count": incident.latest_facts.get("reporter_count"),
+        "flagged_report_count": incident.latest_facts.get("flagged_report_count", 0),
+    }
+
+
+def related_incidents(session: Session, assessments: list[Assessment]) -> dict[int, int | None]:
+    """Resolve related evidence independently of the capped /reports page."""
+    ids = {
+        signal["related_report_id"]
+        for assessment in assessments
+        for signal in assessment.signals or []
+        if signal.get("related_report_id")
+    }
+    if not ids:
+        return {}
+    return dict(
+        session.exec(select(Report.id, Report.incident_id).where(col(Report.id).in_(ids))).all()
+    )
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
 
@@ -129,6 +153,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             photo_rows = session.exec(
                 select(PhotoAssessment).where(col(PhotoAssessment.report_id).in_(ids))
             ).all()
+            spend = model_spend(session)
+            related = related_incidents(session, assessments)
         media_by_id = {m.id: m for m in media}
         media_by_report: defaultdict[int, list[Media]] = defaultdict(list)
         for m in media:
@@ -142,6 +168,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     "overlay": media_by_id.get(row.overlay_media_id),
                 }
             )
+        assessed_media = {row.media_id for row in photo_rows}
+        for m in media:
+            if m.kind == "photo" and m.id not in assessed_media:
+                photos_by_report[m.report_id].append(
+                    {"assessment": None, "photo": m, "overlay": None}
+                )
         by_report = {a.report_id: a for a in assessments}
         items = [
             {
@@ -157,6 +189,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "items": items,
             "agent_llm": settings.agent_llm,
             "ttl_hours": settings.raw_media_ttl_hours,
+            "model_spend": spend,
+            "spend_cap": settings.daily_spend_cap_usd,
+            "related_incidents": related,
         }
         return templates.TemplateResponse(request, "reports.html", context)
 
@@ -168,7 +203,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 .where(Incident.active == True)  # noqa: E712
                 .order_by(col(Incident.last_seen).desc(), col(Incident.id).desc())
             ).all()
-        return templates.TemplateResponse(request, "incidents.html", {"items": items})
+            trust = {incident.id: incident_trust(incident) for incident in items}
+        return templates.TemplateResponse(
+            request, "incidents.html", {"items": items, "trust": trust}
+        )
 
     @app.get("/incidents/{incident_id}", response_class=HTMLResponse)
     def incident_detail(request: Request, incident_id: int) -> HTMLResponse:
@@ -200,6 +238,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 )
                 .order_by(AgentDecision.created_at, AgentDecision.id)
             ).all()
+            trust = incident_trust(incident)
+            related = related_incidents(session, list(assessments.values()))
         items = []
         for report in reports:
             available = [m for m in media[report.id] if m.purged_at is None]
@@ -218,6 +258,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "incident": incident,
                 "items": items,
                 "decisions": decisions,
+                "trust": trust,
+                "related_incidents": related,
             },
         )
 

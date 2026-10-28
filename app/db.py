@@ -31,20 +31,35 @@ def _enable_wal(dbapi_connection, _record) -> None:
 
 def init_db(engine: Engine) -> None:
     SQLModel.metadata.create_all(engine)
-    # create_all does not alter existing tables. These nullable additions preserve slice-2 DBs.
+    # create_all does not alter existing tables. Nullable/defaulted additions preserve older DBs.
     with engine.begin() as connection:
-        columns = {c["name"] for c in inspect(connection).get_columns("report")}
         additions = {
-            "incident_id": "INTEGER REFERENCES incident(id)",
-            "grouping_fingerprint": "VARCHAR",
-            "grouping_error": "VARCHAR",
-            "grouping_needs_officer": "BOOLEAN NOT NULL DEFAULT 0",
+            "report": {
+                "incident_id": "INTEGER REFERENCES incident(id)",
+                "grouping_fingerprint": "VARCHAR",
+                "grouping_error": "VARCHAR",
+                "grouping_needs_officer": "BOOLEAN NOT NULL DEFAULT 0",
+                "hold_reason": "VARCHAR",
+                "assessing_started_at": "DATETIME",
+            },
+            "reporter": {"blocked": "BOOLEAN NOT NULL DEFAULT 0"},
+            "media": {"phash": "VARCHAR"},
+            "photoassessment": {"taken_at": "DATETIME"},
+            "assessment": {"signals": "JSON"},
         }
-        for name, sql_type in additions.items():
-            if name not in columns:
-                connection.exec_driver_sql(f"ALTER TABLE report ADD COLUMN {name} {sql_type}")
+        for table, additions_by_column in additions.items():
+            columns = {c["name"] for c in inspect(connection).get_columns(table)}
+            for name, sql_type in additions_by_column.items():
+                if name not in columns:
+                    connection.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {name} {sql_type}")
         connection.exec_driver_sql(
             "CREATE INDEX IF NOT EXISTS ix_report_incident_id ON report (incident_id)"
+        )
+        connection.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_media_sha256 ON media (sha256)")
+        connection.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_modelcall_at ON modelcall (at)")
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_report_reporter_received "
+            "ON report (reporter_id, received_at)"
         )
 
 

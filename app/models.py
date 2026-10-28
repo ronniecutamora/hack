@@ -13,6 +13,7 @@ STATUS_TRANSCRIPTION_FAILED = "transcription_failed"
 STATUS_ASSESSING = "assessing"
 STATUS_ASSESSED = "assessed"
 STATUS_ASSESSMENT_FAILED = "assessment_failed"  # partial results are still saved
+STATUS_HELD = "held"
 
 
 def utcnow() -> datetime:
@@ -23,6 +24,7 @@ class Reporter(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     pseudonym: str = Field(unique=True, index=True)  # HMAC-SHA256(salt, telegram user id)
     created_at: NaiveDatetime = Field(default_factory=utcnow)
+    blocked: bool = False
 
 
 class Report(SQLModel, table=True):
@@ -40,6 +42,8 @@ class Report(SQLModel, table=True):
     lon: float | None = None
     barangay: str | None = None
     status: str = STATUS_NEW
+    assessing_started_at: NaiveDatetime | None = None
+    hold_reason: str | None = None
 
 
 class Media(SQLModel, table=True):
@@ -47,7 +51,8 @@ class Media(SQLModel, table=True):
     report_id: int = Field(foreign_key="report.id", index=True)
     kind: str  # "photo" | "voice" | "overlay" (SAM masks drawn on a photo; purged like raw media)
     path: str  # relative to DATA_DIR
-    sha256: str
+    sha256: str = Field(index=True)
+    phash: str | None = None  # retained 64-bit dHash; NULL = untried, "" = unavailable
     created_at: NaiveDatetime = Field(default_factory=utcnow)
     # Set when the raw file is deleted; derived text and assessments are kept.
     purged_at: NaiveDatetime | None = None
@@ -57,7 +62,7 @@ class ModelCall(SQLModel, table=True):
     """One row per model request (cache hits included) for observability and cost tracking."""
 
     id: int | None = Field(default=None, primary_key=True)
-    at: NaiveDatetime = Field(default_factory=utcnow)
+    at: NaiveDatetime = Field(default_factory=utcnow, index=True)
     model: str
     latency_ms: int
     cached: bool
@@ -77,6 +82,7 @@ class Assessment(SQLModel, table=True):
     geo_detail: str | None = None  # matched words, or the candidates when ambiguous
     error: str | None = None
     updated_at: NaiveDatetime = Field(default_factory=utcnow)
+    signals: list[dict[str, Any]] | None = Field(default=None, sa_column=Column(JSON))
 
 
 class PhotoAssessment(SQLModel, table=True):
@@ -92,6 +98,7 @@ class PhotoAssessment(SQLModel, table=True):
     # GPS from the photo's EXIF (only when it was sent as a file); used if there is no pin.
     gps_lat: float | None = None
     gps_lon: float | None = None
+    taken_at: NaiveDatetime | None = None  # EXIF Manila local capture time, converted to UTC
     error: str | None = None
     updated_at: NaiveDatetime = Field(default_factory=utcnow)
 

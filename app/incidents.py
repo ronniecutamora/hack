@@ -78,6 +78,8 @@ class Observation:
     point: tuple[float, float] | None
     facts: dict[str, Any]
     context: dict[str, Any]
+    reporter_id: int | None = None
+    flagged: bool = False
 
 
 def distance_m(a: tuple[float, float], b: tuple[float, float]) -> float:
@@ -136,6 +138,8 @@ def rollup(members: list[Observation]) -> dict[str, Any]:
         totals[key] = sum(values) if values else None
     return {
         "report_count": len(ordered),
+        "reporter_count": len({m.reporter_id for m in ordered if m.reporter_id is not None}),
+        "flagged_report_count": sum(m.flagged for m in ordered),
         "latest_depth": depths[-1] if depths else "unknown",
         "max_depth": max(known, key=DEPTH_ORDER.index) if known else "unknown",
         "totals": totals,
@@ -189,6 +193,11 @@ def observations(session: Session) -> dict[int, Observation]:
             point,
             facts,
             context,
+            report.reporter_id,
+            any(
+                s.get("severity") in ("high", "medium")
+                for s in (assessments[report.id].signals or [])
+            ),
         )
     return result
 

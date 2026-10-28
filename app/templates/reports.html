@@ -1,8 +1,10 @@
 {% extends "base.html" %}
+{% from "_trust.html" import signal_chips %}
 {% block content %}
   <header>
     <h1>Reports</h1>
     <p class="muted">Agent LLM: <code>{{ agent_llm }}</code> · photo judgment by the agent LLM, measurements by SAM 3.1</p>
+    <p class="{% if model_spend >= spend_cap %}chip warn{% else %}muted{% endif %}">Model spend, last 24 h: ${{ "%.2f"|format(model_spend) }} of ${{ "%.2f"|format(spend_cap) }} cap</p>
   </header>
   {% if not items %}
     <p class="empty">No reports yet. Send a photo, voice note or text to the Telegram bot and it will show up here.</p>
@@ -44,6 +46,7 @@
               </ul>
             {% endif %}
             {% if not r.text and not r.transcript and r.lat is none and not item.photos %}<span class="muted">(no text)</span>{% endif %}
+            {{ signal_chips(a, related_incidents) }}
           </td>
           <td>
             {% for p in item.photos %}
@@ -74,13 +77,14 @@
                     <div class="muted">SAM measured: {{ m.roof_count }} roof{{ "s" if m.roof_count != 1 }}{% if m.floodwater_present %}, floodwater over {{ "%.0f"|format(m.floodwater_fraction * 100) }}% of the photo{% else %}, no floodwater{% endif %}</div>
                   {% endif %}
                   {% if pa.error %}<div class="error">{{ pa.error }}</div>{% endif %}
-                  <div class="muted">by <code>{{ pa.llm_model }}</code></div>
+                  {% if pa %}<div class="muted">by <code>{{ pa.llm_model }}</code></div>{% else %}<div class="muted">Awaiting assessment.</div>{% endif %}
                 </div>
               </div>
             {% endfor %}
           </td>
           <td>
             <span class="status-{{ r.status }}">{{ r.status|replace("_", " ") }}</span>
+            {% if r.status == 'held' and r.hold_reason %}<div class="chip warn">{{ r.hold_reason }}</div>{% endif %}
             {% if r.incident_id %}<div><a href="/incidents/{{ r.incident_id }}">Incident #{{ r.incident_id }}</a></div>{% else %}<div class="muted">Not grouped yet</div>{% endif %}
             {% if r.grouping_error %}<div class="error">Grouping needs officer review: {{ r.grouping_error }}</div>{% endif %}
             {% if a and a.error %}<div class="error">{{ a.error }}</div>{% endif %}

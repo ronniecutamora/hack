@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_trust.html" import incident_trust, signal_chips %}
 {% block title %}Incident #{{ incident.id }}{% endblock %}
 {% block content %}
   <header>
@@ -7,6 +8,7 @@
   </header>
   {% if not incident.active %}<p class="muted">Retired grouping. Reports were re-linked; its decision history is preserved.</p>{% endif %}
   <p>{{ incident.barangay or "Location unknown" }} · First seen {{ incident.first_seen|manila_time }} · Last seen {{ incident.last_seen|manila_time }}</p>
+  <div>{{ incident_trust(trust) }}</div>
   <p>Latest flood depth: <strong>{{ incident.latest_facts.get("latest_depth", "unknown")|replace("_", " ") }}</strong> · Maximum seen: <strong>{{ incident.latest_facts.get("max_depth", "unknown")|replace("_", " ") }}</strong></p>
   <ul class="chips">
     {% for key, value in incident.latest_facts.get("totals", {}).items() %}
@@ -20,13 +22,15 @@
   {% for item in items %}
     {% set r = item.report %}{% set a = item.assessment %}
     <li id="report-{{ r.id }}">
-      <p><time>{{ r.received_at|manila_time }}</time> · <a href="/reports#report-{{ r.id }}">Report #{{ r.id }}</a>
+      <p><time>{{ r.received_at|manila_time }}</time> · Report #{{ r.id }}
         {% if r.channel == "demo" %}<span class="chip warn">Synthetic demo</span>{% endif %}
       </p>
       {% if a and a.facts %}
         <p>Flood depth: <strong>{{ a.facts.get("flood_depth", "unknown")|replace("_", " ") }}</strong> · {{ a.facts.get("summary_en", "") }}</p>
         <ul class="chips">{% for line in fact_lines(a.facts) %}<li class="chip">{{ line }}</li>{% endfor %}</ul>
       {% else %}<p class="muted">No extracted facts available.</p>{% endif %}
+      {{ signal_chips(a, related_incidents) }}
+      {% if r.status == 'held' %}<p class="chip warn">held{% if r.hold_reason %}: {{ r.hold_reason }}{% endif %}</p>{% endif %}
       <div class="evidence">
         {% for m in item.media %}<a href="/media/{{ m.id }}"><img src="/media/{{ m.id }}" alt="Report photo evidence{% if m.kind == 'overlay' %} with measurement overlay{% endif %}" loading="lazy"></a>{% endfor %}
       </div>

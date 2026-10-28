@@ -7,6 +7,7 @@ import asyncio
 import logging
 import sys
 from collections.abc import Awaitable, Callable
+from functools import wraps
 
 from telegram import Update
 from telegram.error import BadRequest, NetworkError, TelegramError
@@ -21,9 +22,9 @@ from telegram.ext import (
 from app.assessment import make_assessor
 from app.config import Settings, get_settings
 from app.db import init_db, make_engine, make_recorder
-from app.intake import IntakeService
+from app.intake import Admission, IntakeService
 from app.meta.factory import make_transcriber
-from app.models import Report
+from app.models import STATUS_HELD, Report
 from app.retention import purge_loop
 
 logger = logging.getLogger(__name__)
@@ -42,7 +43,7 @@ MISSING_TOKEN_MESSAGE = (
 )
 
 
-def start_text(ttl_hours: int) -> str:
+def start_text(ttl_hours: int, held_max_hours: int) -> str:
     return (
         "Kumusta! Ito ang bot para sa pag-report ng pinsala ng bagyo. Magpadala ng larawan, "
         "voice note, text, o location ng pinsala.\n"
@@ -50,9 +51,11 @@ def start_text(ttl_hours: int) -> str:
         "Privacy:\n"
         "- Hindi namin iniimbak ang pangalan o numero mo, pseudonymous ID lang. / "
         "We store no names or phone numbers, only a pseudonymous ID.\n"
-        f"- Binubura ang orihinal na larawan at audio pagkatapos ng {ttl_hours} oras; "
+        f"- Binubura ang orihinal na larawan at audio pagkatapos ng {ttl_hours} oras, "
+        f"o hanggang {held_max_hours} oras kung nakahinto ang pagproseso; "
         "text at assessment lang ang itinatabi. / "
-        f"Original photos and audio are deleted after {ttl_hours} hours; only text and "
+        f"Original photos and audio are deleted after {ttl_hours} hours, "
+        f"or up to {held_max_hours} hours if processing is paused; only text and "
         "assessments are kept.\n"
         "- Ipoproseso ng AI models ng Meta ang mga ito para sa damage assessment ng LGU. / "
         "Meta AI models process them for the LGU damage assessment.\n"
@@ -61,6 +64,11 @@ def start_text(ttl_hours: int) -> str:
 
 
 RECEIVED = "Natanggap na ang report mo. Salamat! / Report received. Thank you!"
+RATE_LIMITED = (
+    "Marami ka nang naipadalang report ngayon. Subukan ulit mamaya. "
+    "Kung emergency, tumawag sa 911. / "
+    "You've sent many reports recently. Please try again later. For emergencies, call 911."
+)
 LOCATION_RECEIVED = "Natanggap ang location. / Location received."
 VOICE_NOT_TRANSCRIBED = (
     "Natanggap ang voice note pero hindi pa ito na-transcribe. Subukan ulit o mag-text. / "
@@ -112,15 +120,40 @@ async def _reply(message: object, text: str) -> None:
 def _assess_later(context: ContextTypes.DEFAULT_TYPE, report: Report) -> None:
     """Assess in the background so the reporter gets "received" without waiting on models."""
     assessor = context.application.bot_data.get("assessor")
-    if assessor is not None:
+    if assessor is not None and report.status != STATUS_HELD:
         context.application.create_task(assessor.assess(report.id), name=f"assess-{report.id}")
 
 
+def _admitted(*, location_pin: bool = False):
+    """One admission per report message, before download; attached pins are exempt."""
+
+    def decorate(handler):
+        @wraps(handler)
+        async def guarded(update, context):
+            intake = _intake(context)
+            user_ref = update.effective_user.id
+            async with intake.admission_lock(user_ref):
+                admission = intake.admit(user_ref)
+                attached_pin = location_pin and intake.can_attach_location(user_ref)
+                if admission == Admission.RATE_LIMITED and not attached_pin:
+                    await _reply(update.effective_message, RATE_LIMITED)
+                    return
+                return await handler(update, context)
+
+        return guarded
+
+    return decorate
+
+
 async def on_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    ttl = context.application.bot_data["settings"].raw_media_ttl_hours
-    await _reply(update.effective_message, start_text(ttl))
+    settings = context.application.bot_data["settings"]
+    await _reply(
+        update.effective_message,
+        start_text(settings.raw_media_ttl_hours, settings.held_media_max_hours),
+    )
 
 
+@_admitted()
 async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     report = await _intake(context).ingest_text(update.effective_user.id, message.text)
@@ -128,6 +161,7 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     _assess_later(context, report)
 
 
+@_admitted()
 async def on_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     photo = message.photo[-1]  # Telegram lists sizes smallest to largest
@@ -139,6 +173,7 @@ async def on_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     _assess_later(context, report)
 
 
+@_admitted()
 async def on_image_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     document = message.document
@@ -157,14 +192,19 @@ async def on_image_document(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     _assess_later(context, report)
 
 
+@_admitted()
 async def on_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     data = await _download(message.voice)
     report = await _intake(context).ingest_voice(update.effective_user.id, data, ext="ogg")
-    await _reply(message, RECEIVED if report.transcript else VOICE_NOT_TRANSCRIBED)
+    await _reply(
+        message,
+        RECEIVED if report.transcript or report.status == STATUS_HELD else VOICE_NOT_TRANSCRIBED,
+    )
     _assess_later(context, report)
 
 
+@_admitted(location_pin=True)
 async def on_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     report = await _intake(context).ingest_location(
@@ -199,7 +239,7 @@ def build_application(settings: Settings) -> Application:
     init_db(engine)
     recorder = make_recorder(engine)
     transcriber = make_transcriber(settings, recorder)
-    assessor = make_assessor(settings, engine, recorder)
+    assessor = make_assessor(settings, engine, recorder, transcriber=transcriber)
 
     async def post_init(application: Application) -> None:
         application.bot_data["purge_task"] = asyncio.create_task(purge_loop(settings, engine))

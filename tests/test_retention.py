@@ -59,6 +59,36 @@ async def test_purge_tolerates_already_missing_file(settings, engine):
     assert purge_expired(settings, engine, now=later) == 1
 
 
+@pytest.mark.parametrize(
+    "assessing_minutes,media_hours,purged",
+    [(59, 25, 0), (60, 25, 1), (61, 25, 1), (None, 25, 1), (61, 23, 0)],
+)
+async def test_assessing_retention_grace_is_bounded(
+    settings, engine, assessing_minutes, media_hours, purged
+):
+    report = await IntakeService(settings, engine).ingest_photo(1, b"synthetic")
+    now = utcnow()
+    with Session(engine) as session:
+        current = session.get(Report, report.id)
+        current.status = "assessing"
+        current.received_at = now - timedelta(hours=100)
+        current.assessing_started_at = (
+            now - timedelta(minutes=assessing_minutes) if assessing_minutes is not None else None
+        )
+        media = session.exec(select(Media).where(Media.report_id == report.id)).one()
+        media.created_at = now - timedelta(hours=media_hours)
+        path = settings.data_dir / media.path
+        session.add_all([current, media])
+        session.commit()
+
+    assert purge_expired(settings, engine, now=now) == purged
+    assert path.exists() == (not purged)
+    with Session(engine) as session:
+        media = session.exec(select(Media).where(Media.report_id == report.id)).one()
+        assert media.purged_at == (now if purged else None)
+        assert session.get(Report, report.id).status == "assessing"
+
+
 async def test_purge_removes_orphaned_files_after_the_ttl(settings, engine):
     # A file saved before a failed DB write has no Media row; it must still be deleted.
     await IntakeService(settings, engine).ingest_photo(1, b"tracked")

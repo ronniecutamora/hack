@@ -16,37 +16,50 @@ import logging
 import mimetypes
 import sys
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from sqlalchemy import Engine
 from sqlmodel import Session, col, select
 
+from app.audio import AudioConversionError, to_wav_chunks
 from app.cache import sha256_hex
 from app.config import Settings, get_settings
 from app.db import init_db, make_engine, make_recorder
 from app.facts import extract_facts
 from app.gazetteer import Barangay, find_in_text
 from app.geo import barangay_at, exif_gps
-from app.incidents import IncidentService, coordination
+from app.incidents import IncidentService, coordination, observations, rollup
+from app.intake import ConvertFn, IntakeService, Transcriber
 from app.meta.base import MetaError, Recorder
-from app.meta.factory import LLM_BACKENDS, make_agent_llm, make_pair_judge, make_sam
+from app.meta.factory import (
+    LLM_BACKENDS,
+    make_agent_llm,
+    make_pair_judge,
+    make_sam,
+    make_transcriber,
+)
 from app.meta.llm import AgentLLM
 from app.meta.sam import SamClient
 from app.models import (
     STATUS_ASSESSED,
     STATUS_ASSESSING,
     STATUS_ASSESSMENT_FAILED,
+    STATUS_HELD,
     STATUS_NEW,
     STATUS_TRANSCRIPTION_FAILED,
     Assessment,
+    Incident,
     Media,
     PhotoAssessment,
     Report,
+    Reporter,
     utcnow,
 )
 from app.photo import assess_photo
 from app.transcript_cleanup import clean_transcript
+from app.trust import compute_signals, hold_reason, pending_photo_hashes, photo_taken_at
 
 logger = logging.getLogger(__name__)
 # "assessing" is included so a run cut short by a crash or restart is picked up again.
@@ -55,6 +68,7 @@ PENDING_STATUSES = (
     STATUS_ASSESSING,
     STATUS_TRANSCRIPTION_FAILED,
     STATUS_ASSESSMENT_FAILED,
+    STATUS_HELD,
 )
 
 
@@ -117,6 +131,7 @@ class _PhotoOutcome:
     measurement: dict[str, Any] | None = None
     overlay: bytes | None = None
     gps: tuple[float, float] | None = None
+    taken_at: datetime | None = None
     error: str | None = None
 
 
@@ -128,6 +143,8 @@ class AssessmentService:
         llm: AgentLLM,
         sam: SamClient,
         incidents: IncidentService | None = None,
+        transcriber: Transcriber | None = None,
+        convert: ConvertFn = to_wav_chunks,
     ) -> None:
         self.settings = settings
         self.engine = engine
@@ -135,6 +152,7 @@ class AssessmentService:
         self.sam = sam
         self._locks = coordination(engine).reports
         self.incidents = incidents or IncidentService(settings, engine, llm)
+        self.voice_intake = IntakeService(settings, engine, transcriber, convert)
 
     def _session(self) -> Session:
         return Session(self.engine, expire_on_commit=False)
@@ -145,6 +163,19 @@ class AssessmentService:
         Returns None if the report does not exist.
         """
         async with self._locks[report_id]:  # a pin and a photo may arrive moments apart
+            with self._session() as session:
+                report = session.get(Report, report_id)
+                if report is None:
+                    return None
+                reason = hold_reason(session, report, self.settings)
+                if reason:
+                    if report.status == STATUS_ASSESSED:
+                        logger.warning("skipping already-assessed report %s: %s", report_id, reason)
+                        return report
+                    report.status, report.hold_reason = STATUS_HELD, reason
+                    session.add(report)
+                    session.commit()
+                    return report
             try:
                 report = await self._assess(report_id)
             except Exception as exc:  # keep the bot alive; the error is saved for the officer
@@ -167,6 +198,20 @@ class AssessmentService:
             report = session.get(Report, report_id)
             if report is None:
                 return None
+            previous = session.exec(
+                select(Assessment.error).where(Assessment.report_id == report_id)
+            ).first()
+            raw_expired = False
+            if report.status == STATUS_HELD or "raw media expired while held" in (previous or ""):
+                raw_media = session.exec(
+                    select(Media).where(
+                        Media.report_id == report_id, col(Media.kind).in_(("photo", "voice"))
+                    )
+                ).all()
+                raw_expired = any(
+                    m.purged_at is not None or not (self.settings.data_dir / m.path).is_file()
+                    for m in raw_media
+                )
             photos = [
                 _Photo(
                     m.id,
@@ -182,15 +227,44 @@ class AssessmentService:
                 ).all()
                 if (self.settings.data_dir / m.path).is_file()
             ]
-            untranscribed_voice = report.transcript is None and (
+            untranscribed_voice = not report.transcript and (
                 session.exec(
                     select(Media.id).where(Media.report_id == report_id, Media.kind == "voice")
                 ).first()
                 is not None
             )
             report.status = STATUS_ASSESSING
+            report.assessing_started_at = utcnow()
+            report.hold_reason = None
             session.add(report)
             session.commit()
+
+        # A held voice note never incurred transcription cost during intake. Resume it here
+        # under the same block/spend gate as facts, photos and incident pair judgments.
+        if untranscribed_voice and self.voice_intake.transcriber is not None:
+            with self._session() as session:
+                voice = session.exec(
+                    select(Media).where(
+                        Media.report_id == report_id,
+                        Media.kind == "voice",
+                        col(Media.purged_at).is_(None),
+                    )
+                ).first()
+            if voice and (self.settings.data_dir / voice.path).is_file():
+                try:
+                    transcript = await self.voice_intake._transcribe(
+                        self.settings.data_dir / voice.path
+                    )
+                except (MetaError, AudioConversionError):
+                    logger.warning("held voice transcription failed for report %s", report_id)
+                else:
+                    report.transcript = transcript
+                    with self._session() as session:
+                        current = session.get(Report, report_id)
+                        current.transcript = transcript
+                        session.add(current)
+                        session.commit()
+                    untranscribed_voice = not bool(transcript.strip())
 
         transcript = clean_transcript(report.transcript) if report.transcript else None
         text = "\n".join(t for t in (report.text, transcript) if t)
@@ -200,6 +274,19 @@ class AssessmentService:
         )
 
         gps = next((o.gps for o in outcomes if o.gps), None)
+        if gps is None:
+            with self._session() as session:
+                stored = session.exec(
+                    select(PhotoAssessment)
+                    .where(
+                        PhotoAssessment.report_id == report_id,
+                        col(PhotoAssessment.gps_lat).is_not(None),
+                        col(PhotoAssessment.gps_lon).is_not(None),
+                    )
+                    .order_by(PhotoAssessment.id)
+                ).first()
+                if stored is not None:
+                    gps = (stored.gps_lat, stored.gps_lon)
         geo = geolocate(
             pin=(report.lat, report.lon) if report.lat is not None else None,
             exif=gps,
@@ -208,6 +295,8 @@ class AssessmentService:
             llm_barangay=(facts or {}).get("barangay_mentioned"),
         )
         errors = [e for e in (facts_error, *(o.error for o in outcomes)) if e]
+        if raw_expired:
+            errors.append("raw media expired while held")
         if untranscribed_voice:  # part of the report is missing: not "assessed"
             errors.insert(0, "voice note not transcribed")
         return self._save(report_id, transcript, facts, geo, outcomes, errors)
@@ -223,6 +312,7 @@ class AssessmentService:
         outcome = _PhotoOutcome(photo.media_id)
         try:
             outcome.gps = await asyncio.to_thread(exif_gps, photo.data)
+            outcome.taken_at = await asyncio.to_thread(photo_taken_at, photo.data)
             result = await assess_photo(self.llm, self.sam, photo.data, photo.mime)
         except MetaError as exc:
             logger.warning("photo assessment failed: %s", exc)
@@ -246,7 +336,14 @@ class AssessmentService:
         outcomes: list[_PhotoOutcome],
         errors: list[str],
     ) -> Report:
+        # Legacy hashing reads files/decodes images, so finish it before any SQLite write.
+        hashes = pending_photo_hashes(self.engine, self.settings)
         with self._session() as session:
+            for media_id, phash in hashes.items():
+                media = session.get(Media, media_id)
+                if media is not None and media.phash is None:
+                    media.phash = phash
+                    session.add(media)
             report = session.get(Report, report_id)
             assessment = session.exec(
                 select(Assessment).where(Assessment.report_id == report_id)
@@ -262,9 +359,27 @@ class AssessmentService:
             session.add(assessment)
             for outcome in outcomes:
                 self._save_photo(session, report_id, outcome)
+            session.flush()
+            assessment.signals = compute_signals(
+                session, report, self.settings, transcript=transcript
+            )
+            session.add(assessment)
             report.barangay = geo.barangay.name if geo.barangay else None
             report.status = STATUS_ASSESSMENT_FAILED if errors else STATUS_ASSESSED
             session.add(report)
+            session.flush()
+            # Trust changes do not change grouping inputs or justify another pair-judge call.
+            if report.incident_id is not None:
+                incident = session.get(Incident, report.incident_id)
+                if incident is not None:
+                    incident.latest_facts = rollup(
+                        [
+                            o
+                            for o in observations(session).values()
+                            if o.incident_id == report.incident_id
+                        ]
+                    )
+                    session.add(incident)
             session.commit()
             return report
 
@@ -275,6 +390,7 @@ class AssessmentService:
             report_id=report_id, media_id=outcome.media_id, llm_model=self.llm.model
         )
         row.gps_lat, row.gps_lon = outcome.gps or (None, None)
+        row.taken_at = outcome.taken_at
         row.error = outcome.error
         row.updated_at = utcnow()
         if outcome.error is None:
@@ -307,7 +423,7 @@ class AssessmentService:
         session.flush()
         return media.id
 
-    def _mark_failed(self, report_id: int, exc: Exception) -> Report | None:
+    def _mark_failed(self, report_id: int, exc: Exception | str) -> Report | None:
         with self._session() as session:
             report = session.get(Report, report_id)
             if report is None:
@@ -315,9 +431,10 @@ class AssessmentService:
             assessment = session.exec(
                 select(Assessment).where(Assessment.report_id == report_id)
             ).first() or Assessment(report_id=report_id, llm_model=self.llm.model)
-            assessment.error = f"{type(exc).__name__}: {exc}"
+            assessment.error = exc if isinstance(exc, str) else f"{type(exc).__name__}: {exc}"
             assessment.updated_at = utcnow()
             report.status = STATUS_ASSESSMENT_FAILED
+            report.hold_reason = None
             session.add_all([assessment, report])
             session.commit()
             return report
@@ -326,6 +443,9 @@ class AssessmentService:
         query = select(Report.id).order_by(col(Report.id))
         if pending_only:
             query = query.where(col(Report.status).in_(PENDING_STATUSES))
+            query = query.join(Reporter, Reporter.id == Report.reporter_id).where(
+                Reporter.blocked == False  # noqa: E712
+            )
         with self._session() as session:
             return list(session.exec(query).all())
 
@@ -335,7 +455,10 @@ async def _none() -> tuple[None, None]:
 
 
 def make_assessor(
-    settings: Settings, engine: Engine, recorder: Recorder | None = None
+    settings: Settings,
+    engine: Engine,
+    recorder: Recorder | None = None,
+    transcriber: Transcriber | None = None,
 ) -> AssessmentService:
     return AssessmentService(
         settings,
@@ -343,6 +466,7 @@ def make_assessor(
         make_agent_llm(settings, recorder),
         make_sam(settings, recorder),
         IncidentService(settings, engine, make_pair_judge(settings, recorder)),
+        transcriber=transcriber,
     )
 
 
@@ -352,7 +476,9 @@ async def _cli(args: argparse.Namespace) -> int:
         settings = settings.model_copy(update={"agent_llm": args.llm})
     engine = make_engine(settings)
     init_db(engine)
-    assessor = make_assessor(settings, engine, make_recorder(engine))
+    recorder = make_recorder(engine)
+    transcriber = make_transcriber(settings, recorder)
+    assessor = make_assessor(settings, engine, recorder, transcriber=transcriber)
     try:
         ids = [args.report] if args.report else assessor.report_ids(pending_only=args.pending)
         print(f"assessing {len(ids)} report(s) with {assessor.llm.model}")
@@ -363,6 +489,7 @@ async def _cli(args: argparse.Namespace) -> int:
                 continue
             print(f"report {report_id}: {report.status}, barangay {report.barangay or '-'}")
     finally:
+        await transcriber.aclose()
         await assessor.llm.aclose()
         await assessor.sam.aclose()
         await assessor.incidents.judge.aclose()
@@ -373,7 +500,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Assess reports (facts, photos, barangay).")
     which = parser.add_mutually_exclusive_group(required=True)
     which.add_argument("--report", type=int, help="one report id")
-    which.add_argument("--pending", action="store_true", help="new or failed reports")
+    which.add_argument(
+        "--pending", action="store_true", help="new, failed or eligible held reports"
+    )
     which.add_argument("--all", action="store_true", help="every report")
     parser.add_argument("--llm", choices=list(LLM_BACKENDS), help="override AGENT_LLM")
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s %(message)s")
