@@ -28,6 +28,10 @@ class Reporter(SQLModel, table=True):
 class Report(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     reporter_id: int = Field(foreign_key="reporter.id", index=True)
+    incident_id: int | None = Field(default=None, foreign_key="incident.id", index=True)
+    grouping_fingerprint: str | None = None
+    grouping_error: str | None = None
+    grouping_needs_officer: bool = False
     channel: str  # e.g. "telegram"
     received_at: NaiveDatetime = Field(default_factory=utcnow, index=True)
     text: str | None = None  # typed message or photo caption
@@ -90,3 +94,32 @@ class PhotoAssessment(SQLModel, table=True):
     gps_lon: float | None = None
     error: str | None = None
     updated_at: NaiveDatetime = Field(default_factory=utcnow)
+
+
+class Incident(SQLModel, table=True):
+    """Current grouping and deterministic rollup; empty retired groups remain for the audit."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    barangay: str | None = Field(default=None, index=True)
+    title: str
+    first_seen: NaiveDatetime
+    last_seen: NaiveDatetime = Field(index=True)
+    status: str = "open"  # open | needs_officer
+    active: bool = True
+    latest_facts: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+
+
+class AgentDecision(SQLModel, table=True):
+    """Immutable grouping explanation, including deterministic actions without a model call."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    kind: str  # new_incident | merged | kept_separate | needs_officer | re-linked
+    report_id: int = Field(foreign_key="report.id", index=True)
+    incident_id: int = Field(foreign_key="incident.id", index=True)
+    compared_incident_id: int | None = Field(default=None, foreign_key="incident.id")
+    compared_report_id: int | None = Field(default=None, foreign_key="report.id")
+    judge_model: str | None = None  # None means a deterministic rule, never a guessed model
+    decision: str
+    confidence: float | None = None
+    reason: str
+    created_at: NaiveDatetime = Field(default_factory=utcnow)

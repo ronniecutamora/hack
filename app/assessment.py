@@ -15,7 +15,6 @@ import asyncio
 import logging
 import mimetypes
 import sys
-from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -29,8 +28,9 @@ from app.db import init_db, make_engine, make_recorder
 from app.facts import extract_facts
 from app.gazetteer import Barangay, find_in_text
 from app.geo import barangay_at, exif_gps
+from app.incidents import IncidentService, coordination
 from app.meta.base import MetaError, Recorder
-from app.meta.factory import make_agent_llm, make_sam
+from app.meta.factory import LLM_BACKENDS, make_agent_llm, make_pair_judge, make_sam
 from app.meta.llm import AgentLLM
 from app.meta.sam import SamClient
 from app.models import (
@@ -117,12 +117,20 @@ class _PhotoOutcome:
 
 
 class AssessmentService:
-    def __init__(self, settings: Settings, engine: Engine, llm: AgentLLM, sam: SamClient) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        engine: Engine,
+        llm: AgentLLM,
+        sam: SamClient,
+        incidents: IncidentService | None = None,
+    ) -> None:
         self.settings = settings
         self.engine = engine
         self.llm = llm
         self.sam = sam
-        self._locks: defaultdict[int, asyncio.Lock] = defaultdict(asyncio.Lock)
+        self._locks = coordination(engine).reports
+        self.incidents = incidents or IncidentService(settings, engine, llm)
 
     def _session(self) -> Session:
         return Session(self.engine, expire_on_commit=False)
@@ -134,7 +142,10 @@ class AssessmentService:
         """
         async with self._locks[report_id]:  # a pin and a photo may arrive moments apart
             try:
-                return await self._assess(report_id)
+                report = await self._assess(report_id)
+                if report is not None and report.status == STATUS_ASSESSED:
+                    report = await self.incidents.group_locked(report_id)
+                return report
             except Exception as exc:  # keep the bot alive; the error is saved for the officer
                 logger.exception("assessment of report %s failed", report_id)
                 return self._mark_failed(report_id, exc)
@@ -315,7 +326,11 @@ def make_assessor(
     settings: Settings, engine: Engine, recorder: Recorder | None = None
 ) -> AssessmentService:
     return AssessmentService(
-        settings, engine, make_agent_llm(settings, recorder), make_sam(settings, recorder)
+        settings,
+        engine,
+        make_agent_llm(settings, recorder),
+        make_sam(settings, recorder),
+        IncidentService(settings, engine, make_pair_judge(settings, recorder)),
     )
 
 
@@ -338,6 +353,7 @@ async def _cli(args: argparse.Namespace) -> int:
     finally:
         await assessor.llm.aclose()
         await assessor.sam.aclose()
+        await assessor.incidents.judge.aclose()
     return 0
 
 
@@ -347,9 +363,7 @@ def main(argv: list[str] | None = None) -> int:
     which.add_argument("--report", type=int, help="one report id")
     which.add_argument("--pending", action="store_true", help="new or failed reports")
     which.add_argument("--all", action="store_true", help="every report")
-    parser.add_argument(
-        "--llm", choices=["muse-spark-1.3", "muse-spark-open"], help="override AGENT_LLM"
-    )
+    parser.add_argument("--llm", choices=list(LLM_BACKENDS), help="override AGENT_LLM")
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s %(message)s")
     return asyncio.run(_cli(parser.parse_args(argv)))
 

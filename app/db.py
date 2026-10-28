@@ -1,6 +1,6 @@
 """SQLite engine and helpers. The database lives in DATA_DIR/app.db."""
 
-from sqlalchemy import Engine, event
+from sqlalchemy import Engine, event, inspect
 from sqlmodel import Session, SQLModel, create_engine
 
 from app import models
@@ -31,6 +31,21 @@ def _enable_wal(dbapi_connection, _record) -> None:
 
 def init_db(engine: Engine) -> None:
     SQLModel.metadata.create_all(engine)
+    # create_all does not alter existing tables. These nullable additions preserve slice-2 DBs.
+    with engine.begin() as connection:
+        columns = {c["name"] for c in inspect(connection).get_columns("report")}
+        additions = {
+            "incident_id": "INTEGER REFERENCES incident(id)",
+            "grouping_fingerprint": "VARCHAR",
+            "grouping_error": "VARCHAR",
+            "grouping_needs_officer": "BOOLEAN NOT NULL DEFAULT 0",
+        }
+        for name, sql_type in additions.items():
+            if name not in columns:
+                connection.exec_driver_sql(f"ALTER TABLE report ADD COLUMN {name} {sql_type}")
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_report_incident_id ON report (incident_id)"
+        )
 
 
 def make_recorder(engine: Engine) -> Recorder:

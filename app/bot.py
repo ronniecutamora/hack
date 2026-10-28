@@ -209,6 +209,7 @@ def build_application(settings: Settings) -> Application:
         await transcriber.aclose()
         await assessor.llm.aclose()
         await assessor.sam.aclose()
+        await assessor.incidents.judge.aclose()
 
     application = (
         Application.builder()
