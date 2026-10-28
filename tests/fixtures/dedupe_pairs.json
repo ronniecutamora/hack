@@ -1,0 +1,2982 @@
+[
+  {
+    "id": "pair-01",
+    "scenario": "same flood, changing depth and counts",
+    "incident_context": [
+      {
+        "barangay": "Malaban",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Malaban",
+          "place_detail": "Demo Street A",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street A."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Malaban",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Malaban",
+        "place_detail": "Demo Street A",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "waist",
+        "houses_flooded": 5,
+        "is_correction": false,
+        "summary_en": "Flood reported at Demo Street A."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "same"
+  },
+  {
+    "id": "pair-02",
+    "scenario": "same flood, changing depth and counts",
+    "incident_context": [
+      {
+        "barangay": "Casile",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Casile",
+          "place_detail": "Demo Street B",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 4,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street B."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Casile",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Casile",
+        "place_detail": "Demo Street B",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "ankle",
+        "houses_flooded": 6,
+        "is_correction": false,
+        "summary_en": "Flood reported at Demo Street B."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "same"
+  },
+  {
+    "id": "pair-03",
+    "scenario": "same flood, changing depth and counts",
+    "incident_context": [
+      {
+        "barangay": "De La Paz",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "De La Paz",
+          "place_detail": "Demo Street C",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 5,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street C."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "De La Paz",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "De La Paz",
+        "place_detail": "Demo Street C",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "chest",
+        "houses_flooded": 7,
+        "is_correction": false,
+        "summary_en": "Flood reported at Demo Street C."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "same"
+  },
+  {
+    "id": "pair-04",
+    "scenario": "same flood, changing depth and counts",
+    "incident_context": [
+      {
+        "barangay": "Canlalay",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Canlalay",
+          "place_detail": "Demo Street D",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 6,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street D."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Canlalay",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Canlalay",
+        "place_detail": "Demo Street D",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "unknown",
+        "houses_flooded": 8,
+        "is_correction": false,
+        "summary_en": "Flood reported at Demo Street D."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "same"
+  },
+  {
+    "id": "pair-05",
+    "scenario": "same flood, changing depth and counts",
+    "incident_context": [
+      {
+        "barangay": "Zapote",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Zapote",
+          "place_detail": "Demo Street E",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 7,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street E."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Zapote",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Zapote",
+        "place_detail": "Demo Street E",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "waist",
+        "houses_flooded": 9,
+        "is_correction": false,
+        "summary_en": "Flood reported at Demo Street E."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "same"
+  },
+  {
+    "id": "pair-06",
+    "scenario": "same flood, changing depth and counts",
+    "incident_context": [
+      {
+        "barangay": "Timbao",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Timbao",
+          "place_detail": "Demo Street F",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 8,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street F."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Timbao",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Timbao",
+        "place_detail": "Demo Street F",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "ankle",
+        "houses_flooded": 10,
+        "is_correction": false,
+        "summary_en": "Flood reported at Demo Street F."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "same"
+  },
+  {
+    "id": "pair-07",
+    "scenario": "same flood, changing depth and counts",
+    "incident_context": [
+      {
+        "barangay": "Malaban",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Malaban",
+          "place_detail": "Demo Street G",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 9,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street G."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Malaban",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Malaban",
+        "place_detail": "Demo Street G",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "chest",
+        "houses_flooded": 11,
+        "is_correction": false,
+        "summary_en": "Flood reported at Demo Street G."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "same"
+  },
+  {
+    "id": "pair-08",
+    "scenario": "same flood, changing depth and counts",
+    "incident_context": [
+      {
+        "barangay": "Casile",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Casile",
+          "place_detail": "Demo Street H",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 10,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street H."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Casile",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Casile",
+        "place_detail": "Demo Street H",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "unknown",
+        "houses_flooded": 12,
+        "is_correction": false,
+        "summary_en": "Flood reported at Demo Street H."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "same"
+  },
+  {
+    "id": "pair-09",
+    "scenario": "explicit correction of earlier situation",
+    "incident_context": [
+      {
+        "barangay": "Malaban",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Malaban",
+          "place_detail": "Purok 1, Demo Lane A",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 10,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 1, Demo Lane A."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Malaban",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Malaban",
+        "place_detail": "Purok 1, Demo Lane A",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 4,
+        "is_correction": true,
+        "summary_en": "Flood reported at Purok 1, Demo Lane A."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "same"
+  },
+  {
+    "id": "pair-10",
+    "scenario": "explicit correction of earlier situation",
+    "incident_context": [
+      {
+        "barangay": "Casile",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Casile",
+          "place_detail": "Purok 2, Demo Lane A",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 11,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 2, Demo Lane A."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Casile",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Casile",
+        "place_detail": "Purok 2, Demo Lane A",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 5,
+        "is_correction": true,
+        "summary_en": "Flood reported at Purok 2, Demo Lane A."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "same"
+  },
+  {
+    "id": "pair-11",
+    "scenario": "explicit correction of earlier situation",
+    "incident_context": [
+      {
+        "barangay": "De La Paz",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "De La Paz",
+          "place_detail": "Purok 3, Demo Lane A",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 12,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 3, Demo Lane A."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "De La Paz",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "De La Paz",
+        "place_detail": "Purok 3, Demo Lane A",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 6,
+        "is_correction": true,
+        "summary_en": "Flood reported at Purok 3, Demo Lane A."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "same"
+  },
+  {
+    "id": "pair-12",
+    "scenario": "explicit correction of earlier situation",
+    "incident_context": [
+      {
+        "barangay": "Canlalay",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Canlalay",
+          "place_detail": "Purok 4, Demo Lane A",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 13,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 4, Demo Lane A."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Canlalay",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Canlalay",
+        "place_detail": "Purok 4, Demo Lane A",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 7,
+        "is_correction": true,
+        "summary_en": "Flood reported at Purok 4, Demo Lane A."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "same"
+  },
+  {
+    "id": "pair-13",
+    "scenario": "explicit correction of earlier situation",
+    "incident_context": [
+      {
+        "barangay": "Zapote",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Zapote",
+          "place_detail": "Purok 5, Demo Lane A",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 14,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 5, Demo Lane A."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Zapote",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Zapote",
+        "place_detail": "Purok 5, Demo Lane A",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 8,
+        "is_correction": true,
+        "summary_en": "Flood reported at Purok 5, Demo Lane A."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "same"
+  },
+  {
+    "id": "pair-14",
+    "scenario": "explicit correction of earlier situation",
+    "incident_context": [
+      {
+        "barangay": "Timbao",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Timbao",
+          "place_detail": "Purok 6, Demo Lane A",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 15,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 6, Demo Lane A."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Timbao",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Timbao",
+        "place_detail": "Purok 6, Demo Lane A",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 9,
+        "is_correction": true,
+        "summary_en": "Flood reported at Purok 6, Demo Lane A."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "same"
+  },
+  {
+    "id": "pair-15",
+    "scenario": "explicit correction of earlier situation",
+    "incident_context": [
+      {
+        "barangay": "Malaban",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Malaban",
+          "place_detail": "Purok 7, Demo Lane A",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 16,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 7, Demo Lane A."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Malaban",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Malaban",
+        "place_detail": "Purok 7, Demo Lane A",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 10,
+        "is_correction": true,
+        "summary_en": "Flood reported at Purok 7, Demo Lane A."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "same"
+  },
+  {
+    "id": "pair-16",
+    "scenario": "explicit correction of earlier situation",
+    "incident_context": [
+      {
+        "barangay": "Casile",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Casile",
+          "place_detail": "Purok 8, Demo Lane A",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 17,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 8, Demo Lane A."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Casile",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Casile",
+        "place_detail": "Purok 8, Demo Lane A",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 11,
+        "is_correction": true,
+        "summary_en": "Flood reported at Purok 8, Demo Lane A."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "same"
+  },
+  {
+    "id": "pair-17",
+    "scenario": "same place supported by recent incident history",
+    "incident_context": [
+      {
+        "barangay": "Malaban",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Malaban",
+          "place_detail": "Purok 1, Demo Street B",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "waist",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 1, Demo Street B."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      },
+      {
+        "barangay": "Malaban",
+        "observed_at": "2026-10-29T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Malaban",
+          "place_detail": "Purok 1, Demo Street B",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "chest",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 1, Demo Street B."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Malaban",
+      "observed_at": "2026-10-30T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Malaban",
+        "place_detail": "Purok 1, Demo Street B",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Purok 1, Demo Street B."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "same"
+  },
+  {
+    "id": "pair-18",
+    "scenario": "same place supported by recent incident history",
+    "incident_context": [
+      {
+        "barangay": "Casile",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Casile",
+          "place_detail": "Purok 2, Demo Street B",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "waist",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 2, Demo Street B."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      },
+      {
+        "barangay": "Casile",
+        "observed_at": "2026-10-29T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Casile",
+          "place_detail": "Purok 2, Demo Street B",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "chest",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 2, Demo Street B."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Casile",
+      "observed_at": "2026-10-30T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Casile",
+        "place_detail": "Purok 2, Demo Street B",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Purok 2, Demo Street B."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "same"
+  },
+  {
+    "id": "pair-19",
+    "scenario": "same place supported by recent incident history",
+    "incident_context": [
+      {
+        "barangay": "De La Paz",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "De La Paz",
+          "place_detail": "Purok 3, Demo Street B",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "waist",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 3, Demo Street B."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      },
+      {
+        "barangay": "De La Paz",
+        "observed_at": "2026-10-29T04:00:00",
+        "facts": {
+          "barangay_mentioned": "De La Paz",
+          "place_detail": "Purok 3, Demo Street B",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "chest",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 3, Demo Street B."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "De La Paz",
+      "observed_at": "2026-10-30T04:00:00",
+      "facts": {
+        "barangay_mentioned": "De La Paz",
+        "place_detail": "Purok 3, Demo Street B",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Purok 3, Demo Street B."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "same"
+  },
+  {
+    "id": "pair-20",
+    "scenario": "same place supported by recent incident history",
+    "incident_context": [
+      {
+        "barangay": "Canlalay",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Canlalay",
+          "place_detail": "Purok 4, Demo Street B",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "waist",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 4, Demo Street B."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      },
+      {
+        "barangay": "Canlalay",
+        "observed_at": "2026-10-29T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Canlalay",
+          "place_detail": "Purok 4, Demo Street B",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "chest",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 4, Demo Street B."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Canlalay",
+      "observed_at": "2026-10-30T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Canlalay",
+        "place_detail": "Purok 4, Demo Street B",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Purok 4, Demo Street B."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "same"
+  },
+  {
+    "id": "pair-21",
+    "scenario": "same place supported by recent incident history",
+    "incident_context": [
+      {
+        "barangay": "Zapote",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Zapote",
+          "place_detail": "Purok 5, Demo Street B",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "waist",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 5, Demo Street B."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      },
+      {
+        "barangay": "Zapote",
+        "observed_at": "2026-10-29T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Zapote",
+          "place_detail": "Purok 5, Demo Street B",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "chest",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 5, Demo Street B."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Zapote",
+      "observed_at": "2026-10-30T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Zapote",
+        "place_detail": "Purok 5, Demo Street B",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Purok 5, Demo Street B."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "same"
+  },
+  {
+    "id": "pair-22",
+    "scenario": "same place supported by recent incident history",
+    "incident_context": [
+      {
+        "barangay": "Timbao",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Timbao",
+          "place_detail": "Purok 6, Demo Street B",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "waist",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 6, Demo Street B."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      },
+      {
+        "barangay": "Timbao",
+        "observed_at": "2026-10-29T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Timbao",
+          "place_detail": "Purok 6, Demo Street B",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "chest",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 6, Demo Street B."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Timbao",
+      "observed_at": "2026-10-30T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Timbao",
+        "place_detail": "Purok 6, Demo Street B",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Purok 6, Demo Street B."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "same"
+  },
+  {
+    "id": "pair-23",
+    "scenario": "same place supported by recent incident history",
+    "incident_context": [
+      {
+        "barangay": "Malaban",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Malaban",
+          "place_detail": "Purok 7, Demo Street B",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "waist",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 7, Demo Street B."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      },
+      {
+        "barangay": "Malaban",
+        "observed_at": "2026-10-29T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Malaban",
+          "place_detail": "Purok 7, Demo Street B",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "chest",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 7, Demo Street B."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Malaban",
+      "observed_at": "2026-10-30T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Malaban",
+        "place_detail": "Purok 7, Demo Street B",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Purok 7, Demo Street B."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "same"
+  },
+  {
+    "id": "pair-24",
+    "scenario": "same place supported by recent incident history",
+    "incident_context": [
+      {
+        "barangay": "Casile",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Casile",
+          "place_detail": "Purok 8, Demo Street B",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "waist",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 8, Demo Street B."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      },
+      {
+        "barangay": "Casile",
+        "observed_at": "2026-10-29T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Casile",
+          "place_detail": "Purok 8, Demo Street B",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "chest",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 8, Demo Street B."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Casile",
+      "observed_at": "2026-10-30T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Casile",
+        "place_detail": "Purok 8, Demo Street B",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Purok 8, Demo Street B."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "same"
+  },
+  {
+    "id": "pair-25",
+    "scenario": "hard negative: same barangay, different purok",
+    "incident_context": [
+      {
+        "barangay": "Malaban",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Malaban",
+          "place_detail": "Purok 1, Demo Lane C",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 1, Demo Lane C."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Malaban",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Malaban",
+        "place_detail": "Purok 21, Demo Lane C",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Purok 21, Demo Lane C."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-26",
+    "scenario": "hard negative: same barangay, different purok",
+    "incident_context": [
+      {
+        "barangay": "Casile",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Casile",
+          "place_detail": "Purok 2, Demo Lane C",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 2, Demo Lane C."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Casile",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Casile",
+        "place_detail": "Purok 22, Demo Lane C",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Purok 22, Demo Lane C."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-27",
+    "scenario": "hard negative: same barangay, different purok",
+    "incident_context": [
+      {
+        "barangay": "De La Paz",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "De La Paz",
+          "place_detail": "Purok 3, Demo Lane C",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 3, Demo Lane C."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "De La Paz",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "De La Paz",
+        "place_detail": "Purok 23, Demo Lane C",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Purok 23, Demo Lane C."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-28",
+    "scenario": "hard negative: same barangay, different purok",
+    "incident_context": [
+      {
+        "barangay": "Canlalay",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Canlalay",
+          "place_detail": "Purok 4, Demo Lane C",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 4, Demo Lane C."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Canlalay",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Canlalay",
+        "place_detail": "Purok 24, Demo Lane C",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Purok 24, Demo Lane C."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-29",
+    "scenario": "hard negative: same barangay, different purok",
+    "incident_context": [
+      {
+        "barangay": "Zapote",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Zapote",
+          "place_detail": "Purok 5, Demo Lane C",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 5, Demo Lane C."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Zapote",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Zapote",
+        "place_detail": "Purok 25, Demo Lane C",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Purok 25, Demo Lane C."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-30",
+    "scenario": "hard negative: same barangay, different purok",
+    "incident_context": [
+      {
+        "barangay": "Timbao",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Timbao",
+          "place_detail": "Purok 6, Demo Lane C",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 6, Demo Lane C."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Timbao",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Timbao",
+        "place_detail": "Purok 26, Demo Lane C",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Purok 26, Demo Lane C."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-31",
+    "scenario": "hard negative: same barangay, different purok",
+    "incident_context": [
+      {
+        "barangay": "Malaban",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Malaban",
+          "place_detail": "Purok 7, Demo Lane C",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 7, Demo Lane C."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Malaban",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Malaban",
+        "place_detail": "Purok 27, Demo Lane C",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Purok 27, Demo Lane C."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-32",
+    "scenario": "hard negative: same barangay, different purok",
+    "incident_context": [
+      {
+        "barangay": "Casile",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Casile",
+          "place_detail": "Purok 8, Demo Lane C",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 8, Demo Lane C."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Casile",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Casile",
+        "place_detail": "Purok 28, Demo Lane C",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Purok 28, Demo Lane C."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-33",
+    "scenario": "hard negative: same barangay, different purok",
+    "incident_context": [
+      {
+        "barangay": "De La Paz",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "De La Paz",
+          "place_detail": "Purok 9, Demo Lane C",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 9, Demo Lane C."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "De La Paz",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "De La Paz",
+        "place_detail": "Purok 29, Demo Lane C",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Purok 29, Demo Lane C."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-34",
+    "scenario": "hard negative: same barangay, different purok",
+    "incident_context": [
+      {
+        "barangay": "Canlalay",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Canlalay",
+          "place_detail": "Purok 10, Demo Lane C",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 10, Demo Lane C."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Canlalay",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Canlalay",
+        "place_detail": "Purok 30, Demo Lane C",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Purok 30, Demo Lane C."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-35",
+    "scenario": "hard negative: same barangay, different purok",
+    "incident_context": [
+      {
+        "barangay": "Zapote",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Zapote",
+          "place_detail": "Purok 11, Demo Lane C",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 11, Demo Lane C."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Zapote",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Zapote",
+        "place_detail": "Purok 31, Demo Lane C",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Purok 31, Demo Lane C."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-36",
+    "scenario": "hard negative: same barangay, different purok",
+    "incident_context": [
+      {
+        "barangay": "Timbao",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Timbao",
+          "place_detail": "Purok 12, Demo Lane C",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Purok 12, Demo Lane C."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Timbao",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Timbao",
+        "place_detail": "Purok 32, Demo Lane C",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Purok 32, Demo Lane C."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-37",
+    "scenario": "hard negative: same street, unrelated hazard",
+    "incident_context": [
+      {
+        "barangay": "Malaban",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Malaban",
+          "place_detail": "Demo Street A",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street A."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Malaban",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Malaban",
+        "place_detail": "Demo Street A",
+        "hazards": [
+          "fire"
+        ],
+        "flood_depth": "none",
+        "houses_flooded": null,
+        "is_correction": false,
+        "summary_en": "Fire reported at Demo Street A."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": false
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-38",
+    "scenario": "hard negative: same street, unrelated hazard",
+    "incident_context": [
+      {
+        "barangay": "Casile",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Casile",
+          "place_detail": "Demo Street B",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street B."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Casile",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Casile",
+        "place_detail": "Demo Street B",
+        "hazards": [
+          "strong_wind"
+        ],
+        "flood_depth": "none",
+        "houses_flooded": null,
+        "is_correction": false,
+        "summary_en": "Strong wind reported at Demo Street B."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": false
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-39",
+    "scenario": "hard negative: same street, unrelated hazard",
+    "incident_context": [
+      {
+        "barangay": "De La Paz",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "De La Paz",
+          "place_detail": "Demo Street C",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street C."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "De La Paz",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "De La Paz",
+        "place_detail": "Demo Street C",
+        "hazards": [
+          "landslide"
+        ],
+        "flood_depth": "none",
+        "houses_flooded": null,
+        "is_correction": false,
+        "summary_en": "Landslide reported at Demo Street C."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": false
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-40",
+    "scenario": "hard negative: same street, unrelated hazard",
+    "incident_context": [
+      {
+        "barangay": "Canlalay",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Canlalay",
+          "place_detail": "Demo Street D",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street D."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Canlalay",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Canlalay",
+        "place_detail": "Demo Street D",
+        "hazards": [
+          "fire"
+        ],
+        "flood_depth": "none",
+        "houses_flooded": null,
+        "is_correction": false,
+        "summary_en": "Fire reported at Demo Street D."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": false
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-41",
+    "scenario": "hard negative: same street, unrelated hazard",
+    "incident_context": [
+      {
+        "barangay": "Zapote",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Zapote",
+          "place_detail": "Demo Street E",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street E."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Zapote",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Zapote",
+        "place_detail": "Demo Street E",
+        "hazards": [
+          "strong_wind"
+        ],
+        "flood_depth": "none",
+        "houses_flooded": null,
+        "is_correction": false,
+        "summary_en": "Strong wind reported at Demo Street E."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": false
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-42",
+    "scenario": "hard negative: same street, unrelated hazard",
+    "incident_context": [
+      {
+        "barangay": "Timbao",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Timbao",
+          "place_detail": "Demo Street F",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street F."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Timbao",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Timbao",
+        "place_detail": "Demo Street F",
+        "hazards": [
+          "landslide"
+        ],
+        "flood_depth": "none",
+        "houses_flooded": null,
+        "is_correction": false,
+        "summary_en": "Landslide reported at Demo Street F."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": false
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-43",
+    "scenario": "hard negative: same street, unrelated hazard",
+    "incident_context": [
+      {
+        "barangay": "Malaban",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Malaban",
+          "place_detail": "Demo Street G",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street G."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Malaban",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Malaban",
+        "place_detail": "Demo Street G",
+        "hazards": [
+          "fire"
+        ],
+        "flood_depth": "none",
+        "houses_flooded": null,
+        "is_correction": false,
+        "summary_en": "Fire reported at Demo Street G."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": false
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-44",
+    "scenario": "hard negative: same street, unrelated hazard",
+    "incident_context": [
+      {
+        "barangay": "Casile",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Casile",
+          "place_detail": "Demo Street H",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street H."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Casile",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Casile",
+        "place_detail": "Demo Street H",
+        "hazards": [
+          "strong_wind"
+        ],
+        "flood_depth": "none",
+        "houses_flooded": null,
+        "is_correction": false,
+        "summary_en": "Strong wind reported at Demo Street H."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": false
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-45",
+    "scenario": "hard negative: same street, unrelated hazard",
+    "incident_context": [
+      {
+        "barangay": "De La Paz",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "De La Paz",
+          "place_detail": "Demo Street I",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street I."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "De La Paz",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "De La Paz",
+        "place_detail": "Demo Street I",
+        "hazards": [
+          "landslide"
+        ],
+        "flood_depth": "none",
+        "houses_flooded": null,
+        "is_correction": false,
+        "summary_en": "Landslide reported at Demo Street I."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": false
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-46",
+    "scenario": "hard negative: same street, unrelated hazard",
+    "incident_context": [
+      {
+        "barangay": "Canlalay",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Canlalay",
+          "place_detail": "Demo Street J",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street J."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Canlalay",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Canlalay",
+        "place_detail": "Demo Street J",
+        "hazards": [
+          "fire"
+        ],
+        "flood_depth": "none",
+        "houses_flooded": null,
+        "is_correction": false,
+        "summary_en": "Fire reported at Demo Street J."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": false
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-47",
+    "scenario": "hard negative: same street, unrelated hazard",
+    "incident_context": [
+      {
+        "barangay": "Zapote",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Zapote",
+          "place_detail": "Demo Street K",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street K."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Zapote",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Zapote",
+        "place_detail": "Demo Street K",
+        "hazards": [
+          "strong_wind"
+        ],
+        "flood_depth": "none",
+        "houses_flooded": null,
+        "is_correction": false,
+        "summary_en": "Strong wind reported at Demo Street K."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": false
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-48",
+    "scenario": "hard negative: same street, unrelated hazard",
+    "incident_context": [
+      {
+        "barangay": "Timbao",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Timbao",
+          "place_detail": "Demo Street L",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street L."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Timbao",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Timbao",
+        "place_detail": "Demo Street L",
+        "hazards": [
+          "landslide"
+        ],
+        "flood_depth": "none",
+        "houses_flooded": null,
+        "is_correction": false,
+        "summary_en": "Landslide reported at Demo Street L."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": false
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-49",
+    "scenario": "hard negative: neighbouring synthetic streets within same barangay",
+    "incident_context": [
+      {
+        "barangay": "Malaban",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Malaban",
+          "place_detail": "Demo Street A, Block 1",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street A, Block 1."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Malaban",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Malaban",
+        "place_detail": "Demo Street N, Block 1",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Demo Street N, Block 1."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-50",
+    "scenario": "hard negative: neighbouring synthetic streets within same barangay",
+    "incident_context": [
+      {
+        "barangay": "Casile",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Casile",
+          "place_detail": "Demo Street B, Block 1",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street B, Block 1."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Casile",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Casile",
+        "place_detail": "Demo Street O, Block 1",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Demo Street O, Block 1."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-51",
+    "scenario": "hard negative: neighbouring synthetic streets within same barangay",
+    "incident_context": [
+      {
+        "barangay": "De La Paz",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "De La Paz",
+          "place_detail": "Demo Street C, Block 1",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street C, Block 1."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "De La Paz",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "De La Paz",
+        "place_detail": "Demo Street P, Block 1",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Demo Street P, Block 1."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-52",
+    "scenario": "hard negative: neighbouring synthetic streets within same barangay",
+    "incident_context": [
+      {
+        "barangay": "Canlalay",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Canlalay",
+          "place_detail": "Demo Street D, Block 1",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street D, Block 1."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Canlalay",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Canlalay",
+        "place_detail": "Demo Street Q, Block 1",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Demo Street Q, Block 1."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-53",
+    "scenario": "hard negative: neighbouring synthetic streets within same barangay",
+    "incident_context": [
+      {
+        "barangay": "Zapote",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Zapote",
+          "place_detail": "Demo Street E, Block 1",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street E, Block 1."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Zapote",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Zapote",
+        "place_detail": "Demo Street R, Block 1",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Demo Street R, Block 1."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-54",
+    "scenario": "hard negative: neighbouring synthetic streets within same barangay",
+    "incident_context": [
+      {
+        "barangay": "Timbao",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Timbao",
+          "place_detail": "Demo Street F, Block 1",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street F, Block 1."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Timbao",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Timbao",
+        "place_detail": "Demo Street S, Block 1",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Demo Street S, Block 1."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-55",
+    "scenario": "hard negative: neighbouring synthetic streets within same barangay",
+    "incident_context": [
+      {
+        "barangay": "Malaban",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Malaban",
+          "place_detail": "Demo Street G, Block 1",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street G, Block 1."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Malaban",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Malaban",
+        "place_detail": "Demo Street T, Block 1",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Demo Street T, Block 1."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-56",
+    "scenario": "hard negative: neighbouring synthetic streets within same barangay",
+    "incident_context": [
+      {
+        "barangay": "Casile",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Casile",
+          "place_detail": "Demo Street H, Block 1",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street H, Block 1."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Casile",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Casile",
+        "place_detail": "Demo Street U, Block 1",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Demo Street U, Block 1."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-57",
+    "scenario": "hard negative: neighbouring synthetic streets within same barangay",
+    "incident_context": [
+      {
+        "barangay": "De La Paz",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "De La Paz",
+          "place_detail": "Demo Street I, Block 1",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street I, Block 1."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "De La Paz",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "De La Paz",
+        "place_detail": "Demo Street V, Block 1",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Demo Street V, Block 1."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-58",
+    "scenario": "hard negative: neighbouring synthetic streets within same barangay",
+    "incident_context": [
+      {
+        "barangay": "Canlalay",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Canlalay",
+          "place_detail": "Demo Street J, Block 1",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street J, Block 1."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Canlalay",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Canlalay",
+        "place_detail": "Demo Street W, Block 1",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Demo Street W, Block 1."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-59",
+    "scenario": "hard negative: neighbouring synthetic streets within same barangay",
+    "incident_context": [
+      {
+        "barangay": "Zapote",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Zapote",
+          "place_detail": "Demo Street K, Block 1",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street K, Block 1."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Zapote",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Zapote",
+        "place_detail": "Demo Street X, Block 1",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Demo Street X, Block 1."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "different"
+  },
+  {
+    "id": "pair-60",
+    "scenario": "hard negative: neighbouring synthetic streets within same barangay",
+    "incident_context": [
+      {
+        "barangay": "Timbao",
+        "observed_at": "2026-10-28T04:00:00",
+        "facts": {
+          "barangay_mentioned": "Timbao",
+          "place_detail": "Demo Street L, Block 1",
+          "hazards": [
+            "flood"
+          ],
+          "flood_depth": "knee",
+          "houses_flooded": 3,
+          "is_correction": false,
+          "summary_en": "Flood reported at Demo Street L, Block 1."
+        },
+        "photo_judgments": [
+          {
+            "floodwater": true
+          }
+        ]
+      }
+    ],
+    "new_report": {
+      "barangay": "Timbao",
+      "observed_at": "2026-10-29T04:00:00",
+      "facts": {
+        "barangay_mentioned": "Timbao",
+        "place_detail": "Demo Street Y, Block 1",
+        "hazards": [
+          "flood"
+        ],
+        "flood_depth": "knee",
+        "houses_flooded": 3,
+        "is_correction": false,
+        "summary_en": "Flood reported at Demo Street Y, Block 1."
+      },
+      "photo_judgments": [
+        {
+          "floodwater": true
+        }
+      ]
+    },
+    "label": "different"
+  }
+]
