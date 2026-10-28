@@ -65,7 +65,7 @@ async def _ingest_one(
     assert main.id is not None
     ids = [main.id]
     if report.barangay is not None:
-        lat, lon = pick_point(report.barangay, report.key)
+        lat, lon = pick_point(report.barangay, report.key, place=report.place)
         pin = await intake.ingest_location(report.reporter, lat, lon, channel=CHANNEL)
         assert pin.id is not None
         if pin.id not in ids:

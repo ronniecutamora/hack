@@ -1,5 +1,6 @@
 import io
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -12,10 +13,12 @@ from app.db import init_db, make_engine
 from app.demo import DemoDirError, require_demo_dir
 from app.demo.geo import pick_point
 from app.demo.images import images_command, jobs_for
-from app.demo.loader import CHANNEL, MANIFEST_NAME, load_command
+from app.demo.loader import CHANNEL, MANIFEST_NAME, _ingest_one, load_command
 from app.demo.scenario import LANDFALL_AT, load_scenario
 from app.gazetteer import BARANGAYS, BY_NAME
 from app.geo import barangay_at
+from app.incidents import distance_m
+from app.intake import IntakeService
 from app.models import Report
 from tests.test_assessment import FakeLLM, FakeSam
 
@@ -95,6 +98,22 @@ def test_every_barangay_picks_a_point_inside_itself():
 
 
 # the loader
+
+
+async def test_loader_uses_shared_place_and_keeps_unpinned_reports_unpinned(tmp_path):
+    settings = demo_settings(tmp_path)
+    engine = engine_for(settings)
+    intake = IntakeService(settings, engine)
+    first, second, unpinned = load_scenario(FIXTURE)
+    first = replace(first, place="malaban-purok3-corner")
+    second = replace(second, barangay="Malaban", place=first.place)
+    for report in (first, second, unpinned):
+        assert len(await _ingest_one(intake, engine, report, photo=None)) == 1
+    rows = reports(engine)
+    for row, report in zip(rows[:2], (first, second), strict=True):
+        assert (row.lat, row.lon) == pick_point(report.barangay, report.key, place=report.place)
+    assert distance_m((rows[0].lat, rows[0].lon), (rows[1].lat, rows[1].lon)) <= 60
+    assert rows[2].lat is None and rows[2].lon is None
 
 
 def test_loader_ingests_backdates_assesses_and_manifests(tmp_path):

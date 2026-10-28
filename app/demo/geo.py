@@ -1,12 +1,13 @@
 """Deterministic pins inside barangay polygons (no hand-typed coordinates).
 
 The loader pins a report by barangay name: the point is picked from the barangay's
-boundary polygon with a seed derived from the scenario key, so the same scenario
-always yields the same pins. Boundaries: app/data/binan_barangays.geojson.
+boundary polygon with a seed derived from the scenario key. Reports sharing a
+place jitter around one anchor within 30 m. Boundaries: app/data/binan_barangays.geojson.
 """
 
 import hashlib
 import json
+import math
 import random
 from functools import cache
 from pathlib import Path
@@ -15,6 +16,8 @@ from app.gazetteer import BY_NAME
 
 BOUNDARIES = Path(__file__).parent.parent / "data" / "binan_barangays.geojson"
 _ATTEMPTS = 1000
+_EARTH_RADIUS_M = 6_371_000
+_JITTER_M = 30
 
 
 @cache
@@ -56,9 +59,28 @@ def _bbox(polygons: list) -> tuple[float, float, float, float]:
     return min(lons), min(lats), max(lons), max(lats)
 
 
-def pick_point(barangay: str, seed_key: str) -> tuple[float, float]:
-    """A deterministic (lat, lon) inside the barangay, seeded by the scenario key."""
+def pick_point(barangay: str, seed_key: str, place: str | None = None) -> tuple[float, float]:
+    """A deterministic (lat, lon), optionally within 30 m of a shared place anchor."""
     polygons = _polygons()[barangay]
+    if place is not None:
+        anchor = pick_point(barangay, place)
+        rng = random.Random(f"jitter\0{barangay}\0{place}\0{seed_key}")
+        lat, lon = map(math.radians, anchor)
+        for _ in range(_ATTEMPTS):
+            distance = _JITTER_M * math.sqrt(rng.random()) / _EARTH_RADIUS_M
+            bearing = rng.uniform(0, 2 * math.pi)
+            jitter_lat = math.asin(
+                math.sin(lat) * math.cos(distance)
+                + math.cos(lat) * math.sin(distance) * math.cos(bearing)
+            )
+            jitter_lon = lon + math.atan2(
+                math.sin(bearing) * math.sin(distance) * math.cos(lat),
+                math.cos(distance) - math.sin(lat) * math.sin(jitter_lat),
+            )
+            point = (math.degrees(jitter_lat), math.degrees(jitter_lon))
+            if _inside(point[1], point[0], polygons):
+                return point
+        return anchor  # even a narrow polygon keeps the pin inside and within 30 m
     min_lon, min_lat, max_lon, max_lat = _bbox(polygons)
     seed = int(hashlib.sha256(f"{barangay}\0{seed_key}".encode()).hexdigest(), 16) % 2**32
     rng = random.Random(seed)

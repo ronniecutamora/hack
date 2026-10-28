@@ -3,7 +3,8 @@
 Each report is evidence-shaped: a reporter ref, a day/hour offset from landfall, the
 Taglish text (a photo caption when there is a photo), an optional ``photo_prompt``
 scene for Muse Image, and an optional ``barangay`` pin name. Reports that must not
-be pinned (ambiguous or placeless) leave ``barangay`` null on purpose.
+be pinned (ambiguous or placeless) leave ``barangay`` null on purpose. A shared
+``place`` keeps reports' synthetic pins near each other inside that barangay.
 """
 
 import json
@@ -33,6 +34,7 @@ class ScenarioReport:
     series: str | None = None
     flood_cm: int | None = None  # stated water depth, for series reports
     corrects: str | None = None  # key of the earlier report this one corrects
+    place: str | None = None  # shared synthetic location anchor within the barangay
 
 
 def received_at(report: ScenarioReport) -> datetime:
@@ -63,6 +65,8 @@ def validate(reports: list[ScenarioReport]) -> list[str]:
             errors.append(f"{r.key}: hour {r.hour} is outside 0-23")
         if r.barangay is not None and r.barangay not in BY_NAME:
             errors.append(f"{r.key}: unknown barangay {r.barangay!r}")
+        if r.place is not None and (not r.place.strip() or r.barangay is None):
+            errors.append(f"{r.key}: place needs a nonempty name and a barangay pin")
         if r.corrects is not None and r.corrects not in by_key:
             errors.append(f"{r.key}: corrects unknown report {r.corrects!r}")
     if len({r.barangay for r in reports if r.barangay}) < 4:
@@ -73,10 +77,17 @@ def validate(reports: list[ScenarioReport]) -> list[str]:
 
 
 def _validate_series(reports: list[ScenarioReport]) -> list[str]:
+    errors = []
+    for series in sorted({r.series for r in reports if r.series is not None}):
+        group = [r for r in reports if r.series == series]
+        places = {r.place for r in group}
+        if len(places) != 1 or any(p is None or not p.strip() for p in places):
+            errors.append(f"series {series!r}: every report must share one nonempty place")
+        if len({r.barangay for r in group}) != 1 or any(r.barangay is None for r in group):
+            errors.append(f"series {series!r}: every report must pin the same barangay")
     members = [r for r in reports if r.series == STREET_SERIES]
     if len(members) < 3:
-        return [f"need 3+ reports in series {STREET_SERIES!r}, have {len(members)}"]
-    errors = []
+        return [*errors, f"need 3+ reports in series {STREET_SERIES!r}, have {len(members)}"]
     if len({r.reporter for r in members}) < 3:
         errors.append(f"series {STREET_SERIES!r}: need 3+ different reporters")
     if len({r.day for r in members}) != len(members):
