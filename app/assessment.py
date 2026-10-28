@@ -143,12 +143,20 @@ class AssessmentService:
         async with self._locks[report_id]:  # a pin and a photo may arrive moments apart
             try:
                 report = await self._assess(report_id)
-                if report is not None and report.status == STATUS_ASSESSED:
-                    report = await self.incidents.group_locked(report_id)
-                return report
             except Exception as exc:  # keep the bot alive; the error is saved for the officer
                 logger.exception("assessment of report %s failed", report_id)
                 return self._mark_failed(report_id, exc)
+            if report is not None and report.status == STATUS_ASSESSED:
+                try:
+                    report = await self.incidents.group_locked(report_id)
+                except Exception as exc:
+                    logger.exception("grouping of report %s failed", report_id)
+                    with self._session() as session:
+                        report = session.get(Report, report_id)
+                        report.grouping_error = f"{type(exc).__name__}: {exc}"
+                        session.add(report)
+                        session.commit()
+            return report
 
     async def _assess(self, report_id: int) -> Report | None:
         with self._session() as session:

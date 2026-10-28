@@ -1,4 +1,5 @@
 import io
+import sqlite3
 
 import pytest
 from PIL import Image
@@ -222,6 +223,45 @@ async def test_unexpected_errors_are_stored_not_raised(settings, engine):
     out = await service(settings, engine, llm).assess(report.id)
     assert out.status == "assessment_failed"
     assert one(engine, Assessment).error == "RuntimeError: bug"
+
+
+@pytest.mark.parametrize("failure", ["database_lock", "stale_inputs"])
+async def test_grouping_failure_keeps_successful_assessment(
+    settings, engine, monkeypatch, caplog, failure
+):
+    report = await IntakeService(settings, engine).ingest_photo(
+        7, jpeg(), caption="baha sa Malaban"
+    )
+    llm = FakeLLM()
+    assessor = service(settings, engine, llm)
+
+    def fail_apply(*args):
+        if failure == "database_lock":
+            raise sqlite3.OperationalError("database is locked")
+        return None  # exhaust the incident service's stale-plan retries
+
+    with monkeypatch.context() as patch:
+        patch.setattr(assessor.incidents, "_apply", fail_apply)
+        out = await assessor.assess(report.id)
+
+    expected = (
+        "OperationalError: database is locked"
+        if failure == "database_lock"
+        else "RuntimeError: Incident inputs changed repeatedly; rerun grouping."
+    )
+    assert out.status == "assessed"
+    assert out.grouping_error == expected
+    stored = one(engine, Report)
+    assert (stored.status, stored.grouping_error) == ("assessed", expected)
+    assessment = one(engine, Assessment)
+    assert assessment.facts == llm.facts_reply and assessment.error is None
+    assert one(engine, PhotoAssessment).judgment == JUDGMENT
+    assert assessor.report_ids(pending_only=True) == []
+    assert "grouping of report" in caplog.text and expected in caplog.text
+    assert len(llm.calls) == 2
+    retried = await assessor.incidents.group(report.id, retry_failed=True)
+    assert retried.grouping_error is None and retried.incident_id is not None
+    assert len(llm.calls) == 2  # grouping retry never repeats the assessment
 
 
 async def test_missing_report_returns_none(settings, engine):
