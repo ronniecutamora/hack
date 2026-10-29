@@ -377,10 +377,9 @@ def test_numbers_must_be_computed_counts_and_place_digits_only_quoted(engine):
 
     not_accepted = "Every number must be a computed count, next to what it counts. Not accepted: "
     assert check("Four houses were reported damaged in Purok 3.") == []
-    assert check("12 houses.") == [not_accepted + "12 (computed: houses partially damaged 4)."]
-    assert check("Seven houses.") == [
-        not_accepted + "Seven (computed: houses partially damaged 4)."
-    ]
+    houses = "(computed: houses damaged (totally and partially together) 4)."
+    assert check("12 houses.") == [not_accepted + "12 " + houses]
+    assert check("Seven houses.") == [not_accepted + "Seven " + houses]
     assert check(f"{report_id} houses.") != []  # a report id is not a count
     assert check("Flooding.", [999]) == ["cited_report_ids [999] are not in the input."]
     assert check("Flooding.", []) != []
@@ -416,7 +415,7 @@ async def test_invented_numbers_are_retried_once_then_the_fallback_is_stored(eng
     )
     draft, _ = await generate(engine, settings, llm=llm)
     assert len(llm.calls) == 2
-    assert "40 (computed: houses partially damaged 4)" in llm.calls[1]["user_text"]  # retry
+    assert "40 (computed: houses damaged" in llm.calls[1]["user_text"]  # the retry sees why
     assert draft.summary_fallback is True and draft.summary_model is None
     assert [a["errors"] != [] for a in draft.summary_validation] == [True, True]
     assert fields(draft)["1.4"]["source"] == "rule"

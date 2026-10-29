@@ -106,11 +106,14 @@ computed counts: no reporter ids, raw messages, transcripts or names. The reply 
 cites was in the input, it has at most four sentences, and every number passes an allowlist:
 
 - A number must be a confirmed computed count from the form (after the counting rule, pending figures excluded) or
-  the number of reports, incidents or reporters, and it must match the words next to it: "4 houses partially
-  damaged" passes only if 4 is that count, and "3 dead" fails when 3 is a families count. A single report's figure
-  (such as one superseded by a correction), an id, or a sum the agent made up is never allowed.
-- Spelled numbers are read whole ("twenty-five" is 25, "a dozen" is 12) and checked the same way; "one" is allowed
-  only in idioms ("no one", "one of") or when 1 is the count. Vague amounts ("hundreds of", "dozens of") are
+  the number of reports, incidents or reporters, and the words next to it must name exactly that one count: "4 houses
+  partially damaged" passes only if 4 is that count, "4 houses damaged" is totally and partially damaged together,
+  and "3 dead" fails when 3 is a families count. A number with no such label ("2 meters"), or one that could mean
+  several counts ("2 people were trapped", "2 residents drowned"), is rejected: people need a qualifier (evacuated,
+  dead, injured, missing). A single report's figure (such as one superseded by a correction), an id, or a sum the
+  agent made up is never allowed.
+- Spelled numbers are read whole ("twenty-five" is 25, "a dozen" is 12) and checked the same way; "one" is skipped
+  only in "no one" and in "one of" when no count word follows it ("one of the residents died" claims a death). Vague amounts ("hundreds of", "dozens of") are
   rejected.
 - Times (7:30, 7 pm), dates (month or weekday names, 10/28), ordinals (28th, twenty-eighth; "first" is allowed as
   plain English) and report or incident references ("report 12", "#12") are rejected: the form has its own fields
@@ -235,6 +238,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-29 | Review fix: the officer's event date and time is refused when it is in the future or more than 30 days before the earliest report, and flagged when it is after it |
 | 2026-10-29 | Review fix: evidence links to reports outside an incident open /reports around that report, so they work past the 200-report page; trust-signal links use the same target |
 | 2026-10-29 | Review fix (round 2): schema setup, including the trigger rebuild, runs in one BEGIN IMMEDIATE transaction, so the bot and the web app starting together cannot both drop the triggers |
+| 2026-10-29 | Review fix (round 2): every number in the 1.4 summary needs a label naming exactly one computed count; unlabelled numbers, people with no qualifier and "one of" followed by a count word are rejected |
 
 ### Third-party code and assets
 

@@ -36,8 +36,9 @@ SUMMARY_SYSTEM = (
     "JSON. Use only the evidence given: typed facts from residents' reports grouped by incident "
     "(oldest report first) and the computed counts. Write at most 4 short, plain English "
     "sentences on what happened, where, the impact and the stated needs. Every number must be "
-    "a value from computed_counts, written as digits right next to what it counts (for example "
-    "'4 houses partially damaged', '12 families affected', '3 reports'); never repeat one "
+    "a value from computed_counts, written as digits right next to words naming exactly that "
+    "count (for example '4 houses partially damaged', '12 families affected', '2 persons "
+    "injured', '3 reports'); a number with no such words is rejected. Never repeat one "
     "report's figure and never add figures up. Incidents marked as waiting for grouping review "
     "may repeat other reports; their figures are not in the counts. Write no dates, times, "
     "ordinals, report or incident ids, and no place numbers except a place written exactly as "
@@ -78,13 +79,15 @@ DEPTH_WORDS = {
 # Numbers the summary may write: the confirmed counts on the form and how many reports,
 # incidents and reporters it rests on. Raw report figures, ids and place digits are not counts.
 NUMBER_LABELS = COUNT_LABELS | {
-    "houses_damaged": "houses damaged (totally plus partially)",
+    "houses_damaged": "houses damaged (totally and partially together)",
     "reports": "reports",
     "incidents": "incidents",
     "reporters": "reporters",
 }
 # What a number counts is read from the words next to it: the nearest subject and a qualifier
-# that fits it. (subject, qualifier) -> the computed counts the number may equal.
+# that fits it. (subject, qualifier) -> the one computed count the number must equal. A label
+# that could mean several counts ("3 families", "2 people", "5 evacuated") or none ("2 meters",
+# "2 residents drowned") is rejected: people need a qualifier, and nothing is guessed.
 SUBJECTS = {
     "houses": r"houses?|homes?|dwellings?",
     "families": r"famil(?:y|ies)|households?",
@@ -103,29 +106,26 @@ QUALIFIERS = {
     "injured": r"injur\w*|hurt|wounded",
     "missing": r"missing",
 }
-MEANINGS: dict[tuple[str | None, str | None], tuple[str, ...]] = {
-    ("houses", "totally"): ("houses_totally_damaged",),
-    ("houses", "partially"): ("houses_partially_damaged",),
-    ("houses", None): ("houses_totally_damaged", "houses_partially_damaged", "houses_damaged"),
-    ("families", "affected"): ("families_affected",),
-    ("families", "evacuated"): ("families_evacuated",),
-    ("families", None): ("families_affected", "families_evacuated"),
-    ("people", "evacuated"): ("persons_evacuated",),
-    ("people", "dead"): ("dead",),
-    ("people", "injured"): ("injured",),
-    ("people", "missing"): ("missing",),
-    ("people", None): ("persons_evacuated", "dead", "injured", "missing", "reporters"),
-    ("cages", None): ("fish_cages_or_pens_damaged",),
-    ("reports", None): ("reports",),
-    ("incidents", None): ("incidents",),
-    ("reporters", None): ("reporters",),
-    (None, "totally"): ("houses_totally_damaged",),
-    (None, "partially"): ("houses_partially_damaged",),
-    (None, "affected"): ("families_affected",),
-    (None, "evacuated"): ("families_evacuated", "persons_evacuated"),
-    (None, "dead"): ("dead",),
-    (None, "injured"): ("injured",),
-    (None, "missing"): ("missing",),
+MEANINGS: dict[tuple[str | None, str | None], str] = {
+    ("houses", "totally"): "houses_totally_damaged",
+    ("houses", "partially"): "houses_partially_damaged",
+    ("houses", None): "houses_damaged",
+    ("families", "affected"): "families_affected",
+    ("families", "evacuated"): "families_evacuated",
+    ("people", "evacuated"): "persons_evacuated",
+    ("people", "dead"): "dead",
+    ("people", "injured"): "injured",
+    ("people", "missing"): "missing",
+    ("cages", None): "fish_cages_or_pens_damaged",
+    ("reports", None): "reports",
+    ("incidents", None): "incidents",
+    ("reporters", None): "reporters",
+    (None, "totally"): "houses_totally_damaged",
+    (None, "partially"): "houses_partially_damaged",
+    (None, "affected"): "families_affected",
+    (None, "dead"): "dead",
+    (None, "injured"): "injured",
+    (None, "missing"): "missing",
 }
 _SUBJECT = re.compile("|".join(rf"\b(?P<{k}>{v})\b" for k, v in SUBJECTS.items()), re.IGNORECASE)
 _QUALIFIER = re.compile(
@@ -295,12 +295,17 @@ def _spelled_value(run: str) -> float:
 
 
 def _one_idiom(text: str, start: int, end: int) -> bool:
+    """ "no one" is never a count; "one of" is not one only when no count word follows it in
+    the clause: "one of the residents died" claims a death."""
     before = re.search(r"(\w+)\W*$", text[:start])
+    if before and before.group(1).lower() in ONE_IDIOM_BEFORE:
+        return True
     after = re.match(r"\W*(\w+)", text[end:])
-    return bool(
-        (before and before.group(1).lower() in ONE_IDIOM_BEFORE)
-        or (after and after.group(1).lower() in ONE_IDIOM_AFTER)
-    )
+    if not (after and after.group(1).lower() in ONE_IDIOM_AFTER):
+        return False
+    stop = _BOUNDARY.search(text, end)
+    rest = text[end : stop.start() if stop else len(text)]
+    return not (_SUBJECT.search(rest) or _QUALIFIER.search(rest))
 
 
 def numbers_written(text: str) -> list[Written]:
@@ -322,12 +327,16 @@ def numbers_written(text: str) -> list[Written]:
 
 
 def computed_numbers(payload: dict[str, Any]) -> dict[str, float]:
-    """The allowlist: confirmed counts, and reports, incidents and reporters behind them."""
+    """The allowlist: confirmed counts, and reports, incidents and reporters behind them.
+
+    "Houses damaged" with no qualifier is the totally and partially damaged houses together.
+    """
     counts = dict(payload["computed_counts"])
-    if {"houses_totally_damaged", "houses_partially_damaged"} <= set(counts):
-        counts["houses_damaged"] = (
-            counts["houses_totally_damaged"] + counts["houses_partially_damaged"]
-        )
+    houses = [
+        counts[k] for k in ("houses_totally_damaged", "houses_partially_damaged") if k in counts
+    ]
+    if houses:
+        counts["houses_damaged"] = sum(houses)
     return counts
 
 
@@ -346,8 +355,9 @@ def _labels(pattern: re.Pattern, window: str) -> list[str]:
     return [m.lastgroup for m in pattern.finditer(window)]
 
 
-def meaning(before: str, after: str) -> tuple[str, ...] | None:
-    """The computed counts a number may equal, from the words next to it; None if unlabelled.
+def meaning(before: str, after: str) -> str | None:
+    """The one computed count a number must equal, from the words next to it; None when the
+    words name no count or could name several.
 
     The words after the number come first ("4 houses partially damaged"); with none there, the
     words before it ("houses partially damaged: 4"). A qualifier alone after the number may take
@@ -367,11 +377,10 @@ def meaning(before: str, after: str) -> tuple[str, ...] | None:
     return MEANINGS.get((subject, qualifier))
 
 
-def _describe(fields: tuple[str, ...], counts: dict[str, float]) -> str:
-    known = [f"{NUMBER_LABELS[f]} {counts[f]:g}" for f in fields if f in counts]
-    if known:
-        return "computed: " + ", ".join(known)
-    return "no computed count of " + " or ".join(NUMBER_LABELS[f] for f in fields)
+def _describe(name: str, counts: dict[str, float]) -> str:
+    if name in counts:
+        return f"computed: {NUMBER_LABELS[name]} {counts[name]:g}"
+    return f"no computed count of {NUMBER_LABELS[name]}"
 
 
 def _mask(text: str, spans: list[tuple[int, int]]) -> str:
@@ -401,12 +410,11 @@ def number_errors(text: str, payload: dict[str, Any]) -> list[str]:
         clause_end = min((s for s in stops if s >= number.end), default=len(text))
         before = text[max(clause_start, written[i - 1].end if i else 0) : number.start]
         after = text[number.end : min([clause_end, *(w.start for w in written[i + 1 : i + 2])])]
-        fields = meaning(before, after)
-        if fields is None:
-            if number.value not in counts.values():
-                rejected.append(f"{number.text} (not a computed count)")
-        elif not any(counts.get(f) == number.value for f in fields):
-            rejected.append(f"{number.text} ({_describe(fields, counts)})")
+        name = meaning(before, after)
+        if name is None:
+            rejected.append(f"{number.text} (no label next to it names one computed count)")
+        elif counts.get(name) != number.value:
+            rejected.append(f"{number.text} ({_describe(name, counts)})")
     if rejected:
         errors.append(
             "Every number must be a computed count, next to what it counts. Not accepted: "

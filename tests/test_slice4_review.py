@@ -279,12 +279,36 @@ def test_numbers_are_the_computed_counts_they_describe(corrected, text, accepted
         ("Dozens of homes are flooded.", False),
         ("twenty-five houses partially damaged.", False),
         ("No one was hurt.", True),
-        ("One of the houses was reported partially damaged.", True),
+        ("One of the houses was reported partially damaged.", False),  # claims 1, count is 4
+        ("One of them is flooded.", True),  # no count word follows: an idiom
         ("Four houses partially damaged.", True),
     ],
 )
 def test_spelled_numbers_are_read_whole_and_checked(corrected, text, accepted):
     assert (check(corrected, text) == []) is accepted, check(corrected, text)
+
+
+CASUALTY_PAYLOAD = {
+    "computed_counts": {"reports": 3, "incidents": 2, "reporters": 2, "injured": 2, "dead": 0},
+    "incidents": [{"place": None, "reports": [{"report_id": 1}]}],
+}
+
+
+@pytest.mark.parametrize(
+    ("text", "accepted"),
+    [
+        ("2 residents drowned.", False),  # people with no casualty qualifier
+        ("2 people were trapped.", False),
+        ("2 residents reported flooding.", False),  # people are never the reporter count
+        ("One of the residents died.", False),  # "one of" with a count word is a claim
+        ("Water rose 2 meters.", False),  # no label at all
+        ("2 persons were reported injured.", True),
+        ("3 reports from 2 incidents, by 2 reporters.", True),
+        ("Injured: 2; dead: 0.", True),
+    ],
+)
+def test_every_number_needs_a_label_naming_exactly_one_count(text, accepted):
+    assert (check(CASUALTY_PAYLOAD, text) == []) is accepted, check(CASUALTY_PAYLOAD, text)
 
 
 def test_twenty_five_is_25_and_passes_only_when_25_is_a_count(corrected):
