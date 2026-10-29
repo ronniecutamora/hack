@@ -327,6 +327,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-29 | Review fix: one redaction helper (`redact_personal`) for Notice of Loss excerpts, photo notes and place details also removes emails, @handles and Facebook/Messenger account names; the phone pattern no longer swallows ISO dates or decimal coordinates |
 | 2026-10-29 | Review fix: the `/drafts` Notice of Loss summary lists the fields the agent fills and the fields left for the assured from each commodity's field definitions; the annex shows only the SAM concepts a commodity lists (fisheries: floodwater, no roof count) with a caveat that lake or pond water reads as floodwater |
 | 2026-10-29 | Demo reset keeps the model cache as well as the generated images, so a reload does not pay again for photo judgments and SAM calls; updated CLI prompt, messages, help and regression test |
+| 2026-10-29 | Officer dashboard design system: one stylesheet with colour, spacing and type tokens (16 px body text, AA contrast, visible focus rings, 40 px controls), an "Ulat" header bar with the active page marked (`aria-current`), status badges that always carry text, sticky table headers, tables that scroll inside a wrapper on narrow screens and become stacked cards under 640 px, and A4 print rules that drop the dashboard chrome |
 
 ### Third-party code and assets
 
@@ -391,6 +392,7 @@ app/
   retention.py         Purge raw media after the TTL
   bot.py               Telegram bot (python -m app.bot)
   main.py, templates/  FastAPI officer pages: reports, incidents, timelines, decision audit, drafts and media
+  static/              Dashboard stylesheet (css/app.css, design tokens), script (js/app.js) and favicon
   evaluation.py        WER, Cohen's kappa and F1 helpers
 scripts/
   eval_transcribe.py   WER on your own recordings (outside the repo)

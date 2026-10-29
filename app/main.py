@@ -10,17 +10,20 @@ from the app's own pages (a same-origin check), so another site open in the offi
 cannot generate or approve drafts.
 """
 
+import hashlib
 import mimetypes
 from collections import defaultdict
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from datetime import datetime
+from functools import cache
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qsl, urlsplit
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import Engine
 from sqlmodel import Session, col, select
@@ -76,9 +79,33 @@ FORM_CONTENT_TYPE = "application/x-www-form-urlencoded"
 FORM_MAX_BYTES = 16_384
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
+STATIC_DIR = Path(__file__).parent / "static"
+
+# The header navigation, in order: (path, label). A page is current for its own path and the
+# paths below it (/incidents/7 is under Incidents).
+NAV = (
+    ("/incidents", "Incidents"),
+    ("/reports", "Reports"),
+    ("/drafts", "Drafts"),
+    ("/damaged-houses", "Damaged houses"),
+)
+
+
+def nav_current(path: str, href: str) -> bool:
+    return path == href or (href != "/" and path.startswith(href + "/"))
+
+
+@cache
+def static_url(name: str) -> str:
+    """A static file's URL with a content hash, so browsers never run a stale script or style."""
+    digest = hashlib.sha256((STATIC_DIR / name).read_bytes()).hexdigest()[:10]
+    return f"/static/{name}?v={digest}"
 
 
 templates.env.filters["manila_time"] = manila_time
+templates.env.globals["NAV"] = NAV
+templates.env.globals["nav_current"] = nav_current
+templates.env.globals["static_url"] = static_url
 
 GEO_SOURCES = {
     "pin": "location pin",
@@ -294,6 +321,7 @@ def create_app(
 
     # Added last, so it runs first: a request for another host name never reaches a route.
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
     @app.exception_handler(DraftError)
     async def draft_error(request: Request, exc: DraftError) -> HTMLResponse:

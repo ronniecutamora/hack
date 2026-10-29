@@ -2,16 +2,18 @@
 {% block title %}Drafts{% endblock %}
 {% from "_links.html" import report_href %}
 {% from "_deadline.html" import clock, deadline_notes %}
+{% from "_status.html" import draft_status %}
 {% block content %}
   <header>
     <h1>Officer drafts</h1>
     <p class="muted">RDANA form (NDRRMC Memo 107 s. 2021, Annex I) per barangay · {{ rdana_deadline.label }} within {{ rdana_deadline.window_text }} of {{ rdana_deadline.start }} (<a href="{{ rdana_deadline.url }}">{{ rdana_deadline.source }}</a>) · Philippine time (GMT+8)</p>
   </header>
   <p>Each draft fills only what the reports show, links every value to its evidence and leaves the rest for the RDANA team. Nothing is submitted until you approve it.</p>
-  <p><a href="/damaged-houses">Damaged-houses table (DROMIC columns)</a> · <a href="/damaged-houses.csv">Download CSV</a></p>
+  <p class="toolbar"><a href="/damaged-houses">Damaged-houses table (DROMIC columns)</a> · <a href="/damaged-houses.csv">Download CSV</a></p>
   {% if not statuses %}
     <p class="empty">No barangay has assessed reports yet. Drafts can be generated once reports are assessed and placed.</p>
   {% else %}
+    <div class="table-wrap">
     <table>
       <thead><tr><th>Barangay</th><th>Evidence</th><th>Latest RDANA draft</th><th class="no-print">Generate</th></tr></thead>
       <tbody>
@@ -30,7 +32,7 @@
           <td>
             {% if s.latest %}
               <a href="/drafts/{{ s.latest.id }}">Version {{ s.latest.version }}</a>
-              <span class="chip{% if s.latest.status == 'approved' %}{% elif s.latest.status == 'rejected' %} alert{% else %} warn{% endif %}">{{ s.latest.status }}</span>
+              {{ draft_status(s.latest.status) }}
               <div class="muted">{{ s.latest.created_at|manila_time }}</div>
               {% if s.stale %}<div class="chip warn">New evidence since this version: generate again</div>{% endif %}
               {% if s.approved and s.approved.id != s.latest.id %}<div class="muted">Approved: <a href="/drafts/{{ s.approved.id }}">version {{ s.approved.version }}</a></div>{% endif %}
@@ -54,6 +56,7 @@
       {% endfor %}
       </tbody>
     </table>
+    </div>
   {% endif %}
   {% if unplaced %}
     <p class="banner warn">{{ unplaced|length }} incident{{ 's' if unplaced|length != 1 }} without a barangay {{ 'are' if unplaced|length != 1 else 'is' }} in no draft until the officer places {{ 'them' if unplaced|length != 1 else 'it' }}:
@@ -67,6 +70,7 @@
     {% if not rows %}
       <p class="empty">No assessed report states {{ commodity.name }} damage yet.</p>
     {% else %}
+    <div class="table-wrap">
     <table>
       <thead><tr><th>Incident</th><th>Filing clock (from the first report)</th><th>Latest draft</th><th class="no-print">Generate</th></tr></thead>
       <tbody>
@@ -82,7 +86,7 @@
           <td>
             {% if n.latest %}
               <a href="/drafts/{{ n.latest.id }}">Version {{ n.latest.version }}</a>
-              <span class="chip{% if n.latest.status == 'rejected' %} alert{% elif n.latest.status != 'approved' %} warn{% endif %}">{{ "approved for filing, not filed" if n.latest.status == 'approved' else n.latest.status }}</span>
+              {{ draft_status(n.latest.status, nol=true) }}
               {% if n.stale %}<div class="chip warn">New evidence since this version: generate again</div>{% endif %}
               {% if n.approved and n.approved.id != n.latest.id %}<div class="muted">Approved: <a href="/drafts/{{ n.approved.id }}">version {{ n.approved.version }}</a></div>{% endif %}
             {% else %}<span class="muted">None yet</span>{% endif %}
@@ -98,6 +102,7 @@
       {% endfor %}
       </tbody>
     </table>
+    </div>
     {% endif %}
     {{ deadline_notes(deadline_table(commodity)) }}
   </section>
@@ -110,20 +115,22 @@
   </section>
   <h2>All drafts</h2>
   {% if not history %}<p class="empty">No drafts generated yet.</p>{% else %}
+  <div class="table-wrap">
   <table>
     <thead><tr><th>Draft</th><th>Output</th><th>Version</th><th>Status</th><th>Generated</th><th>Decided</th></tr></thead>
     <tbody>
     {% for d in history %}
-      <tr>
+      <tr id="draft-{{ d.id }}">
         <td><a href="/drafts/{{ d.id }}">#{{ d.id }}</a></td>
         <td>{{ output_label(d) }}</td>
         <td>{{ d.version }}</td>
-        <td><span class="chip{% if d.status == 'rejected' %} alert{% elif d.status == 'draft' %} warn{% endif %}">{{ d.status }}</span></td>
+        <td>{{ draft_status(d.status) }}</td>
         <td>{{ d.created_at|manila_time }}</td>
         <td>{% if d.decided_at %}{{ d.decided_at|manila_time }}{% if d.decided_by %} · {{ d.decided_by }}{% endif %}{% endif %}</td>
       </tr>
     {% endfor %}
     </tbody>
   </table>
+  </div>
   {% endif %}
 {% endblock %}

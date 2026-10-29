@@ -1,24 +1,27 @@
 {% extends "base.html" %}
 {% from "_trust.html" import incident_trust %}
+{% from "_status.html" import incident_status %}
 {% block title %}Incidents{% endblock %}
 {% block content %}
   <header><h1>Incidents</h1><p class="muted">Newest activity first · Philippine time (GMT+8)</p></header>
   {% if not items %}
     <p class="empty">No incidents yet. Successfully assessed reports are grouped here.</p>
   {% else %}
-    <table>
+    <div class="table-wrap">
+    <table class="stack">
       <thead><tr><th>Last activity</th><th>Barangay and incident</th><th>Reports</th><th>Flood depth</th><th>Status</th></tr></thead>
       <tbody>
       {% for i in items %}
-        <tr>
-          <td>{{ i.last_seen|manila_time }}</td>
-          <td><strong>{{ i.barangay or "Location unknown" }}</strong><div><a href="/incidents/{{ i.id }}">{{ i.title }}</a></div></td>
-          <td>{{ i.latest_facts.get("report_count", 0) }} report{{ 's' if i.latest_facts.get("report_count", 0) != 1 }}<div>{{ incident_trust(trust[i.id]) }}</div></td>
-          <td>Latest: {{ i.latest_facts.get("latest_depth", "unknown")|replace("_", " ") }}<br>Max: {{ i.latest_facts.get("max_depth", "unknown")|replace("_", " ") }}</td>
-          <td><span class="chip{% if i.status == 'needs_officer' %} warn{% endif %}">{{ i.status|replace("_", " ") }}</span></td>
+        <tr id="incident-{{ i.id }}">
+          <td data-label="Last activity">{{ i.last_seen|manila_time }}</td>
+          <td data-label="Barangay and incident"><strong>{{ i.barangay or "Location unknown" }}</strong><div><a href="/incidents/{{ i.id }}">{{ i.title }}</a></div></td>
+          <td data-label="Reports">{{ i.latest_facts.get("report_count", 0) }} report{{ 's' if i.latest_facts.get("report_count", 0) != 1 }}<div>{{ incident_trust(trust[i.id]) }}</div></td>
+          <td data-label="Flood depth">Latest: {{ i.latest_facts.get("latest_depth", "unknown")|replace("_", " ") }}<br>Max: {{ i.latest_facts.get("max_depth", "unknown")|replace("_", " ") }}</td>
+          <td data-label="Status">{{ incident_status(i.status) }}</td>
         </tr>
       {% endfor %}
       </tbody>
     </table>
+    </div>
   {% endif %}
 {% endblock %}

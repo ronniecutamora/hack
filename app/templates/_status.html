@@ -1,0 +1,9 @@
+{# Status badges: the word is always shown; colour only repeats it. #}
+{% macro incident_status(status) -%}
+  <span class="chip {{ 'warn' if status == 'needs_officer' else 'info' }}">{{ status|replace("_", " ") }}</span>
+{%- endmacro %}
+
+{% macro draft_status(status, nol=false) -%}
+  {%- set tone = {"approved": "ok", "rejected": "alert", "superseded": ""}.get(status, "warn") -%}
+  <span class="chip{{ ' ' ~ tone if tone }}">{{ "approved for filing, not filed" if nol and status == "approved" else status }}</span>
+{%- endmacro %}

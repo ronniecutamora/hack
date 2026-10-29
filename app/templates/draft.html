@@ -4,7 +4,7 @@
 {% block title %}{% if draft.kind == 'rdana' %}RDANA draft · {{ draft.barangay }} v{{ draft.version }}{% elif nol %}Notice of Loss draft · incident #{{ draft.incident_id }} v{{ draft.version }}{% else %}Damaged houses v{{ draft.version }}{% endif %}{% endblock %}
 {% block content %}
   {% set gap = c.not_in_reports or "— not in reports (for the RDANA team)" %}
-  <p class="no-print"><a href="/drafts">← Drafts</a> · <button type="button" onclick="window.print()">Print</button>{% if draft.kind == 'damaged_houses' %} · <a href="/drafts/{{ draft.id }}.csv">Download this version as CSV</a>{% endif %}</p>
+  <p class="no-print toolbar"><a href="/drafts">← Drafts</a> · <button type="button" onclick="window.print()">Print</button>{% if draft.kind == 'damaged_houses' %} · <a href="/drafts/{{ draft.id }}.csv">Download this version as CSV</a>{% endif %}</p>
 
   {% if draft.status == 'approved' %}
     <p class="banner ok keep"><strong>{{ "APPROVED FOR FILING, NOT FILED" if nol else "APPROVED" }}</strong> {{ draft.decided_at|manila_time }}{% if draft.decided_by %} by {{ draft.decided_by }}{% endif %}{% if draft.decision_reason %} · {{ draft.decision_reason }}{% endif %}. This version is frozen.{% if nol %} {{ c.not_filed }} The filing clock keeps running.{% endif %}</p>
@@ -40,6 +40,7 @@
     {% for section in c.sections %}
       <section class="rdana-section">
         <h2>{% if section.number %}{{ section.number }}. {% endif %}{{ section.title }}</h2>
+        <div class="table-wrap">
         <table>
           <tbody>
           {% for f in section.fields %}
@@ -73,6 +74,7 @@
           {% endfor %}
           </tbody>
         </table>
+        </div>
         {% if section.note %}<p class="muted">Note: {{ section.note }}</p>{% endif %}
       </section>
     {% endfor %}
@@ -102,7 +104,7 @@
     <section class="no-print">
       <h2>Officer decision</h2>
       <p class="muted">No login yet: write your designation so the audit shows who decided.</p>
-      <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
+      <div class="decision-forms">
         <form method="post" action="/drafts/{{ draft.id }}/approve">
           <fieldset><legend>Approve</legend>
             <label>Decided by (designation) <input type="text" name="decided_by" maxlength="{{ decided_by_max }}" placeholder="e.g. CDRRMO Head"></label>

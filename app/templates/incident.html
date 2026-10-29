@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% from "_trust.html" import incident_trust, signal_chips %}
 {% from "_deadline.html" import clock %}
+{% from "_status.html" import incident_status %}
 {% block title %}Incident #{{ incident.id }}{% endblock %}
 {% block content %}
   <header>
     <h1>{{ incident.title }}</h1>
-    <span class="chip{% if incident.status == 'needs_officer' %} warn{% endif %}">{{ incident.status|replace("_", " ") }}</span>
+    {{ incident_status(incident.status) }}
   </header>
   {% if not incident.active %}<p class="muted">Retired grouping. Reports were re-linked; its decision history is preserved.</p>{% endif %}
   <p>{{ incident.barangay or "Location unknown" }} · First seen {{ incident.first_seen|manila_time }} · Last seen {{ incident.last_seen|manila_time }}</p>
@@ -26,7 +27,7 @@
   <p class="muted">{{ incident.latest_facts.get("caveat", "Totals may double-count reports; officer verification required.") }}</p>
   <h2>Timeline</h2>
   {% if not items %}<p class="empty">No reports currently linked to this incident.</p>{% endif %}
-  <ol>
+  <ol class="timeline">
   {% for item in items %}
     {% set r = item.report %}{% set a = item.assessment %}
     <li id="report-{{ r.id }}">
@@ -49,12 +50,14 @@
   </ol>
   <h2>Why the agent grouped these</h2>
   {% if not decisions %}<p class="empty">No grouping decisions recorded yet.</p>{% endif %}
+  <div class="decisions">
   {% for d in decisions %}
-    <article>
+    <article class="card">
       <p><strong>{{ d.kind|replace("_", " ") }}</strong> · report #{{ d.report_id }} · {{ d.created_at|manila_time }}</p>
       <p>Model: <code>{{ d.judge_model or "Deterministic rule (no model call)" }}</code> · Decision: {{ d.decision }} · Confidence: {% if d.confidence is not none %}{{ "%.0f%%"|format(d.confidence * 100) }}{% else %}not scored{% endif %}</p>
       <p>{{ d.reason }}</p>
       {% if d.compared_incident_id %}<p class="muted">Compared with <a href="/incidents/{{ d.compared_incident_id }}">incident #{{ d.compared_incident_id }}</a>{% if d.compared_report_id %}, report #{{ d.compared_report_id }}{% endif %}.</p>{% endif %}
     </article>
   {% endfor %}
+  </div>
 {% endblock %}

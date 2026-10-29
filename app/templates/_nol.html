@@ -32,6 +32,7 @@
   <p>Dear Sir/Madam:</p>
   <p>{{ c.preamble }}</p>
   <p class="muted">Left for the assured: {{ c.preamble_blanks|join(", ") }}.</p>
+  <div class="table-wrap">
   <table>
     <tbody>
     {% for f in c.fields %}
@@ -48,12 +49,14 @@
     {% endfor %}
     </tbody>
   </table>
+  </div>
   <p>{% for line in c.closing.split(" / ") %}{{ line }}{% if not loop.last %}<br>{% endif %}{% endfor %}</p>
 </section>
 
 <section>
   <h2>Evidence annex for the PCIC adjuster</h2>
   <p class="muted">Every report in incident #{{ c.incident_id }}, oldest first. Photo judgments are by the agent LLM; SAM 3.1 measurements are {{ c.sam_label }}.{% if c.sam_caveat %} {{ c.sam_caveat }}{% endif %} Names and contact details (phone numbers, emails, handles, account names) are removed from the excerpts and the agent's photo notes. Photo links work until raw media are deleted after the retention period; the judgments and measurements stay.</p>
+  <div class="table-wrap">
   <table>
     <thead><tr><th>Report</th><th>Photo evidence</th><th>What the reporter said</th><th>Trust</th></tr></thead>
     <tbody>
@@ -95,4 +98,5 @@
     {% endfor %}
     </tbody>
   </table>
+  </div>
 </section>

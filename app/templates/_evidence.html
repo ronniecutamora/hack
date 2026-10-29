@@ -30,6 +30,7 @@
 
 {# The DROMIC damaged-houses table, shared by the live page and a frozen draft. #}
 {% macro houses_table(t) %}
+  <div class="table-wrap">
   <table>
     <thead>
       <tr><th rowspan="2">Region</th><th rowspan="2">Province</th><th rowspan="2">City/Municipality</th><th rowspan="2">Barangay</th><th colspan="3">No. of damaged houses</th><th rowspan="2" class="num">Pending grouping review (not added)</th><th rowspan="2">Evidence</th></tr>
@@ -59,5 +60,6 @@
       </tr>
     </tbody>
   </table>
+  </div>
   <p class="muted">{{ t.counting_rule }} An empty cell means no confirmed report states that number; it is not zero. Pending figures may duplicate other reports and are never added to Total. Barangays whose reports state no house-damage number are not listed.{% if t.unplaced_incidents %} {{ t.unplaced_incidents }} incident{{ 's' if t.unplaced_incidents != 1 }} without a barangay {{ 'are' if t.unplaced_incidents != 1 else 'is' }} not counted until the officer places {{ 'them' if t.unplaced_incidents != 1 else 'it' }}.{% endif %}</p>
 {% endmacro %}
