@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% import "_map.html" as m %}
+{% from "_status.html" import incident_status %}
+{% block title %}Map{% endblock %}
+{% block head %}{{ m.head() }}{% endblock %}
+{% block content %}
+  <header>
+    <h1>Map</h1>
+    <p class="muted">Active incidents in Biñan · placed at their reports' GPS, else the barangay centre</p>
+  </header>
+  <div class="map-layout">
+    <div class="map-panel">
+      {{ m.map() }}
+      <noscript><p class="banner">The map needs JavaScript. The list below has every incident and where it is.</p></noscript>
+    </div>
+    <aside class="card map-side">
+      <h2>Legend</h2>
+      {{ m.legend() }}
+      <p class="muted">Positions are evidence for the officer, not surveyed locations. The map never moves to show a pin outside Biñan.</p>
+    </aside>
+  </div>
+
+  <div id="live-map-list" data-live="incidents reports">
+    <h2>Incidents on the map</h2>
+    {% set incidents = features|selectattr("properties.kind", "equalto", "incident")|list %}
+    {% set outside = features|selectattr("properties.kind", "equalto", "outside")|list %}
+    {% if not incidents and not unplaced %}
+      <p class="empty">No active incidents yet. Assessed reports are grouped into incidents and appear here.</p>
+    {% else %}
+    <div class="table-wrap">
+    <table class="stack">
+      <thead><tr><th>Incident</th><th>Status</th><th>Placed at</th><th>Reports</th><th>Flood depth</th></tr></thead>
+      <tbody>
+      {% for f in incidents %}
+        {% set p = f.properties %}
+        <tr id="incident-{{ p.id }}">
+          <td data-label="Incident"><strong>{{ p.barangay or "Location unknown" }}</strong><div><a href="{{ p.url }}">{{ p.title }}</a></div></td>
+          <td data-label="Status">{{ incident_status(p.status) }}</td>
+          <td data-label="Placed at">{% if p.approximate %}<span class="chip warn">approximate</span> <span class="muted">barangay centre, no GPS in its reports</span>{% else %}GPS of {{ p.points }} report{{ 's' if p.points != 1 }}{% if p.points > 1 %} (mean){% endif %}{% endif %}
+            <div class="muted">{{ "%.5f"|format(f.geometry.coordinates[1]) }}, {{ "%.5f"|format(f.geometry.coordinates[0]) }}</div></td>
+          <td data-label="Reports" class="num">{{ p.report_count }}</td>
+          <td data-label="Flood depth">Latest: {{ p.latest_depth }}<br>Max: {{ p.max_depth }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% endif %}
+    {% if unplaced %}
+      <p class="banner warn">Not on the map (no GPS and no barangay): {% for i in unplaced %}<a href="/incidents/{{ i.id }}">{{ i.title }}</a>{{ ", " if not loop.last }}{% endfor %}.</p>
+    {% endif %}
+    {% if outside %}
+      <p class="banner alert">Flagged reports pinned outside Biñan: {% for f in outside %}<a href="{{ f.properties.url }}">report #{{ f.properties.report_id }}</a>{{ ", " if not loop.last }}{% endfor %}.</p>
+    {% endif %}
+  </div>
+{% endblock %}
+{% block scripts %}{{ m.scripts() }}{% endblock %}

@@ -63,7 +63,9 @@ from app.drafts import (
     regenerate_form,
 )
 from app.gazetteer import BY_NAME
+from app.geo import boundaries_geojson
 from app.live import ChangeHub, close_on_shutdown_signals, event_stream
+from app.mapdata import map_features
 from app.meta.factory import make_agent_llm
 from app.meta.llm import AgentLLM
 from app.models import (
@@ -98,6 +100,7 @@ NAV = (
     ("/", "Overview"),
     ("/incidents", "Incidents"),
     ("/reports", "Reports"),
+    ("/map", "Map"),
     ("/drafts", "Drafts"),
     ("/damaged-houses", "Damaged houses"),
 )
@@ -377,6 +380,31 @@ def create_app(
             context = overview(session, drafts, drafts.clock())
         context["spend_cap"] = settings.daily_spend_cap_usd
         return templates.TemplateResponse(request, "overview.html", context)
+
+    @app.get("/map", response_class=HTMLResponse)
+    def map_page(request: Request) -> HTMLResponse:
+        with Session(request.app.state.engine) as session:
+            collection, unplaced = map_features(session)
+        context = {"features": collection["features"], "unplaced": unplaced}
+        return templates.TemplateResponse(request, "map.html", context)
+
+    @app.get("/map/incidents.geojson")
+    def map_incidents(request: Request) -> JSONResponse:
+        with Session(request.app.state.engine) as session:
+            collection, _unplaced = map_features(session)
+        return JSONResponse(
+            collection, media_type="application/geo+json", headers={"Cache-Control": "no-store"}
+        )
+
+    @app.get("/map/barangays.geojson")
+    def map_barangays(request: Request) -> Response:
+        """The barangay boundaries, cached by the browser for a day and revalidated by ETag."""
+        body = boundaries_geojson()
+        etag = '"' + hashlib.sha256(body).hexdigest()[:16] + '"'
+        headers = {"Cache-Control": "public, max-age=86400", "ETag": etag}
+        if request.headers.get("if-none-match") == etag:
+            return Response(status_code=304, headers=headers)
+        return Response(body, media_type="application/geo+json", headers=headers)
 
     @app.get("/reports", response_class=HTMLResponse)
     def reports(request: Request, around: int | None = None) -> HTMLResponse:

@@ -78,6 +78,58 @@ def barangay_at(lat: float, lon: float) -> Barangay | None:
     return None
 
 
+def _ring_centroid(ring: Ring) -> tuple[float, float, float]:
+    """(lon, lat, |area|) of a closed ring by the shoelace formula (fine at barangay scale)."""
+    area = cx = cy = 0.0
+    for (x0, y0), (x1, y1) in zip(ring, ring[1:] + ring[:1], strict=True):
+        cross = x0 * y1 - x1 * y0
+        area += cross
+        cx += (x0 + x1) * cross
+        cy += (y0 + y1) * cross
+    if area == 0:
+        return ring[0][0], ring[0][1], 0.0
+    return cx / (3 * area), cy / (3 * area), abs(area) / 2
+
+
+@cache
+def centroid(name: str) -> tuple[float, float] | None:
+    """(lat, lon) of a point inside the named barangay near its centre, or None if unknown.
+
+    For map markers of incidents without a GPS point. The area centroid of a concave polygon can
+    fall outside it; then the nearest point of a 40 x 40 grid inside the polygon is used.
+    """
+    area = next((a for a in _areas() if a.barangay.name == name), None)
+    if area is None:
+        return None
+    lon, lat, _ = max((_ring_centroid(poly[0]) for poly in area.polygons), key=lambda c: c[2])
+    if barangay_at(lat, lon) == area.barangay:
+        return lat, lon
+    min_lon, min_lat, max_lon, max_lat = area.bbox
+    steps = 40
+    inside = [
+        (y, x)
+        for i in range(1, steps)
+        for j in range(1, steps)
+        if barangay_at(
+            y := min_lat + (max_lat - min_lat) * i / steps,
+            x := min_lon + (max_lon - min_lon) * j / steps,
+        )
+        == area.barangay
+    ]
+    return min(inside, key=lambda p: (p[0] - lat) ** 2 + (p[1] - lon) ** 2, default=None)
+
+
+@cache
+def boundaries_geojson() -> bytes:
+    """The boundaries for the map, each feature named as the gazetteer names it (the source
+    file says "Biñan (Poblacion)", reports and incidents say "Biñan")."""
+    collection = json.loads(BOUNDARIES.read_text(encoding="utf-8"))
+    for feature in collection["features"]:
+        pcode = feature["properties"]["pcode"]
+        feature["properties"] = {"pcode": pcode, "name": BY_PCODE[pcode].name}
+    return json.dumps(collection, ensure_ascii=False, separators=(",", ":")).encode()
+
+
 _GPS_IFD = 0x8825
 _LAT_REF, _LAT, _LON_REF, _LON = 1, 2, 3, 4
 

@@ -217,7 +217,12 @@ officer is typing in: it shows "New updates. Refresh section" there instead, and
 values. The home page `/` is an overview: open incidents, incidents waiting for officer review, reports in the last
 24 hours (and held ones), drafts awaiting approval, the next filing deadline with its live countdown and model spend
 against the cap, each tile linking to its page and counted with the same helpers as that page
-([app/dashboard.py](app/dashboard.py)), beside the incidents needing attention and the latest reports. The header
+([app/dashboard.py](app/dashboard.py)), beside the incidents needing attention, the latest reports and a compact map. `/map` (Leaflet, vendored) draws
+the barangay boundaries and one marker per active incident at the mean of its reports' GPS points inside Biñan, or
+at its barangay's centre when no report has GPS (a dashed, hollow "approximate" marker); the marker's shape, a
+number and a legend in words carry the status, not colour alone, and its popup links to the incident. A report
+pinned outside Biñan appears only when the trust checks flagged it, and the map never pans to it. OpenStreetMap
+tiles are the basemap; the boundaries and markers still draw when the tiles cannot load. The header
 shows Live, Reconnecting or Offline with the time of the last update in Philippine time; when the
 stream keeps failing, the page checks `/events/token` every 20 seconds instead.
 
@@ -253,7 +258,7 @@ cp .env.example .env   # add META_API_KEY, TELEGRAM_BOT_TOKEN, PSEUDONYM_SALT (o
 uv run python -m app.bot                  # Telegram intake bot (long polling)
 uv run python -m app.bot_profile --dry-run  # bot name, descriptions and commands: print what would change
 uv run python -m app.bot_profile --photo    # apply only what differs, and upload assets/brand/ulat-avatar.png
-uv run uvicorn app.main:app --reload      # web app: / (overview), /health, /reports, /incidents, /drafts, /damaged-houses (.csv), /media/<id>, live updates at /events (localhost only: no login yet)
+uv run uvicorn app.main:app --reload      # web app: / (overview), /map, /health, /reports, /incidents, /drafts, /damaged-houses (.csv), /media/<id>, live updates at /events (localhost only: no login yet)
 uv run pytest                             # tests (all HTTP is mocked, no API calls)
 uv run ruff check . && uv run ruff format --check .
 ```
@@ -350,6 +355,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-29 | Bot profile as data (`app/bot_profile.py`): the name, short description, description and command list for @UlatPH_bot in Taglish and English (what to send, Biñan typhoon and flood damage, reports go to the City DRRM Office, not an emergency line: call 911, the same privacy line as `/start`), with Telegram's length limits enforced by a test; an idempotent CLI compares the live values and sets only what differs (`--dry-run` prints the changes), and `--photo` uploads the avatar as a square JPEG; `/help` repeats `/start` |
 | 2026-10-29 | Live dashboard: one database watcher per web process (`PRAGMA data_version` on a dedicated read-only connection, then per-topic tokens in one read transaction) fanned out over server-sent events (`/events`, typed topics, heartbeat, retry, no report text) with a polling fallback (`/events/token`); marked page sections refresh in place without wiping typed input, keep scroll position and highlight new rows; Live / Reconnecting / Offline indicator; streams close on Ctrl+C or reload so uvicorn never hangs |
 | 2026-10-29 | Overview home page (`/`): key-figure tiles (open incidents, officer review, reports in 24 h and held, drafts awaiting approval, next filing deadline with a live countdown, model spend against the cap) that link to their pages and reuse those pages' queries and services (`app/dashboard.py`), the incidents needing attention and the latest reports; it updates live; a test checks every figure against the linked page |
+| 2026-10-29 | Officer map (`/map`, Leaflet 1.9.4 vendored): barangay boundaries served from the COD-AB file (`/map/barangays.geojson`, cached with an ETag) and shaded where incidents are active; one marker per active incident at its reports' mean GPS point inside Biñan, else an "approximate" marker at the barangay centre (`app/geo.py` `centroid`); status by shape, number and a text legend; flagged pins outside Biñan only, never auto-panned to; a list of every position for keyboard, screen-reader and no-JavaScript use; live updates; a compact map on the overview; offline-safe when OSM tiles fail |
 
 ### Third-party code and assets
 
@@ -371,6 +377,7 @@ Licenses read from each installed package's metadata. The Python libraries are i
 | [pytest-asyncio](https://github.com/pytest-dev/pytest-asyncio) | Apache-2.0 | Async tests (dev) |
 | [respx](https://github.com/lundberg/respx) | BSD-3-Clause | HTTP mocking in tests (dev) |
 | [Ruff](https://github.com/astral-sh/ruff) | MIT | Lint and format (dev) |
+| [Leaflet](https://github.com/Leaflet/Leaflet) 1.9.4 (vendored in `app/static/vendor/leaflet-1.9.4/` with its LICENSE and control images, from the npm package, integrity checked) | BSD-2-Clause | The officer map |
 | [htmx](https://github.com/bigskysoftware/htmx) 2.0.11 (vendored in `app/static/vendor/htmx-2.0.11/` with its LICENSE, from the npm package, integrity checked) | 0BSD | Swapping live-updated page sections in place |
 | [FFmpeg](https://ffmpeg.org) (external program, not bundled) | LGPL/GPL depending on build | Voice note conversion to WAV |
 | Ulat bot avatar (`assets/brand/ulat-avatar.png`), generated for this project with OpenAI's image model through the Codex CLI ("GPT Terra") | Output owned by the user under OpenAI's [terms of use](https://openai.com/policies/terms-of-use/) | Branding only: the Telegram bot's profile photo. Not part of the report pipeline |
@@ -379,6 +386,7 @@ Data:
 
 | Name | License | Used for |
 |---|---|---|
+| [OpenStreetMap](https://www.openstreetmap.org/copyright) map tiles (`tile.openstreetmap.org`, loaded by the browser, not stored here) | [ODbL](https://opendatacommons.org/licenses/odbl/) data; tiles CC BY-SA, attributed "© OpenStreetMap contributors" on the map | Basemap of the officer map, under the [tile usage policy](https://operations.osmfoundation.org/policies/tiles/) (light, interactive use) |
 | [OCHA COD-AB Philippines](https://data.humdata.org/dataset/cod-ab-phl) admin level 4 (sources: PSA, NAMRIA), v03, valid on 2025-02-13 | [CC BY-IGO](https://creativecommons.org/licenses/by/3.0/igo/) | Barangay names, codes and boundaries for Biñan in `app/data/binan_barangays.geojson` (24 polygons, clipped and simplified to about 3 m). OCHA notes the boundaries are indicative, not official |
 
 ## Repo structure
@@ -419,6 +427,7 @@ app/
   main.py, templates/  FastAPI officer pages: reports, incidents, timelines, decision audit, drafts and media
   live.py              Live updates: one database watcher per process and the server-sent event streams
   dashboard.py         Read models shared by the officer pages (overview figures, active incidents)
+  mapdata.py           Map features: incident markers (mean GPS or approximate barangay centre), flagged outside pins
   static/              Dashboard stylesheet (css/app.css, design tokens), script (js/app.js), favicon and
                        vendor/ (pinned browser libraries with their licenses)
   evaluation.py        WER, Cohen's kappa and F1 helpers

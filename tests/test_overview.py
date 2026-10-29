@@ -86,7 +86,7 @@ def test_overview_links_every_tile_to_its_page(client, engine):
     for href in ('href="/incidents"', 'href="/reports"', 'href="/drafts#all-drafts"'):
         assert href in home
     assert re.search(r'href="/drafts#nol-fisheries-\d+"', home)
-    assert 'id="live-overview" data-live="reports incidents drafts spend"' in home
+    assert 'id="live-kpis" data-live="reports incidents drafts spend"' in home
     assert '<a href="/" aria-current="page">Overview</a>' in home
 
 

@@ -1,0 +1,25 @@
+{# The Leaflet map (app/static/js/map.js) and its legend. Text in the legend, not colour alone;
+   without JavaScript the map stays hidden and the page's list carries the same incidents. #}
+{% macro map(compact=false) %}
+  <div class="map{{ ' map--compact' if compact }}" data-live-map data-compact="{{ 'true' if compact else 'false' }}"
+       data-incidents="/map/incidents.geojson" data-boundaries="/map/barangays.geojson"
+       role="region" aria-label="Map of active incidents in Biñan" hidden></div>
+  <p class="map-note muted" data-map-note hidden></p>
+{% endmacro %}
+
+{% macro legend() %}
+  <ul class="legend" aria-label="Map legend">
+    <li><span class="pin pin--open" aria-hidden="true">3</span> Open incident (the number is its reports)</li>
+    <li><span class="pin pin--needs_officer" aria-hidden="true">2</span> Needs officer review (square)</li>
+    <li><span class="pin pin--open pin--approx" aria-hidden="true">1</span> Approximate: no GPS in its reports, placed at the barangay centre (dashed, hollow)</li>
+    <li><span class="pin pin--outside" aria-hidden="true">!</span> Flagged report pinned outside Biñan (red diamond)</li>
+    <li><span class="swatch swatch--active" aria-hidden="true"></span> Barangay with active incidents</li>
+  </ul>
+{% endmacro %}
+
+{% macro head() %}<link rel="stylesheet" href="{{ static_url('vendor/leaflet-1.9.4/leaflet.css') }}">{% endmacro %}
+
+{% macro scripts() %}
+  <script src="{{ static_url('vendor/leaflet-1.9.4/leaflet.js') }}" defer></script>
+  <script src="{{ static_url('js/map.js') }}" defer></script>
+{% endmacro %}

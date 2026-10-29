@@ -2,14 +2,16 @@
 {% from "_trust.html" import incident_trust %}
 {% from "_status.html" import incident_status %}
 {% from "_links.html" import report_href %}
+{% import "_map.html" as m %}
 {% block title %}Overview{% endblock %}
+{% block head %}{{ m.head() }}{% endblock %}
 {% block content %}
-<div id="live-overview" data-live="reports incidents drafts spend">
   <header>
     <h1>Overview</h1>
     <p class="muted">Biñan City · Philippine time (GMT+8) · reported figures for the officer to verify</p>
   </header>
 
+  <div id="live-kpis" data-live="reports incidents drafts spend">
   <ul class="kpis" aria-label="Key figures">
     <li>
       <a class="kpi" href="/incidents">
@@ -64,9 +66,11 @@
       </a>
     </li>
   </ul>
+  </div>
 
   <div class="overview-grid">
-    <section class="card" aria-labelledby="attention-title">
+    <div class="overview-col">
+    <section class="card" id="live-attention" data-live="incidents reports" aria-labelledby="attention-title">
       <h2 id="attention-title">Needs attention <span class="muted">({{ attention_total }})</span></h2>
       {% if not attention %}
         <p class="empty">No incident waits for review and none has flagged reports.</p>
@@ -85,8 +89,16 @@
         {% if attention_total > attention|length %}<p><a href="/incidents">All {{ attention_total }} on Incidents</a></p>{% endif %}
       {% endif %}
     </section>
+    {# Outside every live region: a refresh never rebuilds the map; it updates its own markers. #}
+    <section class="card" aria-labelledby="map-title">
+      <h2 id="map-title">Map of active incidents</h2>
+      {{ m.map(compact=true) }}
+      <noscript><p class="muted">The map needs JavaScript.</p></noscript>
+      <p><a href="/map">Open the full map, its legend and the list of positions</a></p>
+    </section>
+    </div>
 
-    <section class="card" aria-labelledby="latest-title">
+    <section class="card" id="live-latest" data-live="reports" aria-labelledby="latest-title">
       <h2 id="latest-title">Latest reports</h2>
       {% if not latest %}
         <p class="empty">No reports yet. Reports sent to the Telegram bot appear here as they arrive.</p>
@@ -112,5 +124,5 @@
       {% endif %}
     </section>
   </div>
-</div>
 {% endblock %}
+{% block scripts %}{{ m.scripts() }}{% endblock %}
