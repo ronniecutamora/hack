@@ -148,15 +148,18 @@ DRAFT_SUPERSEDED = "superseded"  # a newer version of the same output was genera
 
 
 class Draft(SQLModel, table=True):
-    """An officer output drafted from report evidence: one RDANA form or the damaged-houses table.
+    """An officer output drafted from report evidence: one RDANA form, the damaged-houses table
+    or one incident's PCIC Notice of Loss.
 
     `content` is the complete filled output (values, evidence and sources) as generated; pages
     render it, never a recomputation, so an approved draft reads exactly as it was approved.
     """
 
     id: int | None = Field(default=None, primary_key=True)
-    kind: str = Field(index=True)  # rdana | damaged_houses
+    kind: str = Field(index=True)  # rdana | damaged_houses | pcic_nl_<commodity>
     barangay: str | None = Field(default=None, index=True)  # None for the city-wide table
+    # The incident a per-incident output (a Notice of Loss) is about; None for the others.
+    incident_id: int | None = Field(default=None, foreign_key="incident.id", index=True)
     version: int
     status: str = DRAFT_OPEN
     event_name: str | None = None  # officer input (RDANA 1.1.1)

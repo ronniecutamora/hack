@@ -51,6 +51,10 @@ COUNTING_RULE = (
 )
 
 
+def _digest(data: Any) -> str:
+    return hashlib.sha256(json.dumps(data, sort_keys=True, default=str).encode()).hexdigest()
+
+
 @dataclass(frozen=True)
 class IncidentEvidence:
     """One incident's counted reports (or one ungrouped report), oldest first."""
@@ -105,6 +109,26 @@ class IncidentEvidence:
             "reporter_count": self.reporter_count,
             "flagged_report_count": len(self.flagged_report_ids),
         }
+
+    def fingerprint_data(self) -> dict[str, Any]:
+        """What a draft built from this incident depends on (see BarangayEvidence.fingerprint)."""
+        return {
+            "incident": self.incident_id,
+            "status": self.status,
+            "reporters": self.reporter_count,
+            "reports": [
+                [m.id, m.at.isoformat(), m.point, m.flagged, self.facts(m)] for m in self.members
+            ],
+            # Only when present, so fingerprints of drafts made before this key still match.
+            **(
+                {"grouping_errors": list(self.grouping_error_report_ids)}
+                if self.grouping_error_report_ids
+                else {}
+            ),
+        }
+
+    def fingerprint(self) -> str:
+        return _digest(self.fingerprint_data())
 
 
 @dataclass(frozen=True)
@@ -238,31 +262,21 @@ class BarangayEvidence:
 
     def fingerprint(self) -> str:
         """Changes whenever the counted evidence changes, so stale drafts can be flagged."""
-        data = [
-            {
-                "incident": incident.incident_id,
-                "status": incident.status,
-                "reporters": incident.reporter_count,
-                "reports": [
-                    [m.id, m.at.isoformat(), m.point, m.flagged, incident.facts(m)]
-                    for m in incident.members
-                ],
-                # Only when present, so fingerprints of drafts made before this key still match.
-                **(
-                    {"grouping_errors": list(incident.grouping_error_report_ids)}
-                    if incident.grouping_error_report_ids
-                    else {}
-                ),
-            }
-            for incident in self.incidents
-        ]
-        return hashlib.sha256(json.dumps(data, sort_keys=True, default=str).encode()).hexdigest()
+        return _digest([incident.fingerprint_data() for incident in self.incidents])
 
 
 @dataclass
 class CityEvidence:
     barangays: dict[str, BarangayEvidence]
     unplaced: list[IncidentEvidence]  # no barangay: the officer must place them first
+
+    def incidents(self) -> list[IncidentEvidence]:
+        """Every incident and ungrouped report, placed or not, oldest first."""
+        everything = [i for b in self.barangays.values() for i in b.incidents] + self.unplaced
+        return sorted(everything, key=lambda i: (i.members[0].at, i.members[0].id))
+
+    def incident(self, incident_id: int) -> IncidentEvidence | None:
+        return next((i for i in self.incidents() if i.incident_id == incident_id), None)
 
 
 def collect(session: Session) -> CityEvidence:

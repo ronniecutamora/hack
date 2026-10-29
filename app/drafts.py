@@ -1,23 +1,30 @@
-"""Officer drafts: generate versioned RDANA forms and damaged-houses tables, then approve or reject.
+"""Officer drafts: generate versioned RDANA forms, damaged-houses tables and PCIC Notices of Loss,
+then approve or reject them.
 
 A draft is generated once and never edited. Generating again makes version n+1 and marks the
 previous undecided draft of the same output `superseded`; approved and rejected drafts stay as
 they were decided. Every generate, supersede, approve and reject writes an append-only
 DraftEvent. No database transaction is held across the summary model call.
+
+Versioning, staleness, approval and the audit are the same for every output; an output is
+identified by its kind, barangay and incident. Notice of Loss kinds come from the commodity
+entries in app.nol_form, so this module never names a commodity.
 """
 
 import csv
 import hashlib
 import io
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import Engine, func
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from app.config import Settings
-from app.counting import COUNTING_RULE, BarangayEvidence, CityEvidence, collect
+from app.counting import COUNTING_RULE, BarangayEvidence, CityEvidence, IncidentEvidence, collect
+from app.deadlines import Countdown
 from app.meta.llm import AgentLLM
 from app.models import (
     DRAFT_APPROVED,
@@ -30,6 +37,8 @@ from app.models import (
     manila_time,
     utcnow,
 )
+from app.nol import annex, countdowns, deadline_rows, eligible_incidents, fill_nol, occurred_at
+from app.nol_form import COMMODITIES, Commodity, commodity_for_kind
 from app.rdana import EventInput, count_field, fill_rdana, summary_counts
 from app.rdana_form import CITY, PROVINCE, REGION
 from app.rdana_summary import summarize
@@ -94,26 +103,70 @@ def city_fingerprint(city: CityEvidence) -> str:
     return hashlib.sha256(joined.encode()).hexdigest()
 
 
-def current_fingerprint(city: CityEvidence, kind: str, barangay: str | None) -> str | None:
+def current_fingerprint(city: CityEvidence, draft: Draft) -> str | None:
     """The fingerprint a draft of this output would get now; None when no evidence is left."""
-    if kind == KIND_DAMAGED_HOUSES:
+    if draft.kind == KIND_DAMAGED_HOUSES:
         return city_fingerprint(city)
-    evidence = city.barangays.get(barangay or "")
+    if draft.incident_id is not None:
+        incident = city.incident(draft.incident_id)
+        return incident.fingerprint() if incident else None
+    evidence = city.barangays.get(draft.barangay or "")
     return evidence.fingerprint() if evidence else None
+
+
+def _pending_holder(draft: Draft) -> dict[str, Any]:
+    """The part of a draft's content that records the reports pending grouping review."""
+    return draft.content.get("total", {}) if draft.kind == KIND_DAMAGED_HOUSES else draft.content
 
 
 def predates_pending_bucket(draft: Draft) -> bool:
     """Generated before figures pending grouping review were kept apart: its totals may count
     them, so it is never current (see `is_stale`)."""
-    content = draft.content if draft.kind == KIND_RDANA else draft.content.get("total", {})
-    return "pending_report_ids" not in content
+    return "pending_report_ids" not in _pending_holder(draft)
 
 
 def is_stale(draft: Draft, city: CityEvidence) -> bool:
     """The evidence changed after the draft was generated, or it predates the pending bucket."""
     if predates_pending_bucket(draft):
         return True
-    return draft.evidence_fingerprint != current_fingerprint(city, draft.kind, draft.barangay)
+    return draft.evidence_fingerprint != current_fingerprint(city, draft)
+
+
+def same_output(draft: Draft):
+    """SQL condition for every version of the same output as `draft` (NULL-safe)."""
+    condition = Draft.kind == draft.kind
+    for column, value in ((Draft.barangay, draft.barangay), (Draft.incident_id, draft.incident_id)):
+        condition &= column.is_(None) if value is None else column == value
+    return condition
+
+
+def output_label(draft: Draft) -> str:
+    """How the drafts list names a draft's output."""
+    if (commodity := commodity_for_kind(draft.kind)) is not None:
+        where = f" · {draft.barangay}" if draft.barangay else ""
+        return f"PCIC Notice of Loss ({commodity.name}) · incident #{draft.incident_id}{where}"
+    if draft.kind == KIND_RDANA:
+        return f"RDANA · {draft.barangay}"
+    return "Damaged houses · city"
+
+
+def regenerate_form(draft: Draft) -> tuple[str, dict[str, str]]:
+    """Where to post, and with which fields, to generate a new version of this output."""
+    if (commodity := commodity_for_kind(draft.kind)) is not None:
+        return "/drafts/notice-of-loss", {
+            "commodity": commodity.key,
+            "incident_id": str(draft.incident_id),
+        }
+    if draft.kind == KIND_DAMAGED_HOUSES:
+        return "/drafts/damaged-houses", {}
+    fields = {"barangay": draft.barangay or ""}
+    if draft.event_name:
+        fields["event_name"] = draft.event_name
+    if draft.event_type:
+        fields["event_type"] = draft.event_type
+    if draft.event_at:
+        fields["event_at"] = manila_time(draft.event_at).replace(" ", "T")
+    return "/drafts", fields
 
 
 HOUSE_COLUMNS = {"totally": "houses_totally_damaged", "partially": "houses_partially_damaged"}
@@ -216,9 +269,7 @@ def damaged_houses_csv(table: dict[str, Any], status: str) -> str:
 
 def pending_report_ids(draft: Draft) -> list[int]:
     """Reports whose figures waited for grouping review when the draft was generated."""
-    if draft.kind == KIND_RDANA:
-        return draft.content.get("pending_report_ids", [])
-    return draft.content.get("total", {}).get("pending_report_ids", [])
+    return _pending_holder(draft).get("pending_report_ids", [])
 
 
 @dataclass
@@ -231,9 +282,33 @@ class BarangayStatus:
     stale: bool  # the counted evidence changed after the latest draft was generated
 
 
+@dataclass
+class NolStatus:
+    """One incident eligible for a commodity's Notice of Loss, its clock and its drafts."""
+
+    commodity: Commodity
+    incident: IncidentEvidence
+    clocks: list[tuple[dict[str, Any], Countdown]]  # the Notice of Loss deadline first
+    latest: Draft | None = None
+    approved: Draft | None = None
+    stale: bool = False
+    flagged_report_ids: list[int] = field(default_factory=list)  # high/medium trust signals
+
+    @property
+    def anchor(self) -> str:
+        return f"nol-{self.commodity.key}-{self.incident.incident_id}"
+
+
 class DraftService:
-    def __init__(self, settings: Settings, engine: Engine, llm: AgentLLM | None) -> None:
-        self.settings, self.engine, self.llm = settings, engine, llm
+    def __init__(
+        self,
+        settings: Settings,
+        engine: Engine,
+        llm: AgentLLM | None,
+        clock: Callable[[], datetime] = utcnow,
+    ) -> None:
+        """`clock` (naive UTC) sets countdowns and Notice of Loss draft times; tests inject one."""
+        self.settings, self.engine, self.llm, self.clock = settings, engine, llm, clock
 
     def is_stale(self, draft: Draft) -> bool:
         """The counted evidence changed after this draft was generated."""
@@ -301,15 +376,40 @@ class DraftService:
         )
         return self._insert(draft, {"rows": len(table["rows"]), "total": table["total"]["total"]})
 
+    def generate_nol(self, commodity_key: str, incident_id: int) -> Draft:
+        """One incident's Notice of Loss for a commodity. Deterministic: no model call."""
+        commodity = COMMODITIES.get(commodity_key)
+        if commodity is None:
+            raise DraftError(f"Unknown insurance commodity {commodity_key!r}.")
+        with Session(self.engine) as session:
+            city = collect(session)
+            incident = next(
+                (i for i in eligible_incidents(commodity, city) if i.incident_id == incident_id),
+                None,
+            )
+            if incident is None:
+                raise DraftError(
+                    f"Incident #{incident_id} has no assessed report of {commodity.name} damage."
+                )
+            entries = annex(session, incident)
+        drafted_at = self.clock()
+        draft = Draft(
+            kind=commodity.kind,
+            barangay=incident.barangay or None,
+            incident_id=incident_id,
+            version=0,
+            content=fill_nol(commodity, incident, entries, drafted_at),
+            evidence_fingerprint=incident.fingerprint(),
+            created_at=drafted_at,
+        )
+        detail = {"reports": len(incident.report_ids), "commodity": commodity.key}
+        return self._insert(draft, detail)
+
     def _insert(self, draft: Draft, detail: dict[str, Any]) -> Draft:
         """Number the version and supersede open drafts in one write transaction."""
         with Session(self.engine, expire_on_commit=False) as session:
             session.connection().exec_driver_sql("BEGIN IMMEDIATE")
-            same = (Draft.kind == draft.kind) & (
-                Draft.barangay == draft.barangay
-                if draft.barangay is not None
-                else Draft.barangay.is_(None)
-            )
+            same = same_output(draft)
             latest = session.exec(select(func.max(Draft.version)).where(same)).one()
             draft.version = (latest or 0) + 1
             session.add(draft)
@@ -418,14 +518,7 @@ class DraftService:
                 .order_by(DraftEvent.created_at, DraftEvent.id)
             ).all()
             newest = session.exec(
-                select(Draft)
-                .where(
-                    Draft.kind == draft.kind,
-                    Draft.barangay == draft.barangay
-                    if draft.barangay is not None
-                    else Draft.barangay.is_(None),
-                )
-                .order_by(Draft.version.desc())
+                select(Draft).where(same_output(draft)).order_by(Draft.version.desc())
             ).first()
             return draft, list(events), newest
 
@@ -455,6 +548,50 @@ class DraftService:
                 )
             )
         return city, statuses, drafts
+
+    def clocks(self, draft: Draft) -> list[tuple[dict[str, Any], Countdown]]:
+        """A Notice of Loss draft's deadlines as stored, counted down to now; approval does not
+        stop them."""
+        return countdowns(draft.content.get("deadlines", []), self.clock())
+
+    def nol_statuses(
+        self,
+        city: CityEvidence | None = None,
+        drafts: list[Draft] | None = None,
+        incident_id: int | None = None,
+    ) -> list[NolStatus]:
+        """Every incident eligible for a Notice of Loss, per commodity, with its live clock."""
+        if city is None or drafts is None:
+            with Session(self.engine) as session:
+                city = collect(session)
+                per_incident = select(Draft).where(col(Draft.incident_id).is_not(None))
+                drafts = list(session.exec(per_incident).all())
+        now = self.clock()
+        statuses = []
+        for commodity in COMMODITIES.values():
+            for incident in eligible_incidents(commodity, city):
+                if incident_id is not None and incident.incident_id != incident_id:
+                    continue
+                mine = [
+                    d
+                    for d in drafts
+                    if d.kind == commodity.kind and d.incident_id == incident.incident_id
+                ]
+                latest = max(mine, key=lambda d: d.version, default=None)
+                approved = [d for d in mine if d.status == DRAFT_APPROVED]
+                rows = deadline_rows(commodity, occurred_at(incident))
+                statuses.append(
+                    NolStatus(
+                        commodity,
+                        incident,
+                        countdowns(rows, now),
+                        latest,
+                        max(approved, key=lambda d: d.version, default=None),
+                        latest is not None and is_stale(latest, city),
+                        sorted({m.id for m in incident.members if m.flagged}),
+                    )
+                )
+        return statuses
 
 
 def check_event_at(at: datetime, first_report: datetime, now: datetime) -> None:

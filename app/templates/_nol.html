@@ -1,0 +1,95 @@
+{# A PCIC Notice of Loss draft (content from app.nol.fill_nol), included by draft.html. #}
+{% from "_evidence.html" import evidence_refs %}
+{% from "_links.html" import report_href %}
+{% from "_trust.html" import signal_chips %}
+{% from "_deadline.html" import clock, deadline_notes %}
+<header class="keep">
+  <div>
+    <h1>{{ c.title }} <span class="muted">· incident #{{ c.incident_id }}{% if c.barangay %} · {{ c.barangay }}{% endif %} · version {{ draft.version }}</span></h1>
+    <p class="muted">Form: <a href="{{ c.form_url }}">{{ c.form_source }}</a>. Fields in the form's order and numbering. Drafted {{ c.drafted_at }} from {{ c.report_ids|length }} report{{ 's' if c.report_ids|length != 1 }} without a model call; {{ c.filled_count }} field{{ 's' if c.filled_count != 1 }} filled from the reports, {{ c.assured_count }} left for the assured.</p>
+  </div>
+</header>
+{% if c.reused_photos %}
+  <div class="banner alert keep"><strong>PHOTO REUSED.</strong>
+    {% for r in c.reused_photos %}The photo in report <a href="{{ report_href(r.report_id, c.incident_id) }}">#{{ r.report_id }}</a> matches report <a href="{{ report_href(r.related_report_id) }}">#{{ r.related_report_id }}</a> from another reporter{{ "; " if not loop.last else "." }}{% endfor %}
+    One photo cannot prove two losses: verify with the assured and the PCIC adjuster before this is filed.</div>
+{% endif %}
+{% for m in c.missing_evidence %}<p class="banner warn keep"><strong>MISSING EVIDENCE.</strong> {{ m }} The PCIC adjuster will need it.</p>{% endfor %}
+{% if c.single_source %}<p class="banner warn keep"><strong>SINGLE SOURCE.</strong> Only one reporter describes this loss.</p>{% endif %}
+
+<section class="keep">
+  <h2>Filing clock</h2>
+  {% for row, cd in clocks %}<div>{{ clock(row, cd) }}</div>{% endfor %}
+  <p class="muted">Counted from the first report in this incident, {{ c.fields|selectattr("number", "equalto", "5")|map(attribute="value")|first or "" }}: the loss may be earlier, which makes every deadline earlier. Approving this draft does not stop the clock; filing does, and only the assured can file.</p>
+  {{ deadline_notes(c.deadlines) }}
+</section>
+
+<section class="keep">
+  <p><strong>PHILIPPINE CROP INSURANCE CORPORATION</strong><br>{{ c.office.name }}</p>
+  <p><strong>{{ c.title }}</strong> <span class="muted">({{ c.form_id }}, {{ c.revision }})</span></p>
+  <p>Date: <span class="gap">{{ c.assured_marker }}</span></p>
+  <p>TO: {{ c.office.addressee }}<br>{{ c.office.name }}<br>{{ c.office.address }}<br>{{ c.office.email }} · {{ c.office.phone }} <span class="muted">(address from {{ c.office.source }})</span></p>
+  <p>Dear Sir/Madam:</p>
+  <p>{{ c.preamble }}</p>
+  <p class="muted">Left for the assured: {{ c.preamble_blanks|join(", ") }}.</p>
+  <table>
+    <tbody>
+    {% for f in c.fields %}
+      <tr class="keep" id="f-{{ f.number }}">
+        <td style="width: 32%"><strong>{{ f.number }}.</strong> {{ f.label }}</td>
+        <td>
+          {% if f.mode == "assured" %}<div class="gap">{{ c.assured_marker }}</div>
+          {% elif f.value is not none %}<div class="value"><strong>{{ f.value }}</strong></div>
+          {% else %}<div class="gap">{{ c.not_in_reports }}</div>{% endif %}
+          {% if f.note %}<div class="muted">{{ f.note }}</div>{% endif %}
+          {{ evidence_refs(f.evidence) }}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p>{% for line in c.closing.split(" / ") %}{{ line }}{% if not loop.last %}<br>{% endif %}{% endfor %}</p>
+</section>
+
+<section>
+  <h2>Evidence annex for the PCIC adjuster</h2>
+  <p class="muted">Every report in incident #{{ c.incident_id }}, oldest first. Photo judgments are by the agent LLM; SAM 3.1 measurements are {{ c.sam_label }}. Names are removed from the excerpts. Photo links work until raw media are deleted after the retention period; the judgments and measurements stay.</p>
+  <table>
+    <thead><tr><th>Report</th><th>Photo evidence</th><th>What the reporter said</th><th>Trust</th></tr></thead>
+    <tbody>
+    {% for e in c.annex %}
+      <tr class="keep" id="annex-{{ e.report_id }}">
+        <td><a href="{{ report_href(e.report_id, c.incident_id) }}">#{{ e.report_id }}</a><div class="muted">{{ e.at }}</div></td>
+        <td>
+          {% for p in e.photos %}
+            <div>
+              {% if p.media_id in available_media %}<a href="/media/{{ p.media_id }}">photo</a>{% else %}<span class="muted">photo deleted (retention)</span>{% endif %}
+              {% if p.overlay_media_id %} · {% if p.overlay_media_id in available_media %}<a href="/media/{{ p.overlay_media_id }}">SAM overlay</a>{% else %}<span class="muted">overlay deleted</span>{% endif %}{% endif %}
+              {% set j = p.judgment %}
+              {% if j %}
+                <ul class="chips">
+                  {% if j.roof_damage is defined %}<li class="chip">roof damage: {{ j.roof_damage }}</li>{% endif %}
+                  {% if j.floodwater %}<li class="chip">floodwater</li>{% endif %}
+                  {% if j.debris %}<li class="chip">debris</li>{% endif %}
+                  {% if j.tarpaulin %}<li class="chip">tarpaulin</li>{% endif %}
+                  {% if j.fallen_tree %}<li class="chip warn">fallen tree (needs confirmation)</li>{% endif %}
+                </ul>
+                {% if j.notes %}<div class="muted">Agent: {{ j.notes }}</div>{% endif %}
+              {% else %}<div class="muted">Not judged.</div>{% endif %}
+              {% set m = p.measurement %}
+              {% if m %}<div class="muted">SAM 3.1 measured ({{ c.sam_label }}): {{ m.roof_count }} roof{{ "s" if m.roof_count != 1 }}{% if m.floodwater_present %}, floodwater over {{ "%.0f"|format(m.floodwater_fraction * 100) }}% of the photo{% else %}, no floodwater{% endif %}</div>{% endif %}
+            </div>
+          {% else %}<span class="muted">No photo.</span>{% endfor %}
+        </td>
+        <td>{% for x in e.excerpts %}<div><span class="muted">{{ x.source }}:</span> “{{ x.text }}”</div>{% else %}<span class="muted">No text.</span>{% endfor %}</td>
+        <td>
+          {{ signal_chips(e, {}) }}
+          {% if c.single_source %}<span class="chip warn">single source</span>{% endif %}
+          {% if e.report_id in c.pending_report_ids %}<span class="chip warn">grouping pending officer review</span>{% endif %}
+          {% if not e.signals and not c.single_source and e.report_id not in c.pending_report_ids %}<span class="muted">No trust signals.</span>{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>

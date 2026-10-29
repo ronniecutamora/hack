@@ -63,6 +63,7 @@ def init_db(engine: Engine) -> None:
             "media": {"phash": "VARCHAR"},
             "photoassessment": {"taken_at": "DATETIME"},
             "assessment": {"signals": "JSON"},
+            "draft": {"incident_id": "INTEGER REFERENCES incident(id)"},
         }
         for table, additions_by_column in additions.items():
             columns = {c["name"] for c in inspect(connection).get_columns(table)}
@@ -73,6 +74,9 @@ def init_db(engine: Engine) -> None:
             "CREATE INDEX IF NOT EXISTS ix_report_incident_id ON report (incident_id)"
         )
         connection.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_media_sha256 ON media (sha256)")
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_draft_incident_id ON draft (incident_id)"
+        )
         connection.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_modelcall_at ON modelcall (at)")
         connection.exec_driver_sql(
             "CREATE INDEX IF NOT EXISTS ix_report_reporter_received "
@@ -88,6 +92,7 @@ def init_db(engine: Engine) -> None:
 DRAFT_GENERATED_COLUMNS = (
     "kind",
     "barangay",
+    "incident_id",
     "version",
     "event_name",
     "event_type",

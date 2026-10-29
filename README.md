@@ -151,6 +151,58 @@ this host, or the app answers 403, so another site open in the officer's browser
 answers only to the host names in `ALLOWED_HOSTS` (default `localhost,127.0.0.1`; other names get 400), so a DNS
 rebinding site cannot pose as this host. These are cross-site guards, not authentication.
 
+### Insurance: fisheries Notice of Loss
+
+The second officer output is a draft **PCIC Notice of Loss, Fisheries** (FIP CAS Form No. 1, REV. 2022/MAY) for
+each incident whose reports state fish pen, fish cage or fishpond damage, with or without a count. The `/drafts`
+page lists those incidents with their filing clocks and a button per incident; the incident page shows the same
+clock as a chip. The draft is deterministic (no model call) and uses the same versioning, staleness, approval,
+audit and same-origin rules as the RDANA drafts.
+
+| Field (form numbering) | Filled with |
+|---|---|
+| Regional Office, addressee | Fixed: PCIC Regional Office No. IV, Calamba City (address, email and phone from the PCIC Fisheries Insurance brochure 2024 V4) |
+| 3 Location of farm | Barangay, city and province; the redacted place details; the mean of the report pins |
+| 4 Nature/cause of loss | The hazards as reported (flood, strong wind, …) |
+| 5 Date/time of loss | The earliest report in the incident, labelled "first reported": the loss may be earlier |
+| 6 Total area affected | Only an area a report states; never derived from photos or SAM masks |
+| 9 Extent of damage | The livelihood damage and counts as reported, and the photos with the agent's judgments and SAM 3.1 measurements, labelled "evidence for the adjuster, not the loss figure". The PCIC loss bands (total 90% and above, partial over 10% and below 90%) are shown; the agent never classifies the loss |
+| Left for the assured | Type of policy and policy number (preamble), 1 name, 2 address, 7 lot number, 8 expected harvest date, 10 policy number, 11 underwriter, 12 contact number, date and signature. Ulat stores no names, addresses or phone numbers |
+
+An **evidence annex** for the PCIC adjuster lists every report in the incident: its time, links to the photo and the
+SAM overlay (until retention deletes the raw files), the photo judgments and measurements, an excerpt of the message
+or voice note with names removed, and its trust chips. A photo another reporter already sent (`photo_reused`) is a
+red chip linking the earlier report and a red banner on the draft: one photo cannot prove two losses. Single-source
+incidents, missing photos and grouping still pending officer review are marked too.
+
+**Deadlines.** Every deadline comes from one table, [app/data/deadlines.json](app/data/deadlines.json), each row with
+its source; adding a row (crops later) is data only.
+
+| Deadline | Window | Counted from | Source |
+|---|---|---|---|
+| PCIC fisheries Notice of Loss | 2 calendar days | occurrence of loss | [PCIC Fisheries Insurance general information, 2024 V4](https://pcic.gov.ph/wp-content/uploads/2024/09/Fisheries-Insurance-2024-V4.pdf) |
+| PCIC fisheries Claim for Indemnity | 7 calendar days | occurrence of loss | same brochure |
+| Completed RDANA forms to the EOC | 72 hours | deployment at the assessment site | [NDRRMC Memorandum No. 107, s. 2021](https://ndrrmc.gov.ph/wp-content/uploads/2026/05/09-22-2021-NDRRMC-Memorandum-No.-107-s-2021-NDRRMC-Rapid-Damage-Assessment-Needs-Analysis-RDANA-Standard-Operating-Procedures.pdf), section 7.5.2 |
+
+⚠️ Whether PCIC relaxed the fisheries deadlines for declared calamities after 2024 is not confirmed; the 2024 brochure
+is the newest official text found. The clock runs from the first report (the earliest the loss can be known to have
+happened) in Philippine time, and "within N calendar days" is read as N × 24 hours, the earliest reading, so the clock
+never shows more time than the assured may have. It shows "due in 5h 3m" or "overdue by 2 days" and keeps counting
+while the page is open. The draft also shows the PCIC Citizen's Charter 2026 fallback: a first notice may be sent by
+text message, official email or official FB Messenger with the assured's name and address, the type of insurance,
+and the date and cause of loss; the written Notice of Loss must follow.
+
+**Approved for filing, not filed.** Approval does not stop the clock: the approved draft says "approved for filing,
+not filed". Ulat never sends anything to PCIC; the assured (or the City Agriculturist's office on their behalf)
+files it.
+
+**Commodities as data.** The form is defined once in [app/nol_form.py](app/nol_form.py) as a commodity entry: its
+PCIC form fields and numbering, the deadline-table rows it uses, the facts that make an incident eligible, the
+evidence it requires, and how each field is filled (`assured` or an `evidence` rule; the office is fixed). The
+drafting, deadline and approval code never names a commodity; a test adds a dummy commodity with no code change.
+Only fisheries is built: crop insurance (rice, corn, high-value crops) is later work, one more entry once its PCIC
+deadlines are verified for Biñan.
+
 ## Demo
 
 - Video (3 min): _TBD_
@@ -246,6 +298,8 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-29 | Review fix (round 2): a host allowlist (ALLOWED_HOSTS, default localhost and 127.0.0.1, enforced by Starlette TrustedHostMiddleware) stops DNS rebinding around the same-origin check |
 | 2026-10-29 | Livelihood facts: a report can state livelihood damage without a count (fish pens or cages, fishponds, fishing gear, boats, crops, livestock), a stated fishery area and a livelihood-materials need, with Taglish cues (baklad, kulungan, lambat, kawayan, bangka); the pair judge, incident rollups and RDANA 18.1/18.2 use them, so the two De La Paz fish-pen reports are no longer judged "no damage stated". Older stored facts keep working |
 | 2026-10-29 | Deadlines table (`app/data/deadlines.json`): PCIC fisheries Notice of Loss (2 calendar days) and Claim for Indemnity (7), and RDANA forms to the EOC (72 hours), each row with its source; a countdown in Philippine time with an injected clock; the RDANA drafts page reads its deadline from the table, and a test keeps deadline literals out of the code |
+| 2026-10-29 | PCIC fisheries Notice of Loss draft (FIP CAS Form No. 1) per incident, defined as commodity data: location, cause, first-reported time, stated area and extent filled from the reports with evidence links, identity and policy fields left for the assured, the PCIC Region IV office fixed, and an evidence annex for the adjuster (photo and SAM overlay links, judgments, SAM measurements as evidence only, name-redacted excerpts, trust chips, a red banner for a reused photo); deterministic, no model call |
+| 2026-10-29 | Filing clock: Notice of Loss and Claim for Indemnity countdowns from the first report on `/drafts`, the draft page and the incident page, with the Citizen's Charter first-notice fallback; approval reads "approved for filing, not filed" and does not stop the clock. Notice of Loss drafts reuse the versioning, staleness, approval, audit and same-origin rules (a draft now records its incident) |
 
 ### Third-party code and assets
 
@@ -299,6 +353,7 @@ app/
   counting.py          Per-barangay evidence and the no-double-counting rule
   rdana_form.py        The 2021 RDANA form as data (sections, numbering, fill modes)
   rdana.py             Evidence rules that fill the form; rdana_summary.py: the validated 1.4 summary
+  nol_form.py, nol.py  PCIC Notice of Loss commodities as data (fisheries) and the deterministic filling
   drafts.py            Versioned drafts, approve/reject, audit, damaged-houses table and CSV
   deadlines.py         Filing deadlines from data/deadlines.json (with sources) and countdowns
   pair_judge.py        Text-only pair schema and redacted evidence prompts

@@ -1,4 +1,5 @@
-"""FastAPI app: health check, the officer's reports, incidents, RDANA drafts and evidence media.
+"""FastAPI app: health check, reports, incidents, officer drafts (RDANA, damaged houses, PCIC
+Notices of Loss) and evidence media.
 
 Run with: uv run uvicorn app.main:app --reload
 
@@ -11,8 +12,9 @@ cannot generate or approve drafts.
 
 import mimetypes
 from collections import defaultdict
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qsl, urlsplit
@@ -20,7 +22,9 @@ from urllib.parse import parse_qsl, urlsplit
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import Engine
 from sqlmodel import Session, col, select
+from starlette.concurrency import run_in_threadpool
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.config import Settings, get_settings
@@ -40,9 +44,11 @@ from app.drafts import (
     csv_status,
     damaged_houses,
     damaged_houses_csv,
+    output_label,
     parse_event_at,
     pending_report_ids,
     predates_pending_bucket,
+    regenerate_form,
 )
 from app.gazetteer import BY_NAME
 from app.meta.factory import make_agent_llm
@@ -50,6 +56,7 @@ from app.meta.llm import AgentLLM
 from app.models import (
     AgentDecision,
     Assessment,
+    Draft,
     Incident,
     Media,
     PhotoAssessment,
@@ -58,6 +65,8 @@ from app.models import (
     manila_time,
     utcnow,
 )
+from app.nol import deadline_table
+from app.nol_form import COMMODITIES, commodity_for_kind
 from app.rdana import RDANA_DEADLINE, EventInput
 from app.trust import model_spend
 
@@ -136,6 +145,8 @@ def fact_lines(facts: dict[str, Any] | None) -> list[str]:
 
 templates.env.globals["fact_lines"] = fact_lines
 templates.env.globals["GEO_SOURCES"] = GEO_SOURCES
+templates.env.globals["output_label"] = output_label
+templates.env.globals["deadline_table"] = deadline_table
 
 
 def incident_trust(incident: Incident) -> dict[str, int | None]:
@@ -159,6 +170,25 @@ def related_incidents(session: Session, assessments: list[Assessment]) -> dict[i
     return dict(
         session.exec(select(Report.id, Report.incident_id).where(col(Report.id).in_(ids))).all()
     )
+
+
+def available_media(engine: Engine, draft: Draft) -> set[int]:
+    """Media a frozen Notice of Loss annex links to that retention has not deleted yet."""
+    ids = {
+        media_id
+        for entry in draft.content.get("annex", [])
+        for photo in entry["photos"]
+        for media_id in (photo["media_id"], photo.get("overlay_media_id"))
+        if media_id is not None
+    }
+    if not ids:
+        return set()
+    with Session(engine) as session:
+        return set(
+            session.exec(
+                select(Media.id).where(col(Media.id).in_(ids), col(Media.purged_at).is_(None))
+            ).all()
+        )
 
 
 def csv_response(text: str, filename: str) -> Response:
@@ -229,8 +259,14 @@ def report_page(session: Session, around: int | None) -> list[tuple[Report, str]
     return [*reversed(newer), *older]
 
 
-def create_app(settings: Settings | None = None, *, summary_llm: AgentLLM | None = None) -> FastAPI:
-    """`summary_llm` replaces the configured agent LLM for RDANA summaries (tests, offline)."""
+def create_app(
+    settings: Settings | None = None,
+    *,
+    summary_llm: AgentLLM | None = None,
+    clock: Callable[[], datetime] | None = None,
+) -> FastAPI:
+    """`summary_llm` replaces the configured agent LLM for RDANA summaries (tests, offline);
+    `clock` (naive UTC) replaces the real clock for filing countdowns (tests only)."""
     settings = settings or get_settings()
 
     @asynccontextmanager
@@ -239,7 +275,7 @@ def create_app(settings: Settings | None = None, *, summary_llm: AgentLLM | None
         init_db(app.state.engine)
         # Building a client makes no request; a missing key surfaces as a recorded fallback.
         llm = summary_llm or make_agent_llm(settings, make_recorder(app.state.engine))
-        app.state.drafts = DraftService(settings, app.state.engine, llm)
+        app.state.drafts = DraftService(settings, app.state.engine, llm, clock or utcnow)
         yield
         if summary_llm is None:
             await llm.aclose()
@@ -389,6 +425,7 @@ def create_app(settings: Settings | None = None, *, summary_llm: AgentLLM | None
                 "decisions": decisions,
                 "trust": trust,
                 "related_incidents": related,
+                "nol_statuses": request.app.state.drafts.nol_statuses(incident_id=incident_id),
             },
         )
 
@@ -396,6 +433,8 @@ def create_app(settings: Settings | None = None, *, summary_llm: AgentLLM | None
     def drafts_page(request: Request) -> HTMLResponse:
         city, statuses, history = request.app.state.drafts.overview()
         context = {
+            "nol_statuses": request.app.state.drafts.nol_statuses(city, history),
+            "commodities": list(COMMODITIES.values()),
             "statuses": statuses,
             "history": history,
             "unplaced": city.unplaced,
@@ -418,6 +457,18 @@ def create_app(settings: Settings | None = None, *, summary_llm: AgentLLM | None
         draft = await request.app.state.drafts.generate_rdana(barangay, event)
         return RedirectResponse(f"/drafts/{draft.id}", status_code=303)
 
+    @app.post("/drafts/notice-of-loss")
+    async def generate_nol_draft(request: Request) -> RedirectResponse:
+        form = await form_fields(request)
+        try:
+            incident_id = int(form.get("incident_id", ""))
+        except ValueError as exc:
+            raise DraftError("Choose an incident.") from exc
+        draft = await run_in_threadpool(
+            request.app.state.drafts.generate_nol, form.get("commodity", ""), incident_id
+        )
+        return RedirectResponse(f"/drafts/{draft.id}", status_code=303)
+
     @app.post("/drafts/damaged-houses")
     def generate_houses_draft(request: Request) -> RedirectResponse:
         draft = request.app.state.drafts.generate_damaged_houses()
@@ -430,7 +481,10 @@ def create_app(settings: Settings | None = None, *, summary_llm: AgentLLM | None
             "draft": draft,
             "stale": request.app.state.drafts.is_stale(draft),
             "predates_pending": predates_pending_bucket(draft),
-            "event_at_local": draft.event_at and manila_time(draft.event_at).replace(" ", "T"),
+            "regenerate": regenerate_form(draft),
+            "nol": commodity_for_kind(draft.kind) is not None,
+            "clocks": request.app.state.drafts.clocks(draft),
+            "available_media": available_media(request.app.state.engine, draft),
             "c": draft.content,
             "events": events,
             "newest": newest,

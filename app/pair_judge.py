@@ -50,11 +50,16 @@ _POSSESSIVE_PERSON = re.compile(
 )
 
 
+def redact_names(text: str) -> str:
+    """Self-introductions, titled or introduced people and possessives ("Juan's") removed."""
+    text = _POSSESSIVE_PERSON.sub("[redacted]", redact_self_introductions(text))
+    return _PERSON.sub("[redacted]", text)
+
+
 def redacted_place(value: Any) -> str | None:
     if not isinstance(value, str):
         return None
-    value = _POSSESSIVE_PERSON.sub("[redacted]", redact_self_introductions(value))
-    return _PERSON.sub("[redacted]", value)[:180]
+    return redact_names(value)[:180]
 
 
 def safe_facts(facts: dict[str, Any] | None) -> dict[str, Any]:

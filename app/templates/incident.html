@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_trust.html" import incident_trust, signal_chips %}
+{% from "_deadline.html" import clock %}
 {% block title %}Incident #{{ incident.id }}{% endblock %}
 {% block content %}
   <header>
@@ -9,6 +10,10 @@
   {% if not incident.active %}<p class="muted">Retired grouping. Reports were re-linked; its decision history is preserved.</p>{% endif %}
   <p>{{ incident.barangay or "Location unknown" }} · First seen {{ incident.first_seen|manila_time }} · Last seen {{ incident.last_seen|manila_time }}</p>
   <div>{{ incident_trust(trust) }}</div>
+  {% for n in nol_statuses %}
+    {% set row, cd = n.clocks[0] %}
+    <p>{{ clock(row, cd) }} <a href="/drafts#{{ n.anchor }}">{% if n.latest %}Notice of Loss draft v{{ n.latest.version }} ({{ "approved for filing, not filed" if n.latest.status == "approved" else n.latest.status }}){% else %}Draft the Notice of Loss{% endif %}</a></p>
+  {% endfor %}
   <p>Latest flood depth: <strong>{{ incident.latest_facts.get("latest_depth", "unknown")|replace("_", " ") }}</strong> · Maximum seen: <strong>{{ incident.latest_facts.get("max_depth", "unknown")|replace("_", " ") }}</strong></p>
   <ul class="chips">
     {% for key, value in incident.latest_facts.get("totals", {}).items() %}

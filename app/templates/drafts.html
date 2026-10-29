@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Drafts{% endblock %}
 {% from "_links.html" import report_href %}
+{% from "_deadline.html" import clock, deadline_notes %}
 {% block content %}
   <header>
     <h1>Officer drafts</h1>
@@ -58,6 +59,49 @@
     <p class="banner warn">{{ unplaced|length }} incident{{ 's' if unplaced|length != 1 }} without a barangay {{ 'are' if unplaced|length != 1 else 'is' }} in no draft until the officer places {{ 'them' if unplaced|length != 1 else 'it' }}:
       {% for i in unplaced %}{% if i.incident_id %}<a href="/incidents/{{ i.incident_id }}">incident #{{ i.incident_id }}</a>{% else %}<a href="{{ report_href(i.report_ids[0]) }}">report #{{ i.report_ids[0] }}</a>{% endif %}{{ ", " if not loop.last }}{% endfor %}.</p>
   {% endif %}
+  {% for commodity in commodities %}
+  {% set rows = nol_statuses|selectattr("commodity.key", "equalto", commodity.key)|list %}
+  <section id="nol-{{ commodity.key }}">
+    <h2>PCIC Notice of Loss ({{ commodity.name }})</h2>
+    <p>One draft of the {{ commodity.form_id }} ({{ commodity.revision }}) per incident whose reports state damage to {{ commodity.eligible_livelihood|map("replace", "_", " ")|join(", or ") }}. The agent fills the location, cause, first-reported time and extent from the reports and packages the evidence for the PCIC adjuster; the assured's name, address, policy, lot, harvest date, underwriter and contact are left for the assured. Nothing is filed: the assured files with PCIC.</p>
+    {% if not rows %}
+      <p class="empty">No assessed report states {{ commodity.name }} damage yet.</p>
+    {% else %}
+    <table>
+      <thead><tr><th>Incident</th><th>Filing clock (from the first report)</th><th>Latest draft</th><th class="no-print">Generate</th></tr></thead>
+      <tbody>
+      {% for n in rows %}
+        <tr id="{{ n.anchor }}">
+          <td><a href="/incidents/{{ n.incident.incident_id }}">Incident #{{ n.incident.incident_id }}</a> · {{ n.incident.barangay or "Location unknown" }}
+            <div class="muted">{{ n.incident.report_ids|length }} report{{ 's' if n.incident.report_ids|length != 1 }} · first {{ n.incident.members[0].at|manila_time }}{% if n.incident.place() %} · {{ n.incident.place() }}{% endif %}</div>
+            {% if n.incident.reporter_count == 1 %}<span class="chip warn">single source</span>{% endif %}
+            {% if n.incident.pending %}<span class="chip warn">grouping needs officer review</span>{% endif %}
+            {% if n.flagged_report_ids %}<span class="chip alert">flagged: report{{ 's' if n.flagged_report_ids|length != 1 }} {{ n.flagged_report_ids|join(", ") }}</span>{% endif %}
+          </td>
+          <td>{% for row, c in n.clocks %}<div>{{ clock(row, c) }}</div>{% endfor %}</td>
+          <td>
+            {% if n.latest %}
+              <a href="/drafts/{{ n.latest.id }}">Version {{ n.latest.version }}</a>
+              <span class="chip{% if n.latest.status == 'rejected' %} alert{% elif n.latest.status != 'approved' %} warn{% endif %}">{{ "approved for filing, not filed" if n.latest.status == 'approved' else n.latest.status }}</span>
+              {% if n.stale %}<div class="chip warn">New evidence since this version: generate again</div>{% endif %}
+              {% if n.approved and n.approved.id != n.latest.id %}<div class="muted">Approved: <a href="/drafts/{{ n.approved.id }}">version {{ n.approved.version }}</a></div>{% endif %}
+            {% else %}<span class="muted">None yet</span>{% endif %}
+          </td>
+          <td class="no-print">
+            <form method="post" action="/drafts/notice-of-loss">
+              <input type="hidden" name="commodity" value="{{ commodity.key }}">
+              <input type="hidden" name="incident_id" value="{{ n.incident.incident_id }}">
+              <button type="submit">Generate Notice of Loss draft</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+    {{ deadline_notes(deadline_table(commodity)) }}
+  </section>
+  {% endfor %}
   <section class="no-print">
     <h2>Damaged-houses table</h2>
     {% if has_house_counts %}
@@ -72,7 +116,7 @@
     {% for d in history %}
       <tr>
         <td><a href="/drafts/{{ d.id }}">#{{ d.id }}</a></td>
-        <td>{% if d.kind == 'rdana' %}RDANA · {{ d.barangay }}{% else %}Damaged houses · city{% endif %}</td>
+        <td>{{ output_label(d) }}</td>
         <td>{{ d.version }}</td>
         <td><span class="chip{% if d.status == 'rejected' %} alert{% elif d.status == 'draft' %} warn{% endif %}">{{ d.status }}</span></td>
         <td>{{ d.created_at|manila_time }}</td>

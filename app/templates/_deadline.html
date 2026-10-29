@@ -1,0 +1,15 @@
+{# Filing clocks. The server renders the text from the deadlines table and the app's clock;
+   the ticker in base.html only keeps "due in" current while the page stays open. #}
+{% macro clock(row, c) -%}
+  <span class="chip {{ 'alert' if c.overdue else 'warn' }}" title="{{ row.label }}: within {{ row.window }} of {{ row.start }} ({{ row.source }})">{{ row.label }}: <strong data-due="{{ c.due_iso }}">{{ c.text }}</strong> · due {{ c.due_local }}</span>
+{%- endmacro %}
+
+{# The deadline table rows a draft or section uses, with sources, the first-notice fallback and caveats. #}
+{% macro deadline_notes(rows) %}
+  <ul class="muted">
+  {% for row in rows %}
+    <li>{{ row.label }}: within {{ row.window }} of {{ row.start }} (<a href="{{ row.url }}">{{ row.source }}</a>).{% if row.caveat %} {{ row.caveat }}{% endif %}</li>
+    {% if row.first_notice %}<li><strong>First notice:</strong> {{ row.first_notice.text }} (<a href="{{ row.first_notice.url }}">{{ row.first_notice.source }}</a>)</li>{% endif %}
+  {% endfor %}
+  </ul>
+{% endmacro %}

@@ -13,7 +13,7 @@ from typing import Any
 
 from app.counting import COUNT_FIELDS, COUNTING_RULE, BarangayEvidence, Count, IncidentEvidence
 from app.facts import LIVELIHOOD_DAMAGE
-from app.incidents import distance_m
+from app.incidents import Observation, distance_m
 from app.models import manila_time
 from app.rdana_form import (
     FORM_ID,
@@ -63,7 +63,7 @@ class RuleContext:
     summary: SummaryResult
 
 
-def _incident_ref(incident: IncidentEvidence, report_ids: list[int], **extra) -> dict[str, Any]:
+def incident_ref(incident: IncidentEvidence, report_ids: list[int], **extra) -> dict[str, Any]:
     return {
         "incident_id": incident.incident_id,
         "label": incident.key,
@@ -75,7 +75,7 @@ def _incident_ref(incident: IncidentEvidence, report_ids: list[int], **extra) ->
     }
 
 
-def _filled(value: str, source: str, evidence=(), note: str | None = None) -> dict[str, Any]:
+def filled(value: str, source: str, evidence=(), note: str | None = None) -> dict[str, Any]:
     return {"value": value, "source": source, "evidence": list(evidence), "note": note}
 
 
@@ -85,7 +85,7 @@ def _listing(evidence: BarangayEvidence, list_field: str, values: tuple[str, ...
     for incident in evidence.incidents:
         ids = sorted({r for v in values for r in incident.reports_listing(list_field, v)})
         if ids:
-            refs.append(_incident_ref(incident, ids))
+            refs.append(incident_ref(incident, ids))
         found += [v for v in values if incident.reports_listing(list_field, v)]
     return refs, list(dict.fromkeys(v for v in values if v in found))
 
@@ -116,7 +116,7 @@ def count_field(count: Count | None) -> dict[str, Any] | None:
     if count is None:
         return None
     refs = [
-        _incident_ref(
+        incident_ref(
             c.incident,
             list(c.stating_report_ids),
             value=c.value,
@@ -138,7 +138,7 @@ def count_field(count: Count | None) -> dict[str, Any] | None:
     if count.pending:
         notes.append(f"Not added: {pending_text(count)}.")
     value = f"{total:g}" if count.confirmed else None
-    return _filled(value, "reports" if count.confirmed else None, refs, " ".join(notes)) | {
+    return filled(value, "reports" if count.confirmed else None, refs, " ".join(notes)) | {
         "count": {
             "value": total if count.confirmed else None,
             "single_source": count.single_source_value,
@@ -150,7 +150,7 @@ def count_field(count: Count | None) -> dict[str, Any] | None:
 
 
 def _event_name(ctx: RuleContext):
-    return _filled(ctx.event.name, "officer") if ctx.event.name else None
+    return filled(ctx.event.name, "officer") if ctx.event.name else None
 
 
 def _event_type(ctx: RuleContext):
@@ -158,67 +158,75 @@ def _event_type(ctx: RuleContext):
     reported = ", ".join(HAZARD_TYPES[h] for h in found)
     if ctx.event.type:
         note = f"Reports mention: {reported}." if reported else None
-        return _filled(ctx.event.type, "officer", refs, note)
-    return _filled(reported, "reports", refs, "Hazards named in the reports.") if found else None
+        return filled(ctx.event.type, "officer", refs, note)
+    return filled(reported, "reports", refs, "Hazards named in the reports.") if found else None
 
 
 def _event_at(ctx: RuleContext):
     first = ctx.evidence.members[0]
     incident = next(i for i in ctx.evidence.incidents if first in i.members)
-    refs = [_incident_ref(incident, [first.id])]
+    refs = [incident_ref(incident, [first.id])]
     if ctx.event.at is not None:
         note = f"Earliest report: {manila_time(first.at)}."
-        filled = _filled(manila_time(ctx.event.at), "officer", refs, note)
+        result = filled(manila_time(ctx.event.at), "officer", refs, note)
         if ctx.event.at > first.at:
-            filled["warning"] = "Later than the earliest report: check the date."
-        return filled
+            result["warning"] = "Later than the earliest report: check the date."
+        return result
     note = "Time of the earliest report; the event itself may be earlier."
-    return _filled(manila_time(first.at), "reports", refs, note)
+    return filled(manila_time(first.at), "reports", refs, note)
 
 
 def _barangay(ctx: RuleContext):
-    refs = [_incident_ref(i, i.report_ids) for i in ctx.evidence.incidents]
-    return _filled(ctx.evidence.barangay, "reports", refs)
+    refs = [incident_ref(i, i.report_ids) for i in ctx.evidence.incidents]
+    return filled(ctx.evidence.barangay, "reports", refs)
 
 
 def _places(ctx: RuleContext):
     refs, places = [], []
     for incident in ctx.evidence.incidents:
         if place := incident.place():
-            refs.append(_incident_ref(incident, incident.report_ids))
+            refs.append(incident_ref(incident, incident.report_ids))
             places.append(place)
     note = "Place details as reported (names of people removed)."
-    return _filled("; ".join(dict.fromkeys(places)), "reports", refs, note) if places else None
+    return filled("; ".join(dict.fromkeys(places)), "reports", refs, note) if places else None
 
 
-def _gps(ctx: RuleContext):
-    pinned = [m for m in ctx.evidence.members if m.point is not None]
+def mean_pin(members: list[Observation]) -> tuple[str, str] | None:
+    """The mean of the members' pins or photo GPS, as "lat, lon", and a note on its spread."""
+    pinned = [m.point for m in members if m.point is not None]
     if not pinned:
         return None
-    lat = sum(m.point[0] for m in pinned) / len(pinned)
-    lon = sum(m.point[1] for m in pinned) / len(pinned)
-    spread = max(distance_m((lat, lon), m.point) for m in pinned)
-    refs = [
-        _incident_ref(i, ids)
-        for i in ctx.evidence.incidents
-        if (ids := [m.id for m in i.members if m.point is not None])
-    ]
+    lat = sum(p[0] for p in pinned) / len(pinned)
+    lon = sum(p[1] for p in pinned) / len(pinned)
+    spread = max(distance_m((lat, lon), p) for p in pinned)
     note = (
         f"Mean of {len(pinned)} report location{'s' if len(pinned) != 1 else ''} "
         f"(pin or photo GPS); farthest is {spread:.0f} m from it."
     )
-    return _filled(f"{lat:.5f}, {lon:.5f}", "reports", refs, note)
+    return f"{lat:.5f}, {lon:.5f}", note
+
+
+def _gps(ctx: RuleContext):
+    pin = mean_pin(ctx.evidence.members)
+    if pin is None:
+        return None
+    refs = [
+        incident_ref(i, ids)
+        for i in ctx.evidence.incidents
+        if (ids := [m.id for m in i.members if m.point is not None])
+    ]
+    return filled(pin[0], "reports", refs, pin[1])
 
 
 def _drafted_at(ctx: RuleContext):
-    return _filled(manila_time(ctx.drafted_at), "rule", note="When this draft was generated.")
+    return filled(manila_time(ctx.drafted_at), "rule", note="When this draft was generated.")
 
 
 def _summary(ctx: RuleContext):
     summary = ctx.summary
     cited = set(summary.cited_report_ids)
     refs = [
-        _incident_ref(i, ids)
+        incident_ref(i, ids)
         for i in ctx.evidence.incidents
         if (ids := [r for r in i.report_ids if r in cited])
     ]
@@ -230,19 +238,19 @@ def _summary(ctx: RuleContext):
             f"Drafted by {summary.model}; every number checked against the computed count it "
             "describes, and every citation against the reports."
         )
-    return _filled(summary.text, source, refs, note)
+    return filled(summary.text, source, refs, note)
 
 
 def _roads(ctx: RuleContext):
     refs, found = _listing(ctx.evidence, "infrastructure", ("road", "bridge"))
     if not found:
         return None
-    return _filled("Yes", "reports", refs, f"Reported damaged or impassable: {', '.join(found)}.")
+    return filled("Yes", "reports", refs, f"Reported damaged or impassable: {', '.join(found)}.")
 
 
 def _access_need(ctx: RuleContext):
     refs, found = _listing(ctx.evidence, "needs", tuple(ACCESS_NEEDS))
-    return _filled(", ".join(ACCESS_NEEDS[n] for n in found), "reports", refs) if found else None
+    return filled(", ".join(ACCESS_NEEDS[n] for n in found), "reports", refs) if found else None
 
 
 def _power(ctx: RuleContext):
@@ -250,12 +258,12 @@ def _power(ctx: RuleContext):
     if not found:
         return None
     note = "Evidence note only: the reports do not say which of the listed damages it is."
-    return _filled("Power outage or damage reported", "reports", refs, note)
+    return filled("Power outage or damage reported", "reports", refs, note)
 
 
 def _srr_needed(ctx: RuleContext):
     refs, found = _listing(ctx.evidence, "needs", ("rescue",))
-    return _filled("Yes", "reports", refs, "Rescue requested in the reports.") if found else None
+    return filled("Yes", "reports", refs, "Rescue requested in the reports.") if found else None
 
 
 def _srr_type(ctx: RuleContext):
@@ -265,15 +273,15 @@ def _srr_type(ctx: RuleContext):
         rescue = incident.reports_listing("needs", "rescue")
         water = sorted({r for h in WATER_HAZARDS for r in incident.reports_listing("hazards", h)})
         if rescue and water:
-            refs.append(_incident_ref(incident, sorted(set(rescue) | set(water))))
+            refs.append(incident_ref(incident, sorted(set(rescue) | set(water))))
     note = "Rescue requested in an incident with flood or storm surge."
-    return _filled("Water", "reports", refs, note) if refs else None
+    return filled("Water", "reports", refs, note) if refs else None
 
 
 def _need(name: str) -> Callable[[RuleContext], dict[str, Any] | None]:
     def rule(ctx: RuleContext):
         refs, found = _listing(ctx.evidence, "needs", (name,))
-        return _filled(NEED_VALUES[name], "reports", refs) if found else None
+        return filled(NEED_VALUES[name], "reports", refs) if found else None
 
     return rule
 
@@ -306,7 +314,7 @@ def _livelihood(ctx: RuleContext):
                 crops.setdefault(crop, []).append(member.id)
                 ids.append(member.id)
         if ids:
-            refs.append(_incident_ref(incident, ids))
+            refs.append(incident_ref(incident, ids))
     hectares = ctx.evidence.count("crop_area_hectares")
     if crops:
         crop_text = "crops damaged: " + ", ".join(crops)
@@ -320,13 +328,13 @@ def _livelihood(ctx: RuleContext):
     if not parts:
         return None
     note = "Evidence note on livelihood losses, not a survey of the main livelihood."
-    return _filled("; ".join(parts), "reports", refs, note)
+    return filled("; ".join(parts), "reports", refs, note)
 
 
 def _livelihood_need(ctx: RuleContext):
     refs, found = _listing(ctx.evidence, "needs", ("livelihood_materials",))
     note = "Livelihood materials requested (such as nets, bamboo or boats); no item is invented."
-    return _filled("Others", "reports", refs, note) if found else None
+    return filled("Others", "reports", refs, note) if found else None
 
 
 RULES: dict[str, Callable[[RuleContext], dict[str, Any] | None]] = {
@@ -356,11 +364,11 @@ def _rule(name: str) -> Callable[[RuleContext], dict[str, Any] | None]:
 
 
 def fill_field(form_field: FormField, ctx: RuleContext) -> dict[str, Any]:
-    filled = None
+    result = None
     if form_field.mode == "fixed":
-        filled = _filled(form_field.value, "fixed")
+        result = filled(form_field.value, "fixed")
     elif form_field.rule:
-        filled = _rule(form_field.rule)(ctx)
+        result = _rule(form_field.rule)(ctx)
     return {
         "key": form_field.key,
         "number": form_field.number,
@@ -370,7 +378,7 @@ def fill_field(form_field: FormField, ctx: RuleContext) -> dict[str, Any]:
         "heading": form_field.heading,
         "required": form_field.required,
         "options": list(form_field.options),
-        **(filled or {"value": None, "source": None, "evidence": [], "note": None}),
+        **(result or {"value": None, "source": None, "evidence": [], "note": None}),
     }
 
 
@@ -381,7 +389,7 @@ def flood_support(evidence: BarangayEvidence) -> list[dict[str, Any]]:
         depth = incident.depth()
         if depth["max"] == "unknown" and depth["latest"] == "unknown":
             continue
-        rows.append(_incident_ref(incident, incident.report_ids, place=incident.place(), **depth))
+        rows.append(incident_ref(incident, incident.report_ids, place=incident.place(), **depth))
     return rows
 
 

@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% from "_evidence.html" import evidence_refs, houses_table %}
 {% from "_links.html" import report_href %}
-{% block title %}{% if draft.kind == 'rdana' %}RDANA draft · {{ draft.barangay }} v{{ draft.version }}{% else %}Damaged houses v{{ draft.version }}{% endif %}{% endblock %}
+{% block title %}{% if draft.kind == 'rdana' %}RDANA draft · {{ draft.barangay }} v{{ draft.version }}{% elif nol %}Notice of Loss draft · incident #{{ draft.incident_id }} v{{ draft.version }}{% else %}Damaged houses v{{ draft.version }}{% endif %}{% endblock %}
 {% block content %}
   {% set gap = c.not_in_reports or "— not in reports (for the RDANA team)" %}
   <p class="no-print"><a href="/drafts">← Drafts</a> · <button type="button" onclick="window.print()">Print</button>{% if draft.kind == 'damaged_houses' %} · <a href="/drafts/{{ draft.id }}.csv">Download this version as CSV</a>{% endif %}</p>
 
   {% if draft.status == 'approved' %}
-    <p class="banner ok keep"><strong>APPROVED</strong> {{ draft.decided_at|manila_time }}{% if draft.decided_by %} by {{ draft.decided_by }}{% endif %}{% if draft.decision_reason %} · {{ draft.decision_reason }}{% endif %}. This version is frozen.</p>
+    <p class="banner ok keep"><strong>{{ "APPROVED FOR FILING, NOT FILED" if nol else "APPROVED" }}</strong> {{ draft.decided_at|manila_time }}{% if draft.decided_by %} by {{ draft.decided_by }}{% endif %}{% if draft.decision_reason %} · {{ draft.decision_reason }}{% endif %}. This version is frozen.{% if nol %} {{ c.not_filed }} The filing clock keeps running.{% endif %}</p>
   {% elif draft.status == 'rejected' %}
     <p class="banner alert keep"><strong>REJECTED</strong> {{ draft.decided_at|manila_time }}{% if draft.decided_by %} by {{ draft.decided_by }}{% endif %}: {{ draft.decision_reason }}</p>
   {% elif draft.status == 'superseded' %}
@@ -17,13 +17,14 @@
   {% endif %}
   {% if stale and draft.status == 'draft' %}
     <div class="banner warn keep"><strong>NEW EVIDENCE SINCE THIS VERSION.</strong> {% if predates_pending %}It was generated before figures pending grouping review were kept out of the totals, so they may be added in.{% else %}The counted reports changed after it was generated, so its values may be out of date.{% endif %} Generate a new version, or confirm below that you approve this version as it is.
-      <form class="no-print" method="post" action="{% if draft.kind == 'rdana' %}/drafts{% else %}/drafts/damaged-houses{% endif %}">
-        {% if draft.kind == 'rdana' %}<input type="hidden" name="barangay" value="{{ draft.barangay }}">{% if draft.event_name %}<input type="hidden" name="event_name" value="{{ draft.event_name }}">{% endif %}{% if draft.event_type %}<input type="hidden" name="event_type" value="{{ draft.event_type }}">{% endif %}{% if event_at_local %}<input type="hidden" name="event_at" value="{{ event_at_local }}">{% endif %}{% endif %}
+      <form class="no-print" method="post" action="{{ regenerate[0] }}">
+        {% for name, value in regenerate[1].items() %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
         <button type="submit">Generate a new version</button>
       </form>
     </div>
   {% elif stale and draft.status == 'approved' %}<p class="muted">The counted reports changed after this version was generated; it stays as approved.</p>{% endif %}
-  {% if pending %}<p class="banner warn keep"><strong>PENDING GROUPING REVIEW.</strong> Report{{ 's' if pending|length != 1 }} {{ pending|join(", ") }} may duplicate other reports: {{ 'their figures are' if pending|length != 1 else 'its figures are' }} shown as pending beside each count and not added to any total. Review the grouping on the incident pages{% if draft.status == 'draft' %}, or write why you approve anyway{% endif %}.</p>{% endif %}
+  {% if pending and nol %}<p class="banner warn keep"><strong>PENDING GROUPING REVIEW.</strong> The agent was not sure that report{{ 's' if pending|length != 1 }} {{ pending|join(", ") }} {{ 'belong' if pending|length != 1 else 'belongs' }} with the other reports of this loss: counts are shown as pending. Review the grouping on the <a href="/incidents/{{ draft.incident_id }}">incident page</a>{% if draft.status == 'draft' %}, or write why you approve anyway{% endif %}.</p>
+  {% elif pending %}<p class="banner warn keep"><strong>PENDING GROUPING REVIEW.</strong> Report{{ 's' if pending|length != 1 }} {{ pending|join(", ") }} may duplicate other reports: {{ 'their figures are' if pending|length != 1 else 'its figures are' }} shown as pending beside each count and not added to any total. Review the grouping on the incident pages{% if draft.status == 'draft' %}, or write why you approve anyway{% endif %}.</p>{% endif %}
   {% if newest and newest.id != draft.id and draft.status != 'superseded' %}<p class="muted no-print">A newer version exists: <a href="/drafts/{{ newest.id }}">version {{ newest.version }}</a> ({{ newest.status }}).</p>{% endif %}
 
   {% if draft.kind == 'rdana' %}
@@ -89,6 +90,8 @@
       {% endif %}
       <p class="muted">The agent saw only typed, redacted facts per report and the computed counts: no reporter ids, raw messages, transcripts or names.</p>
     </section>
+  {% elif nol %}
+    {% include "_nol.html" %}
   {% else %}
     <h1>Damaged houses by barangay <span class="muted">· version {{ draft.version }}</span></h1>
     <p class="muted">Snapshot drafted {{ c.drafted_at }} in the DSWD DROMIC damaged-houses columns.</p>
@@ -106,7 +109,7 @@
             {% if pending %}<label>Reason (required: figures wait for grouping review) <textarea name="reason" required minlength="{{ reason_min }}" maxlength="{{ reason_max }}" rows="2"></textarea></label>
             {% else %}<label>Note (optional) <textarea name="reason" maxlength="{{ reason_max }}" rows="2"></textarea></label>{% endif %}
             {% if stale %}<label><input type="checkbox" name="confirm_stale" value="1" required> Approve this version as it is, although new evidence arrived</label>{% endif %}
-            <button type="submit">Approve this version</button>
+            <button type="submit">{{ "Approve for filing (Ulat files nothing)" if nol else "Approve this version" }}</button>
           </fieldset>
         </form>
         <form method="post" action="/drafts/{{ draft.id }}/reject">
