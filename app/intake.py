@@ -255,13 +255,25 @@ class IntakeService:
         return media
 
     async def ingest_text(
-        self, user_ref: int | str, text: str, *, channel: str = "telegram"
+        self,
+        user_ref: int | str,
+        text: str,
+        *,
+        channel: str = "telegram",
+        corrects_report_id: int | None = None,
     ) -> Report:
+        """Store a text report. `corrects_report_id` marks it as a correction of the sender's own
+        earlier report (a reply to its summary); another reporter's report is never linked."""
         text = text.strip()
         if not text:
             raise ValueError("text report is empty")
         with self._session() as session:
             report = self._new_report(session, user_ref, channel, text=text)
+            if corrects_report_id is not None:
+                earlier = session.get(Report, corrects_report_id)
+                if earlier is not None and earlier.reporter_id == report.reporter_id:
+                    report.corrects_report_id = earlier.id
+                    session.add(report)
             session.commit()
             return report
 

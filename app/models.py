@@ -59,6 +59,9 @@ class Report(SQLModel, table=True):
     # the barangay an officer set, which geolocation never overwrites.
     officer_incident_id: int | None = Field(default=None, foreign_key="incident.id")
     officer_barangay: str | None = None
+    # The same reporter's earlier report this one corrects: they replied to the bot's summary of
+    # it ("Mali? I-reply ang tamang detalye."). Grouping routes it there by rule.
+    corrects_report_id: int | None = Field(default=None, foreign_key="report.id")
 
 
 class Media(SQLModel, table=True):

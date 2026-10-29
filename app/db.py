@@ -61,6 +61,7 @@ def init_db(engine: Engine) -> None:
                 "album": "VARCHAR",
                 "officer_incident_id": "INTEGER REFERENCES incident(id)",
                 "officer_barangay": "VARCHAR",
+                "corrects_report_id": "INTEGER REFERENCES report(id)",
             },
             "reporter": {"blocked": "BOOLEAN NOT NULL DEFAULT 0"},
             "media": {"phash": "VARCHAR"},

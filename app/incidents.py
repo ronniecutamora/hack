@@ -91,6 +91,7 @@ class Observation:
     # An officer's verdict on a fallen tree (the models cannot see them reliably): True
     # confirmed, False not there, None not reviewed. Counting applies it to the hazards.
     fallen_tree: bool | None = None
+    corrects: int | None = None  # the report this one corrects (a reply to its summary)
 
 
 def distance_m(a: tuple[float, float], b: tuple[float, float]) -> float:
@@ -181,8 +182,14 @@ class OwnCorrection:
     incident_id: int
     report_id: int  # the reporter's earlier report the correction restates
     fields: tuple[str, ...]  # count fields both reports state
+    replied: bool = False  # the reporter replied to the bot's summary of that report
 
     def reason(self) -> str:
+        if self.replied:
+            return (
+                f"Correction by the same reporter, sent as a reply to the bot's summary of "
+                f"report {self.report_id}; routed by rule, no model call."
+            )
         names = ", ".join(n.replace("_", " ") for n in self.fields)
         plural = "s" if len(self.fields) > 1 else ""
         return (
@@ -203,7 +210,23 @@ def own_correction(
     candidates (same place, inside the activity window) qualify, only earlier reports count, and
     when several do, the most recent wins.
     """
-    if not new.facts.get("is_correction") or new.reporter_id is None:
+    if new.reporter_id is None:
+        return None
+    if new.corrects is not None:
+        # A reply to the bot's summary of one report names it, whatever the wording, and often
+        # without a place ("dalawa lang po"): it joins that report's incident unless it names
+        # a different barangay, which the place filters then handle like any report.
+        for incident_id, members in groups.items():
+            target = next(
+                (m for m in members if m.id == new.corrects and m.reporter_id == new.reporter_id),
+                None,
+            )
+            if target is None:
+                continue
+            place = next((m.barangay for m in reversed(members) if m.barangay), None)
+            if new.barangay is None or place is None or new.barangay == place:
+                return OwnCorrection(incident_id, target.id, (), replied=True)
+    if not new.facts.get("is_correction"):
         return None
     restated = [n for n in FACT_COUNT_FIELDS if new.facts.get(n) is not None]
     best: tuple[tuple[datetime, int], OwnCorrection] | None = None
@@ -378,6 +401,7 @@ def observations(session: Session) -> dict[int, Observation]:
                 for p in photos[report.id]
             ),
             tree_reviews.get(report.id),
+            report.corrects_report_id,
         )
     return result
 

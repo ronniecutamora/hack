@@ -304,6 +304,10 @@ class AssessmentService:
             transcript=transcript,
             llm_barangay=(facts or {}).get("barangay_mentioned"),
         )
+        if facts is not None and report.corrects_report_id is not None:
+            # The reporter replied to our summary of an earlier report: a correction by intent,
+            # whatever the wording ("Purok 3 po", "dalawa lang").
+            facts = {**facts, "is_correction": True}
         errors = [e for e in (facts_error, *(o.error for o in outcomes)) if e]
         if raw_expired:
             errors.append("raw media expired while held")

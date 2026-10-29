@@ -9,6 +9,7 @@ import sys
 from collections.abc import Awaitable, Callable
 from functools import wraps
 
+from sqlmodel import Session, select
 from telegram import Update
 from telegram.error import BadRequest, NetworkError, TelegramError
 from telegram.ext import (
@@ -24,7 +25,8 @@ from app.config import Settings, get_settings
 from app.db import init_db, make_engine, make_recorder
 from app.intake import Admission, IntakeService
 from app.meta.factory import make_transcriber
-from app.models import STATUS_HELD, Report
+from app.models import STATUS_HELD, Assessment, Incident, Report
+from app.reporter_summary import Acknowledgements, summary_text
 from app.retention import purge_loop
 
 logger = logging.getLogger(__name__)
@@ -82,6 +84,9 @@ def start_text(ttl_hours: int, held_max_hours: int) -> str:
 
 
 RECEIVED = "Natanggap na ang report mo. Salamat! / Report received. Thank you!"
+CORRECTION_RECEIVED = (
+    "Natanggap ang pagtatama mo. Salamat! / Your correction was received. Thank you!"
+)
 RATE_LIMITED = (
     "Marami ka nang naipadalang report ngayon. Subukan ulit mamaya. "
     "Kung emergency, tumawag sa 911. / "
@@ -136,11 +141,57 @@ async def _reply(message: object, text: str) -> None:
     await _with_retries(lambda: message.reply_text(text))
 
 
-def _assess_later(context: ContextTypes.DEFAULT_TYPE, report: Report) -> None:
-    """Assess in the background so the reporter gets "received" without waiting on models."""
-    assessor = context.application.bot_data.get("assessor")
-    if assessor is not None and report.status != STATUS_HELD:
-        context.application.create_task(assessor.assess(report.id), name=f"assess-{report.id}")
+def _assess_later(
+    context: ContextTypes.DEFAULT_TYPE, report: Report, message: object | None = None
+) -> None:
+    """Assess in the background so the reporter gets "received" without waiting on models, then
+    tell them what was understood (when acknowledgements are on and `message` is given)."""
+    application = context.application
+    assessor = application.bot_data.get("assessor")
+    if assessor is None or report.status == STATUS_HELD:
+        return
+    acks: Acknowledgements | None = application.bot_data.get("acks")
+    generation = acks.touch(report.id, message) if acks and message is not None else None
+    application.create_task(
+        _assess_and_acknowledge(application, assessor, report.id, generation),
+        name=f"assess-{report.id}",
+    )
+
+
+async def _assess_and_acknowledge(
+    application: Application, assessor: object, report_id: int, generation: int | None
+) -> None:
+    report = await assessor.assess(report_id)
+    acks: Acknowledgements | None = application.bot_data.get("acks")
+    if generation is None or acks is None or report is None:
+        return
+    # Wait for the quiet period: a later caption, pin or album photo supersedes this task.
+    await asyncio.sleep(acks.quiet_s)
+    message = acks.due(report_id, generation)
+    if message is None:
+        return
+    text = reporter_summary(application.bot_data["intake"].engine, report_id)
+    if text is None:  # held, blocked or failed: the reporter already has "received"
+        return
+    try:
+        sent = await _with_retries(lambda: message.reply_text(text))
+    except TelegramError as exc:
+        logger.warning("could not send the summary of report %s: %s", report_id, exc)
+        return
+    acks.remember(sent, report_id)
+
+
+def reporter_summary(engine: object, report_id: int) -> str | None:
+    """The bilingual summary of a report as stored now (app.reporter_summary)."""
+    with Session(engine) as session:
+        report = session.get(Report, report_id)
+        if report is None:
+            return None
+        facts = session.exec(
+            select(Assessment.facts).where(Assessment.report_id == report_id)
+        ).first()
+        incident = session.get(Incident, report.incident_id) if report.incident_id else None
+        return summary_text(report, facts, incident.barangay if incident else None)
 
 
 def _admitted(*, attaches: Callable[[IntakeService, int, object], bool] | None = None):
@@ -191,9 +242,14 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if report is not None:
         await _reply(message, CAPTION_ADDED)
     else:
-        report = await intake.ingest_text(update.effective_user.id, message.text)
-        await _reply(message, RECEIVED)
-    _assess_later(context, report)  # re-assesses and re-groups a photo that got its caption
+        # A reply to one of our summaries corrects that report ("Mali? I-reply…").
+        acks: Acknowledgements | None = context.application.bot_data.get("acks")
+        corrects = acks.replied_to(message) if acks else None
+        report = await intake.ingest_text(
+            update.effective_user.id, message.text, corrects_report_id=corrects
+        )
+        await _reply(message, CORRECTION_RECEIVED if report.corrects_report_id else RECEIVED)
+    _assess_later(context, report, message)  # re-assesses a photo that got its caption
 
 
 def _joins_album(intake: IntakeService, user_ref: int, message: object) -> bool:
@@ -213,7 +269,7 @@ async def _ingest_photo(
     )
     if not joins:
         await _reply(message, RECEIVED)
-    _assess_later(context, report)
+    _assess_later(context, report, message)
 
 
 @_admitted(attaches=_joins_album)
@@ -245,7 +301,7 @@ async def on_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         message,
         RECEIVED if report.transcript or report.status == STATUS_HELD else VOICE_NOT_TRANSCRIBED,
     )
-    _assess_later(context, report)
+    _assess_later(context, report, message)
 
 
 @_admitted(attaches=lambda intake, user_ref, _message: intake.can_attach_location(user_ref))
@@ -255,7 +311,7 @@ async def on_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         update.effective_user.id, message.location.latitude, message.location.longitude
     )
     await _reply(message, LOCATION_RECEIVED)
-    _assess_later(context, report)  # re-maps a report that was assessed before the pin came
+    _assess_later(context, report, message)  # re-maps a report assessed before the pin came
 
 
 async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -310,6 +366,7 @@ def build_application(settings: Settings) -> Application:
     application.bot_data["settings"] = settings
     application.bot_data["intake"] = IntakeService(settings, engine, transcriber)
     application.bot_data["assessor"] = assessor
+    application.bot_data["acks"] = Acknowledgements()  # in memory only: chats are never stored
     add_handlers(application)
     return application
 

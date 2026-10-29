@@ -52,6 +52,18 @@ Ulat is a hackathon prototype that Biñan's disaster office has not adopted, and
 `/start` and `/help` carry the same prototype notice. A test keeps every public text free of claims that reports
 reach the City DRRM Office.
 
+**"Here's what we understood."** When a report's assessment finishes, the bot answers in the same chat with what the
+agent took from it, built from the stored facts with no extra model call: the barangay (or "hindi pa alam ang lugar /
+place not identified yet: send a location pin"), the flood depth, the counts and the needs, ending "Mali? I-reply ang
+tamang detalye. / Wrong? Reply with the correct details." The place detail goes through the same redaction as every
+output, so the reply never repeats a name or phone number, not even the reporter's own. A report must stay quiet for
+15 seconds after its assessment before the summary goes out, so a photo, its pin and its caption get one summary,
+not three; held, blocked and failed reports get no facts back (only the earlier "received"). A reply to a summary
+within 24 hours is stored as a correction of that report (`Report.corrects_report_id`, the same reporter only) and
+joins its incident by rule, even when it names no place ("dalawa lang po"). **Privacy:** the chat id is never stored;
+it lives only in the bot process's memory (inside the message being answered), so after a restart pending summaries
+are skipped and replies to older summaries are ordinary reports. Rate limits are unchanged.
+
 ## Spam and fake reports
 
 Ulat never sends aid or files a claim by itself: every output is a draft an officer approves, and PCIC
@@ -406,6 +418,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-30 | Same-reporter correction rule (fix from the live bot test): a correction joins the candidate incident where its own reporter stated the figure it corrects, before any judge call, logged as a deterministic merge (no model) naming the corrected figure and report; the most recent qualifying report wins. Report 18 ("dalawang bahay lang") had merged into an old-photo incident because the judge was only unsure about the reporter's own voice note; a regression test replays that case. Grouping fingerprint version 3, so a re-run applies the rule |
 | 2026-10-30 | Albums (gap from the late-caption fix): the photos of a Telegram album join one report instead of one report each (stored `media_group_id`, 2-minute window, same reporter, never for a blocked reporter), so a text after a caption-less album captions every photo; the bot answers "received" once per album, later album photos are exempt from the rate limit, and an album photo arriving mid-assessment keeps the report "new" for the queued re-run |
 | 2026-10-30 | Officer review: a `/review` queue (header, overview tile) and an incident-page panel for reports the agent could not settle (uncertain or failed duplicate check, unknown place, unchecked trust signals, unconfirmed fallen trees) with the judge's comparisons and audited actions: merge, keep separate, set the barangay (then re-group), review a trust signal, confirm a fallen tree, block or unblock the reporter (the CLI's function). Each is an append-only `OfficerAction` row with the officer's initials; merges and keep-separate pin the grouping so re-grouping never undoes them, a set barangay survives re-assessment, counts, rollups, the pending bucket and draft staleness follow at once, and live sections refresh. The incident page shows agent and officer decisions together |
+| 2026-10-30 | Reporter loop: after assessment the bot replies with a bilingual summary of what the agent understood (barangay or "send a location pin", depth, counts, needs, "Mali? I-reply…"), built deterministically from the redacted facts; one summary per report after a 15-second quiet period (photo + pin + caption → one), none for held, blocked or failed reports; a reply to the summary becomes a correction of that report and joins its incident by rule; the chat stays in memory only, never stored |
 
 ### Third-party code and assets
 
@@ -474,6 +487,7 @@ app/
   intake.py            Ingest text, photo, voice and location into reports
   retention.py         Purge raw media after the TTL
   bot.py               Telegram bot (python -m app.bot)
+  reporter_summary.py  The reporter's "here's what we understood" reply and its in-memory acknowledgements
   bot_profile.py       The bot's public profile (name, descriptions, commands) as data; idempotent CLI that applies it
   main.py, templates/  FastAPI officer pages: reports, incidents, timelines, decision audit, drafts and media
   live.py              Live updates: one database watcher per process and the server-sent event streams
