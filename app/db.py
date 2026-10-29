@@ -33,6 +33,15 @@ def init_db(engine: Engine) -> None:
     SQLModel.metadata.create_all(engine)
     # create_all does not alter existing tables. Nullable/defaulted additions preserve older DBs.
     with engine.begin() as connection:
+        # Every draft trigger is dropped first and recreated last, in this one transaction, so
+        # a changed, renamed or removed definition reaches existing databases. A backfill that
+        # must UPDATE decided drafts goes between the two, where no trigger can abort it; a new
+        # column with a DEFAULT needs no UPDATE at all and is the preferred way.
+        for (name,) in connection.exec_driver_sql(
+            "SELECT name FROM sqlite_master WHERE type = 'trigger' "
+            "AND tbl_name IN ('draft', 'draftevent')"
+        ).all():
+            connection.exec_driver_sql(f'DROP TRIGGER IF EXISTS "{name}"')
         additions = {
             "report": {
                 "incident_id": "INTEGER REFERENCES incident(id)",
@@ -61,8 +70,8 @@ def init_db(engine: Engine) -> None:
             "CREATE INDEX IF NOT EXISTS ix_report_reporter_received "
             "ON report (reporter_id, received_at)"
         )
-        for statement in DRAFT_TRIGGERS:
-            connection.exec_driver_sql(statement)
+        for name, statement in DRAFT_TRIGGERS.items():
+            connection.exec_driver_sql(f"CREATE TRIGGER {name} {statement}")
 
 
 # The audit is append-only and a decided draft is frozen, even against a stray UPDATE: the
@@ -81,18 +90,18 @@ DRAFT_GENERATED_COLUMNS = (
     "summary_validation",
     "created_at",
 )
-DRAFT_TRIGGERS = (
-    "CREATE TRIGGER IF NOT EXISTS draftevent_no_update BEFORE UPDATE ON draftevent "
+DRAFT_TRIGGERS = {
+    "draftevent_no_update": "BEFORE UPDATE ON draftevent "
     "BEGIN SELECT RAISE(ABORT, 'draft audit rows are immutable'); END",
-    "CREATE TRIGGER IF NOT EXISTS draftevent_no_delete BEFORE DELETE ON draftevent "
+    "draftevent_no_delete": "BEFORE DELETE ON draftevent "
     "BEGIN SELECT RAISE(ABORT, 'draft audit rows are immutable'); END",
-    "CREATE TRIGGER IF NOT EXISTS draft_no_delete BEFORE DELETE ON draft "
+    "draft_no_delete": "BEFORE DELETE ON draft "
     "BEGIN SELECT RAISE(ABORT, 'drafts are never deleted'); END",
-    "CREATE TRIGGER IF NOT EXISTS draft_frozen BEFORE UPDATE ON draft "
+    "draft_frozen": "BEFORE UPDATE ON draft "
     "WHEN OLD.status != 'draft' OR "
     + " OR ".join(f"NEW.{c} IS NOT OLD.{c}" for c in DRAFT_GENERATED_COLUMNS)
     + " BEGIN SELECT RAISE(ABORT, 'a decided draft or generated content never changes'); END",
-)
+}
 
 
 def make_recorder(engine: Engine) -> Recorder:

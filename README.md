@@ -105,7 +105,8 @@ not zero. The officer can save the current table as a draft for approval; its CS
 designation of the officer. Generating again creates version n+1 and marks the previous undecided version
 `superseded`; approved and rejected versions stay exactly as decided. Every generate, supersede, approve and
 reject writes an append-only `DraftEvent`, kept apart from the incident grouping audit (`AgentDecision`), which is
-per report. SQLite triggers reject edits to decided drafts and to the audit. The `/drafts` list shows when new
+per report. SQLite triggers reject edits to decided drafts and to the audit; startup drops and recreates them, so a
+changed definition reaches an existing database (a backfill that must update decided drafts runs in between). The `/drafts` list shows when new
 evidence arrived after the latest version. **There is no login yet** (planned): anyone who can reach the web app
 can approve, so it must only listen on localhost.
 
@@ -189,6 +190,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-29 | RDANA draft filling: deterministic evidence rules for 24 of its 108 fields with incident and report links, the "not in reports" marker for the rest, and the agent's 1.4 summary validated against cited reports and numbers, with one retry and a recorded deterministic fallback under the spend cap |
 | 2026-10-29 | Officer drafts: `/drafts` list and printable A4 form, approve or reject with a reason, versioning that supersedes undecided drafts, an append-only `DraftEvent` audit and database triggers that freeze decided drafts |
 | 2026-10-29 | Damaged-houses table per barangay in the DROMIC columns, with a city total, evidence report ids, a CSV download and approvable frozen snapshots |
+| 2026-10-29 | Review fix: startup drops and recreates every draft trigger, so changed definitions reach existing databases and a backfill can run between the two |
 
 ### Third-party code and assets
 
