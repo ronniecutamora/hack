@@ -175,6 +175,24 @@ def test_no_reporter_name_reaches_the_draft_or_its_page(client, engine):
     }
 
 
+def test_phone_numbers_and_names_in_photo_notes_are_removed(client, engine):
+    from app.nol import excerpt
+
+    assert excerpt("Tawagan po ako sa 0917 123 4567 o +63-917-765-4321.") == (
+        "Tawagan po ako sa [number] o [number]."
+    )
+    assert excerpt("Purok 1, 3 fish pens, 2026") == "Purok 1, 3 fish pens, 2026"
+    incident, first, _ = fisherfolk_incident(engine)
+    add_photo(engine, first)
+    with Session(engine) as session:
+        row = session.exec(select(PhotoAssessment)).one()
+        row.judgment = {**row.judgment, "notes": "Pen of Mang Kanor, call 09171234567."}
+        session.add(row)
+        session.commit()
+    notes = stored(engine, generate(client, incident)).content["annex"][0]["photos"][0]
+    assert notes["judgment"]["notes"] == "Pen of [redacted], call [number]."
+
+
 def test_a_long_excerpt_is_cut_after_redaction(client, engine):
     incident, *_ = fisherfolk_incident(engine)
     add_report(

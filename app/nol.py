@@ -8,6 +8,7 @@ name-redacted excerpt of the message or voice note, and the trust signals. The f
 stored once and never recomputed; the countdown is computed when the page is shown.
 """
 
+import re
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
@@ -31,6 +32,9 @@ NOT_FILED = (
 SAM_LABEL = "evidence for the adjuster, not the loss figure"
 NOT_IN_REPORTS = "— not in reports (for the assured)"
 EXCERPT_MAX = 280
+# Seven or more digits, allowing a leading + and spaces, dots or dashes ("0917 123 4567").
+_PHONE = re.compile(r"\+?\d(?:[\s.-]?\d){6,}")
+PHONE_PLACEHOLDER = "[number]"
 JUDGMENT_KEYS = (
     "roof_damage",
     "floodwater",
@@ -93,9 +97,18 @@ def countdowns(rows: list[dict[str, Any]], now: datetime) -> list[tuple[dict, Co
 
 
 def excerpt(text: str) -> str:
-    """Names removed first, then shortened, so a cut never exposes half a name."""
-    text = " ".join(redact_names(text).split())
+    """Names and phone numbers removed first, then shortened, so a cut never exposes half of
+    one. The assured gives their own contact number on the form (field 12)."""
+    text = " ".join(_PHONE.sub(PHONE_PLACEHOLDER, redact_names(text)).split())
     return text if len(text) <= EXCERPT_MAX else text[: EXCERPT_MAX - 1].rstrip() + "…"
+
+
+def _judgment(judgment: dict[str, Any] | None) -> dict[str, Any]:
+    """The photo judgment's known keys; its free-text note is redacted like an excerpt."""
+    kept = {k: judgment[k] for k in JUDGMENT_KEYS if k in (judgment or {})}
+    if isinstance(kept.get("notes"), str):
+        kept["notes"] = excerpt(kept["notes"])
+    return kept
 
 
 def annex(session: Session, incident: IncidentEvidence) -> list[dict[str, Any]]:
@@ -137,9 +150,7 @@ def annex(session: Session, incident: IncidentEvidence) -> list[dict[str, Any]]:
                     {
                         "media_id": p.media_id,
                         "overlay_media_id": p.overlay_media_id,
-                        "judgment": {
-                            k: p.judgment[k] for k in JUDGMENT_KEYS if k in (p.judgment or {})
-                        },
+                        "judgment": _judgment(p.judgment),
                         "measurement": {
                             k: p.measurement[k]
                             for k in MEASUREMENT_KEYS

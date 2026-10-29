@@ -172,7 +172,7 @@ audit and same-origin rules as the RDANA drafts.
 
 An **evidence annex** for the PCIC adjuster lists every report in the incident: its time, links to the photo and the
 SAM overlay (until retention deletes the raw files), the photo judgments and measurements, an excerpt of the message
-or voice note with names removed, and its trust chips. A photo another reporter already sent (`photo_reused`) is a
+or voice note with names and phone numbers removed, and its trust chips. A photo another reporter already sent (`photo_reused`) is a
 red chip linking the earlier report and a red banner on the draft: one photo cannot prove two losses. Single-source
 incidents, missing photos and grouping still pending officer review are marked too.
 
@@ -314,6 +314,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-29 | Livelihood facts: a report can state livelihood damage without a count (fish pens or cages, fishponds, fishing gear, boats, crops, livestock), a stated fishery area and a livelihood-materials need, with Taglish cues (baklad, kulungan, lambat, kawayan, bangka); the pair judge, incident rollups and RDANA 18.1/18.2 use them, so the two De La Paz fish-pen reports are no longer judged "no damage stated". Older stored facts keep working |
 | 2026-10-29 | Deadlines table (`app/data/deadlines.json`): PCIC fisheries Notice of Loss (2 calendar days) and Claim for Indemnity (7), and RDANA forms to the EOC (72 hours), each row with its source; a countdown in Philippine time with an injected clock; the RDANA drafts page reads its deadline from the table, and a test keeps deadline literals out of the code |
 | 2026-10-29 | PCIC fisheries Notice of Loss draft (FIP CAS Form No. 1) per incident, defined as commodity data: location, cause, first-reported time, stated area and extent filled from the reports with evidence links, identity and policy fields left for the assured, the PCIC Region IV office fixed, and an evidence annex for the adjuster (photo and SAM overlay links, judgments, SAM measurements as evidence only, name-redacted excerpts, trust chips, a red banner for a reused photo); deterministic, no model call |
+| 2026-10-29 | Review fix: phone numbers are removed from Notice of Loss excerpts, and the agent's free-text photo notes are redacted like excerpts |
 | 2026-10-29 | Filing clock: Notice of Loss and Claim for Indemnity countdowns from the first report on `/drafts`, the draft page and the incident page, with the Citizen's Charter first-notice fallback; approval reads "approved for filing, not filed" and does not stop the clock. Notice of Loss drafts reuse the versioning, staleness, approval, audit and same-origin rules (a draft now records its incident) |
 | 2026-10-29 | Demo: an 18th synthetic report (a San Antonio fish-pen claim resending the De La Paz photo through a validated `photo_from`, no new image) so the reused-photo warning appears on a Notice of Loss; the loader assesses each report as it arrives, so only the later copy is flagged; `--anchor-now` places scenario times relative to the load so the filing countdowns are live |
 
