@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
 from app.db import DRAFT_TRIGGERS, init_db, make_engine
-from app.drafts import CSV_BOM, DraftService
+from app.drafts import CSV_BOM, DraftService, damaged_houses_csv
 from app.main import create_app
 from app.models import Draft, DraftEvent, Report
 from app.rdana import summary_counts
@@ -172,8 +172,8 @@ def test_pending_figures_show_on_the_form_csv_and_banner_and_approval_needs_a_re
 
     lines = client.get("/damaged-houses.csv").text.removeprefix(CSV_BOM).split("\r\n")
     semicolons = ";".join(map(str, ids))
-    assert lines[1].endswith(f",Malaban,,,,,5,{semicolons}")  # no Total: nothing confirmed
-    assert lines[2].endswith(f",City total,,,,,5,{semicolons}")
+    assert lines[1].endswith(f",Malaban,,,,,,,5,{semicolons}")  # no Total: nothing confirmed
+    assert lines[2].endswith(f",City total,,,,,,,5,{semicolons}")
     assert '<span class="chip warn">5</span>' in client.get("/damaged-houses").text
 
     refused = client.post(f"/drafts/{draft_id}/approve", data={"reason": ""})
@@ -419,3 +419,72 @@ def test_state_changing_posts_must_be_same_origin(client, headers, status):
         "/drafts", data={"barangay": "Malaban"}, headers=headers, follow_redirects=False
     )
     assert generated.status_code == status
+
+
+# --- CSV status and columns --------------------------------------------------------------
+
+
+def csv_rows(text):
+    return [line.split(",") for line in text.removeprefix(CSV_BOM).split("\r\n") if line]
+
+
+def test_every_csv_row_says_live_or_which_snapshot_it_is(client):
+    engine = client.app.state.engine
+    incident = add_incident(engine)
+    add_report(engine, incident=incident, reporter="a", houses_totally_damaged=2)
+    add_report(engine, incident=incident, reporter="b", hours=1, houses_totally_damaged=2)
+    live = csv_rows(client.get("/damaged-houses.csv").text)
+    assert {row[0] for row in live[1:]} == {"LIVE (NOT APPROVED)"}
+    assert live[1][9:11] == ["0", "0"]  # two reporters said 2: corroborated, unflagged
+    response = client.get("/damaged-houses.csv")
+    assert "live-not-approved" in response.headers["content-disposition"]
+
+    houses = client.post("/drafts/damaged-houses", follow_redirects=False)
+    draft_id = int(houses.headers["location"].rsplit("/", 1)[1])
+    assert csv_rows(client.get(f"/drafts/{draft_id}.csv").text)[1][0] == "DRAFT v1 (NOT APPROVED)"
+    client.post(f"/drafts/{draft_id}/approve", data={})
+    snapshot = csv_rows(client.get(f"/drafts/{draft_id}.csv").text)
+    assert snapshot[1][0] == "APPROVED v1" and snapshot[1][1:] == live[1][1:]
+
+
+def test_snapshots_made_before_the_new_columns_still_render(client):
+    old = {
+        "region": "R",
+        "province": "P",
+        "city": "C",
+        "rows": [
+            {
+                "barangay": "Malaban",
+                "total": 3,
+                "totally": None,
+                "partially": 3,
+                "single_source": 3,
+                "flagged": 0,
+                "report_ids": [1, 2],
+            }
+        ],
+        "total": {
+            "total": 3,
+            "totally": None,
+            "partially": 3,
+            "single_source": 3,
+            "flagged": 0,
+            "report_ids": [1, 2],
+        },
+    }
+    rows = csv_rows(damaged_houses_csv(old, "APPROVED v1"))
+    assert rows[1] == [
+        "APPROVED v1",
+        "R",
+        "P",
+        "C",
+        "Malaban",
+        "3",
+        "",
+        "3",
+        "1;2",
+        "3",
+        "0",
+        "",
+        "",
+    ]

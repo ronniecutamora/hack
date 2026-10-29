@@ -43,6 +43,7 @@ REASON_MIN, REASON_MAX = 5, 1000
 DECIDED_BY_MAX = 120
 EVENT_NAME_MAX, EVENT_TYPE_MAX = 160, 80
 CSV_HEADER = (
+    "Status",
     "Region",
     "Province",
     "City/Municipality",
@@ -51,9 +52,12 @@ CSV_HEADER = (
     "Totally",
     "Partially",
     "Evidence report ids",
+    "Stated by only one reporter",
+    "From flagged reports",
     "Pending grouping review",
     "Pending report ids",
 )
+LIVE_CSV_STATUS = "LIVE (NOT APPROVED)"
 CITY_TOTAL = "City total"
 CSV_BOM = "\ufeff"  # spreadsheets then read the file as UTF-8 ("Biñan")
 
@@ -156,8 +160,19 @@ def damaged_houses(city: CityEvidence) -> dict[str, Any]:
     }
 
 
-def damaged_houses_csv(table: dict[str, Any]) -> str:
-    """CSV in the DROMIC column order, with a UTF-8 BOM so spreadsheets read "Biñan" right."""
+def csv_status(draft: Draft) -> str:
+    """The Status cell of a snapshot's CSV, e.g. "APPROVED v3" or "DRAFT v2 (NOT APPROVED)"."""
+    status = f"{draft.status.upper()} v{draft.version}"
+    return status if draft.status == DRAFT_APPROVED else f"{status} (NOT APPROVED)"
+
+
+def damaged_houses_csv(table: dict[str, Any], status: str) -> str:
+    """CSV in the DROMIC column order, with a UTF-8 BOM so spreadsheets read "Biñan" right.
+
+    Every row starts with the file's status, so a copied row still says whether it is the live,
+    unapproved table or which snapshot it came from. Snapshots made before a column existed
+    leave it empty; their stored values are never recomputed.
+    """
     out = io.StringIO()
     writer = csv.writer(out, lineterminator="\r\n")
     writer.writerow(CSV_HEADER)
@@ -168,6 +183,7 @@ def damaged_houses_csv(table: dict[str, Any]) -> str:
     for row in [*table["rows"], {"barangay": CITY_TOTAL, **table["total"]}]:
         writer.writerow(
             [
+                status,
                 table["region"],
                 table["province"],
                 table["city"],
@@ -176,7 +192,9 @@ def damaged_houses_csv(table: dict[str, Any]) -> str:
                 cell(row["totally"]),
                 cell(row["partially"]),
                 ";".join(str(r) for r in row["report_ids"]),
-                cell(row.get("pending")),  # absent in snapshots made before the bucket
+                cell(row.get("single_source") if row["total"] is not None else None),
+                cell(row.get("flagged") if row["total"] is not None else None),
+                cell(row.get("pending")),
                 ";".join(str(r) for r in row.get("pending_report_ids", [])),
             ]
         )

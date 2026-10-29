@@ -123,9 +123,11 @@ or the daily spend cap is reached, a deterministic summary is used and the reaso
 
 **Damaged-houses table.** `/damaged-houses` (and `.csv`, UTF-8 with a byte-order mark for spreadsheets) lists
 Region / Province / City / Barangay / Total / Totally / Partially / evidence report ids, in the DSWD DROMIC
-damaged-houses columns, then the pending grouping-review figure and its report ids, per barangay with a city total,
-using the same counting rule. An unstated count is empty, not zero. The officer can save the current table as a
-draft for approval; its CSV is then frozen.
+damaged-houses columns, per barangay with a city total, using the same counting rule, then how much of Total was
+stated by only one reporter or comes from flagged reports, and the pending grouping-review figure with its report
+ids. An unstated count is empty, not zero. Every CSV row starts with a Status column: `LIVE (NOT APPROVED)` for the
+live table (also in its file name), or the snapshot's status and version (`APPROVED v3`, `DRAFT v2 (NOT APPROVED)`).
+The officer can save the current table as a draft for approval; its values are then frozen.
 
 **Approval and audit.** A draft is approved or rejected once (a reason is required to reject), with an optional
 designation of the officer. Generating again creates version n+1 and marks the previous undecided version
@@ -227,6 +229,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-29 | Review fix: the 1.4 summary validator is an allowlist of the confirmed computed counts, each matched to the words next to it; spelled numbers are read whole; times, dates, ordinals, report ids, vague amounts and unquoted place numbers are rejected, and the prompt asks for digits |
 | 2026-10-29 | Review fix: staleness is re-checked when a draft is approved: the draft page shows a new-evidence banner with a regenerate button, approving a stale version needs an explicit confirmation, and the audit records it |
 | 2026-10-29 | Review fix: a same-origin check on every state-changing request (an Origin or Referer for another host gets 403) until the dashboard has a login |
+| 2026-10-29 | Review fix: every damaged-houses CSV row starts with its status (LIVE (NOT APPROVED), or the snapshot's status and version) and the CSV adds single-source and flagged columns |
 
 ### Third-party code and assets
 

@@ -28,11 +28,13 @@ from app.drafts import (
     EVENT_NAME_MAX,
     EVENT_TYPE_MAX,
     KIND_DAMAGED_HOUSES,
+    LIVE_CSV_STATUS,
     REASON_MAX,
     REASON_MIN,
     DraftError,
     DraftService,
     clean_text,
+    csv_status,
     damaged_houses,
     damaged_houses_csv,
     parse_event_at,
@@ -406,7 +408,7 @@ def create_app(settings: Settings | None = None, *, summary_llm: AgentLLM | None
         if draft.kind != KIND_DAMAGED_HOUSES:
             raise HTTPException(404, "Only damaged-houses drafts have a CSV.")
         name = f"binan-damaged-houses-v{draft.version}-{draft.status}.csv"
-        return csv_response(damaged_houses_csv(draft.content), name)
+        return csv_response(damaged_houses_csv(draft.content, csv_status(draft)), name)
 
     @app.post("/drafts/{draft_id:int}/{action}")
     async def decide_draft(request: Request, draft_id: int, action: str) -> RedirectResponse:
@@ -428,8 +430,8 @@ def create_app(settings: Settings | None = None, *, summary_llm: AgentLLM | None
     @app.get("/damaged-houses.csv")
     def damaged_houses_download(request: Request) -> Response:
         table = damaged_houses(request.app.state.drafts.evidence())
-        name = f"binan-damaged-houses-{utcnow():%Y%m%d-%H%M}-utc.csv"
-        return csv_response(damaged_houses_csv(table), name)
+        name = f"binan-damaged-houses-live-not-approved-{utcnow():%Y%m%d-%H%M}-utc.csv"
+        return csv_response(damaged_houses_csv(table, LIVE_CSV_STATUS), name)
 
     @app.get("/media/{media_id}")
     def media_file(request: Request, media_id: int) -> FileResponse:
