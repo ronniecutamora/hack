@@ -167,6 +167,54 @@ def candidate_fit(
     return CandidateFit(incident_id, any(m.id in review for m in others), corrected)
 
 
+@dataclass(frozen=True)
+class OwnCorrection:
+    """A correction routed by rule to the incident holding its reporter's own earlier figure."""
+
+    incident_id: int
+    report_id: int  # the reporter's earlier report the correction restates
+    fields: tuple[str, ...]  # count fields both reports state
+
+    def reason(self) -> str:
+        names = ", ".join(n.replace("_", " ") for n in self.fields)
+        plural = "s" if len(self.fields) > 1 else ""
+        return (
+            f"Correction by the same reporter of the {names} figure{plural} in report "
+            f"{self.report_id}; routed by rule, no model call."
+        )
+
+
+def own_correction(
+    new: Observation, groups: dict[int, list[Observation]], candidates: list[int]
+) -> OwnCorrection | None:
+    """Rule B: a correction joins the candidate incident where the same pseudonymous reporter
+    stated a figure it corrects, before any judge call.
+
+    The live test (2026-10-29) showed why: "mali po yung sinabi ko kanina: dalawang bahay lang"
+    was judged only "unsure" against the reporter's own voice note (no purok detail in the
+    correction) and "same" against an unrelated old-photo incident, and merged there. Only
+    candidates (same place, inside the activity window) qualify, only earlier reports count, and
+    when several do, the most recent wins.
+    """
+    if not new.facts.get("is_correction") or new.reporter_id is None:
+        return None
+    restated = [n for n in FACT_COUNT_FIELDS if new.facts.get(n) is not None]
+    best: tuple[tuple[datetime, int], OwnCorrection] | None = None
+    for incident_id in candidates:
+        for member in groups[incident_id]:
+            if (
+                member.id == new.id
+                or member.reporter_id != new.reporter_id
+                or (member.at, member.id) > (new.at, new.id)
+            ):
+                continue
+            fields = tuple(n for n in restated if member.facts.get(n) is not None)
+            key = (member.at, member.id)
+            if fields and (best is None or key > best[0]):
+                best = (key, OwnCorrection(incident_id, member.id, fields))
+    return best[1] if best else None
+
+
 def choose(
     accepted: list[tuple[CandidateFit, dict[str, Any]]], *, current: int | None
 ) -> tuple[int, str | None]:
@@ -315,7 +363,8 @@ class IncidentService:
     def fingerprint(self, observation: Observation) -> str:
         data = {
             # 2: every candidate up to the cap is judged and the best accepted match wins.
-            "version": 2,
+            # 3: a correction joins its reporter's own earlier figure by rule (own_correction).
+            "version": 3,
             "context": observation.context,
             "point": observation.point,
             "judge": self.judge.model,
@@ -355,6 +404,17 @@ class IncidentService:
                     candidates = candidate_incidents(
                         new, groups, window_days=self.settings.incident_window_days
                     )
+                rule = own_correction(new, groups, candidates)
+                if rule is not None:
+                    # Deterministic and certain: no judge call is needed or paid for.
+                    decision = {"decision": "same", "confidence": None, "reason": rule.reason()}
+                    comparisons = [(rule.incident_id, rule.report_id, decision, None)]
+                    out = self._apply(
+                        new, fingerprint, epoch, rule.incident_id, False, comparisons, None
+                    )
+                    if out is not None:
+                        return out
+                    continue
                 fits = [candidate_fit(new, i, groups[i], review) for i in candidates]
                 # Stable sort: within equal fit the nearest, newest order stays.
                 fits.sort(key=lambda f: (f.pending, -len(f.corrected)))
@@ -380,7 +440,7 @@ class IncidentService:
                             "confidence": None,
                             "reason": f"Pair judge unavailable: {error}",
                         }
-                    comparisons.append((fit.incident_id, recent[-1].id, judgment))
+                    comparisons.append((fit.incident_id, recent[-1].id, judgment, self.judge.model))
                     if error:
                         # The provider is down, and a missing comparison may hide the best
                         # match: nothing merges; the officer sees it and can retry.
@@ -393,11 +453,11 @@ class IncidentService:
                     chosen, why = choose(accepted, current=new.incident_id)
                     if why:
                         comparisons = [
-                            (i, r, {**j, "reason": f"{j['reason']} {why}"} if i == chosen else j)
-                            for i, r, j in comparisons
+                            (i, r, {**j, "reason": f"{j['reason']} {why}"} if i == chosen else j, m)
+                            for i, r, j, m in comparisons
                         ]
                 needs_officer = (not new.barangay and new.point is None) or (
-                    chosen is None and any(self._uncertain(j) for _, _, j in comparisons)
+                    chosen is None and any(self._uncertain(j) for _, _, j, _ in comparisons)
                 )
                 out = self._apply(
                     new, fingerprint, epoch, chosen, needs_officer, comparisons, error
@@ -455,7 +515,7 @@ class IncidentService:
             report.grouping_needs_officer = needs_officer
             session.add(report)
             session.flush()
-            for compared_id, compared_report, judgment in comparisons:
+            for compared_id, compared_report, judgment, model in comparisons:
                 # An uncertain comparison needs the officer only when nothing else matched.
                 session.add(
                     AgentDecision(
@@ -468,7 +528,7 @@ class IncidentService:
                         incident_id=target.id,
                         compared_incident_id=compared_id,
                         compared_report_id=compared_report,
-                        judge_model=self.judge.model,
+                        judge_model=model,  # None: a deterministic rule decided
                         **judgment,
                     )
                 )

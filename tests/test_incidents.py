@@ -79,11 +79,14 @@ def rows(engine, model):
         return session.exec(select(model).order_by(model.id)).all()
 
 
-def add_report(engine, *, barangay="Malaban", at=AT, point=None, **fields):
+def add_report(
+    engine, *, barangay="Malaban", at=AT, point=None, reporter="synthetic", place=None, **fields
+):
     with Session(engine, expire_on_commit=False) as session:
-        reporter = session.exec(select(Reporter)).first()
+        pseudonym = reporter
+        reporter = session.exec(select(Reporter).where(Reporter.pseudonym == pseudonym)).first()
         if reporter is None:
-            reporter = Reporter(pseudonym="synthetic")
+            reporter = Reporter(pseudonym=pseudonym)
             session.add(reporter)
             session.flush()
         report = Report(
@@ -102,7 +105,7 @@ def add_report(engine, *, barangay="Malaban", at=AT, point=None, **fields):
             Assessment(
                 report_id=report.id,
                 llm_model="fake-facts",
-                facts=facts(hazards=["flood"], place_detail="Demo Street A", **fields),
+                facts=facts(hazards=["flood"], place_detail=place or "Demo Street A", **fields),
             )
         )
         session.commit()
@@ -558,6 +561,7 @@ async def test_correction_goes_to_the_incident_stating_the_corrected_figure(sett
             at=AT + timedelta(hours=2),
             is_correction=True,
             houses_partially_damaged=2,
+            reporter="neighbour",  # not the voice note's reporter: the judge decides
         )
     )
     assert correction.incident_id == voice.incident_id
@@ -590,6 +594,7 @@ async def test_wrongly_merged_correction_moves_when_regrouped(settings, engine):
         at=AT + timedelta(hours=2),
         is_correction=True,
         houses_partially_damaged=2,
+        reporter="neighbour",
     )
     with Session(engine) as session:  # the live state: merged into the photo's incident
         report = session.get(Report, correction_id)
@@ -656,6 +661,107 @@ async def test_judge_failure_stops_judging_and_never_merges(settings, engine):
     assert failed.grouping_needs_officer is True
     assert len(rows(engine, Incident)) == 3
     assert len([d for d in rows(engine, AgentDecision) if d.report_id == failed.id]) == 2
+
+
+async def test_live_case_own_correction_joins_the_reporters_incident_by_rule(settings, engine):
+    """Regression for the 2026-10-29 live test, reports 8 and 18: the voice note (Casile,
+    Purok 2, 3 houses) and "mali po yung sinabi ko kanina: dalawang bahay lang" came from one
+    reporter. The judge said `unsure` for the voice note's incident (no purok in the correction)
+    and `same` 0.85 for an old-photo incident, so it merged there. Same reporter + a figure the
+    earlier report states is a deterministic signal: it routes before any judge call."""
+    judge = FakeJudge(UNSURE)
+    service = IncidentService(settings, engine, judge)
+    voice = await service.group(
+        add_report(
+            engine,
+            barangay="Casile",
+            houses_partially_damaged=3,
+            place="Purok 2",
+            reporter="resident-8",
+        )
+    )
+    photo = await service.group(
+        add_report(engine, barangay="Casile", at=AT + timedelta(hours=1), reporter="photo-9")
+    )
+    assert photo.incident_id != voice.incident_id and photo.grouping_needs_officer
+    calls_before = len(judge.calls)
+    judge.replies = [UNSURE, same(0.85)]  # what the live judge answered; never asked now
+    correction = await service.group(
+        add_report(
+            engine,
+            barangay="Casile",
+            at=AT + timedelta(hours=2),
+            is_correction=True,
+            houses_partially_damaged=2,
+            place=None,
+            reporter="resident-8",
+        )
+    )
+    assert correction.incident_id == voice.incident_id
+    assert correction.grouping_needs_officer is False and correction.grouping_error is None
+    assert len(judge.calls) == calls_before
+    (decision,) = [d for d in rows(engine, AgentDecision) if d.report_id == correction.id]
+    assert (decision.kind, decision.judge_model, decision.confidence) == ("merged", None, None)
+    assert (decision.compared_incident_id, decision.compared_report_id) == (
+        voice.incident_id,
+        voice.id,
+    )
+    assert decision.reason == (
+        f"Correction by the same reporter of the houses partially damaged figure in report "
+        f"{voice.id}; routed by rule, no model call."
+    )
+    with Session(engine) as session:
+        houses = collect(session).barangays["Casile"].count("houses_partially_damaged")
+    assert (houses.value, houses.contributions[0].rule) == (2, "latest correction")
+    # Re-grouping is a no-op: the rule result is stable under the fingerprint.
+    assert (await service.group(correction.id)).incident_id == voice.incident_id
+    assert len([d for d in rows(engine, AgentDecision) if d.report_id == correction.id]) == 1
+
+
+async def test_own_correction_takes_the_most_recent_qualifying_report(settings, engine):
+    service = IncidentService(settings, engine, FakeJudge(DIFFERENT, DIFFERENT, DIFFERENT))
+    first = await service.group(
+        add_report(engine, houses_flooded=5, place="Purok 1", reporter="r1")
+    )
+    second = await service.group(
+        add_report(
+            engine, at=AT + timedelta(hours=1), houses_flooded=4, place="Purok 3", reporter="r1"
+        )
+    )
+    assert first.incident_id != second.incident_id
+    correction = await service.group(
+        add_report(
+            engine, at=AT + timedelta(hours=2), is_correction=True, houses_flooded=3, reporter="r1"
+        )
+    )
+    assert correction.incident_id == second.incident_id
+
+
+@pytest.mark.parametrize(
+    "case",
+    ["not a correction", "no shared figure", "other reporter", "other barangay", "later report"],
+)
+async def test_own_correction_rule_needs_every_condition(settings, engine, case):
+    judge = FakeJudge(DIFFERENT)
+    service = IncidentService(settings, engine, judge)
+    earlier = dict(houses_flooded=5, reporter="r1", place="Purok 1")
+    if case == "other barangay":
+        earlier["barangay"] = "Casile"
+    if case == "later report":
+        earlier["at"] = AT + timedelta(hours=3)
+    await service.group(add_report(engine, **earlier))
+    fields = dict(at=AT + timedelta(hours=2), is_correction=True, houses_flooded=3, reporter="r1")
+    if case == "not a correction":
+        fields["is_correction"] = False
+    if case == "no shared figure":
+        fields.pop("houses_flooded")
+        fields["families_evacuated"] = 2
+    if case == "other reporter":
+        fields["reporter"] = "r2"
+    report = await service.group(add_report(engine, **fields))
+    decisions = [d for d in rows(engine, AgentDecision) if d.report_id == report.id]
+    assert all(d.judge_model is not None or d.kind == "new_incident" for d in decisions)
+    assert not any("routed by rule" in d.reason for d in decisions)
 
 
 def test_correction_fields_reuse_the_facts_schema():
