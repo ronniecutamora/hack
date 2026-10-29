@@ -18,6 +18,7 @@ import argparse
 import asyncio
 import json
 import shutil
+from collections.abc import Callable
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -66,8 +67,11 @@ async def _ingest_one(
     report: ScenarioReport,
     photo: bytes | None,
     shift: timedelta = timedelta(0),
+    *,
+    backdate: bool = True,
 ) -> list[int]:
-    """Ingest one scenario report (photo + pin when present) and backdate it.
+    """Ingest one scenario report (photo + pin when present) and backdate it to scenario time
+    (unless `backdate` is False: the replay keeps the real arrival time).
 
     Returns the ids of the reports created (normally one; the pin joins it).
     """
@@ -85,6 +89,8 @@ async def _ingest_one(
         assert pin.id is not None
         if pin.id not in ids:
             ids.append(pin.id)
+    if not backdate:
+        return ids
     when = received_at(report, shift)
     with Session(engine) as session:
         for report_id in ids:
@@ -94,6 +100,38 @@ async def _ingest_one(
                 session.add(row)
         session.commit()
     return ids
+
+
+async def feed_one(
+    intake: IntakeService,
+    engine: Engine,
+    assessor: AssessmentService,
+    report: ScenarioReport,
+    photo: bytes | None,
+    manifest: dict[str, int],
+    data_dir: Path,
+    *,
+    shift: timedelta = timedelta(0),
+    backdate: bool = True,
+    after_ingest: Callable[[list[int]], None] | None = None,
+) -> list[Report]:
+    """Ingest one report, record it in the manifest, then assess what it created.
+
+    The manifest is written before assessment, so an interrupted run never ingests a report
+    twice; `after_ingest` runs between the two. Returns the assessed reports.
+    """
+    ids = await _ingest_one(intake, engine, report, photo, shift, backdate=backdate)
+    manifest[report.key] = ids[0]
+    _write_manifest(data_dir, manifest)
+    if after_ingest is not None:
+        after_ingest(ids)
+    # Assess exactly the reports this report created, before the next one arrives.
+    assessed = []
+    for report_id in ids:
+        out = await assessor.assess(report_id)
+        if out is not None:
+            assessed.append(out)
+    return assessed
 
 
 async def _close(assessor: AssessmentService) -> None:
@@ -136,15 +174,11 @@ async def load_reports(
             photo = None
             if report.key in images:
                 photo = images[report.key].read_bytes()
-            ids = await _ingest_one(intake, engine, report, photo, shift)
-            manifest[report.key] = ids[0]
-            _write_manifest(data_dir, manifest)
+            outs = await feed_one(
+                intake, engine, assessor, report, photo, manifest, data_dir, shift=shift
+            )
             loaded += 1
-            # Assess exactly the reports this run created, before the next one arrives.
-            for report_id in ids:
-                out = await assessor.assess(report_id)
-                if out is None:
-                    continue
+            for out in outs:
                 if out.status == "assessed":
                     assessed += 1
                 else:
@@ -196,16 +230,7 @@ def load_command(
             if answer.strip().lower() not in ("y", "yes"):
                 print("Cancelled; demo data left alone.")
                 return 0
-        # Generated photos and cached model responses cost credits to make again; a reload
-        # with the same scenario reuses both, so only the databases, uploads and manifest go.
-        kept = {data_dir / "images", settings.cache_dir}
-        for path in data_dir.iterdir():
-            if path in kept and path.is_dir() and not path.is_symlink():
-                continue
-            if path.is_dir() and not path.is_symlink():
-                shutil.rmtree(path)
-            else:
-                path.unlink()
+        clear_demo_data(settings, data_dir)
         print(f"Deleted demo data in {data_dir}; kept generated images and the model cache.")
     engine = make_engine(settings)
     init_db(engine)
@@ -216,9 +241,7 @@ def load_command(
         for problem in problems:
             print(f"  - {problem}")
         return 1
-    missing = [
-        job.report.key for job in jobs_for(reports, data_dir / "images") if not job.path.is_file()
-    ]
+    missing = missing_images(reports, data_dir)
     if missing:
         print(f"Missing {len(missing)} image(s) for: {', '.join(missing)}.")
         print("Generate them first: DATA_DIR=var/demo uv run python -m app.demo images")
@@ -245,6 +268,32 @@ def load_command(
     found = ", ".join(summary["barangays"]) or "-"
     print(f"Barangays found: {found}.")
     return 0
+
+
+def clear_demo_data(settings: Settings, data_dir: Path) -> None:
+    """Delete a demo dir's databases, uploads and manifest; keep its images and model cache.
+
+    Generated photos and cached model responses cost credits to make again, and a reload of
+    the same scenario reuses both.
+    """
+    # Both sides resolved: with a relative DATA_DIR, the unresolved cache path never matched
+    # the listed (absolute) one, so a reset deleted the cache it promised to keep.
+    data_dir = data_dir.resolve()
+    kept = {data_dir / "images", settings.cache_dir.resolve()}
+    for path in data_dir.iterdir():
+        if path in kept and path.is_dir() and not path.is_symlink():
+            continue
+        if path.is_dir() and not path.is_symlink():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
+
+
+def missing_images(reports: list[ScenarioReport], data_dir: Path) -> list[str]:
+    """Keys of the reports whose generated photo is not in the demo dir yet."""
+    return [
+        job.report.key for job in jobs_for(reports, data_dir / "images") if not job.path.is_file()
+    ]
 
 
 def main(argv: list[str] | None = None) -> int:
