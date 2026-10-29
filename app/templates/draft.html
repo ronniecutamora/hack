@@ -57,6 +57,7 @@
                     <div class="gap">{{ gap }}</div>
                   {% endif %}
                   {% if f.options %}<div class="muted">{% for o in f.options %}<span>{{ "☒" if o in selected else "☐" }} {{ o }}</span>{{ " · " if not loop.last }}{% endfor %}</div>{% endif %}
+                  {% if f.warning %}<div><span class="chip warn">{{ f.warning }}</span></div>{% endif %}
                   {% if f.note %}<div class="muted">{{ f.note }}</div>{% endif %}
                   {{ evidence_refs(f.evidence) }}
                   {% if f.key == "1.4" and c.flood_depths %}

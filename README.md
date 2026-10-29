@@ -71,7 +71,7 @@ submitted by), filled by a deterministic rule over typed report facts, or writte
 
 | What the draft fills | From |
 |---|---|
-| 1.1.2 type and 1.1.3 date/time of event | Reported hazards; the earliest report (the officer can override both) |
+| 1.1.2 type and 1.1.3 date/time of event | Reported hazards; the earliest report (the officer can override both; an event time in the future or more than 30 days before the earliest report is refused, and one after the earliest report is kept with a warning) |
 | 1.2.4–1.2.7 barangay, sitio/purok, GPS, date/time of RDANA | The incidents, their redacted place details, the mean of report pins, the draft time |
 | 1.4 summary description | The agent, plus the latest and maximum flood depth per incident as support data |
 | 2.1, 2.3, 2.4, 2.9, 2.12, 2.15 | Families affected, families and persons evacuated, missing, injured, dead (totals only) |
@@ -230,6 +230,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-29 | Review fix: staleness is re-checked when a draft is approved: the draft page shows a new-evidence banner with a regenerate button, approving a stale version needs an explicit confirmation, and the audit records it |
 | 2026-10-29 | Review fix: a same-origin check on every state-changing request (an Origin or Referer for another host gets 403) until the dashboard has a login |
 | 2026-10-29 | Review fix: every damaged-houses CSV row starts with its status (LIVE (NOT APPROVED), or the snapshot's status and version) and the CSV adds single-source and flagged columns |
+| 2026-10-29 | Review fix: the officer's event date and time is refused when it is in the future or more than 30 days before the earliest report, and flagged when it is after it |
 
 ### Third-party code and assets
 

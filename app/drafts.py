@@ -10,7 +10,7 @@ import csv
 import hashlib
 import io
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import Engine, func
@@ -58,6 +58,9 @@ CSV_HEADER = (
     "Pending report ids",
 )
 LIVE_CSV_STATUS = "LIVE (NOT APPROVED)"
+# An officer's event date this long before the first report is more likely a typo than a
+# typhoon nobody reported for a month; RDANA is due within 72 hours of the event.
+EVENT_MAX_DAYS_BEFORE_FIRST_REPORT = 30
 CITY_TOTAL = "City total"
 CSV_BOM = "\ufeff"  # spreadsheets then read the file as UTF-8 ("Biñan")
 
@@ -243,6 +246,8 @@ class DraftService:
         evidence = self.evidence().barangays.get(barangay)
         if evidence is None:
             raise DraftError(f"No assessed reports are placed in {barangay!r}.")
+        if event.at is not None:
+            check_event_at(event.at, evidence.members[0].at, utcnow())
         counts = summary_counts(evidence)
         summary = await summarize(self.llm, evidence, counts, blocked=self.spend_block)
         drafted_at = utcnow()
@@ -434,6 +439,24 @@ class DraftService:
                 )
             )
         return city, statuses, drafts
+
+
+def check_event_at(at: datetime, first_report: datetime, now: datetime) -> None:
+    """Reject an officer's event time in the future or far before the first report (naive UTC).
+
+    A time after the first report is allowed (the officer may mean a later landfall) and the
+    form shows it as a warning.
+    """
+    if at > now:
+        raise DraftError(
+            f"Date and time of event ({manila_time(at)}) is in the future (Philippine time)."
+        )
+    if at < first_report - timedelta(days=EVENT_MAX_DAYS_BEFORE_FIRST_REPORT):
+        raise DraftError(
+            f"Date and time of event ({manila_time(at)}) is more than "
+            f"{EVENT_MAX_DAYS_BEFORE_FIRST_REPORT} days before the earliest report "
+            f"({manila_time(first_report)}). Check the date."
+        )
 
 
 def parse_event_at(value: str | None) -> datetime | None:

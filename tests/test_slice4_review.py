@@ -1,6 +1,7 @@
 """Regression coverage for the slice 4 review. All reports and model clients are synthetic."""
 
 import sqlite3
+from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,7 +10,7 @@ from sqlmodel import Session, select
 from app.db import DRAFT_TRIGGERS, init_db, make_engine
 from app.drafts import CSV_BOM, DraftService, damaged_houses_csv
 from app.main import create_app
-from app.models import Draft, DraftEvent, Report
+from app.models import Draft, DraftEvent, Report, manila_time, utcnow
 from app.rdana import summary_counts
 from app.rdana_summary import fallback_summary, summary_input, validate_summary
 from tests.test_rdana import AT, SummaryLLM, add_incident, add_report, cite_all, evidence
@@ -488,3 +489,36 @@ def test_snapshots_made_before_the_new_columns_still_render(client):
         "",
         "",
     ]
+
+
+# --- Event date and time -----------------------------------------------------------------
+
+
+def local(value):
+    return manila_time(value).replace(" ", "T")
+
+
+@pytest.mark.parametrize(
+    ("event_at", "message"),
+    [
+        (lambda: local(utcnow() + timedelta(hours=2)), "is in the future"),
+        (lambda: local(AT - timedelta(days=31)), "more than 30 days before the earliest report"),
+    ],
+)
+def test_impossible_event_times_are_rejected(client, event_at, message):
+    add_report(client.app.state.engine, hazards=["flood"])
+    response = client.post("/drafts", data={"barangay": "Malaban", "event_at": event_at()})
+    assert response.status_code == 422 and message in response.text
+    with Session(client.app.state.engine) as session:
+        assert session.exec(select(Draft)).all() == []
+
+
+def test_an_event_time_after_the_first_report_is_kept_with_a_warning(client):
+    add_report(client.app.state.engine, hazards=["flood"])
+    draft_id = generate(client, event_at=local(AT + timedelta(hours=3)))
+    field = form_fields(stored(client, draft_id))["1.1.3"]
+    assert field["value"] == manila_time(AT + timedelta(hours=3))
+    assert field["warning"] == "Later than the earliest report: check the date."
+    assert "Later than the earliest report" in client.get(f"/drafts/{draft_id}").text
+    earlier = generate(client, event_at=local(AT - timedelta(days=29)))
+    assert "warning" not in form_fields(stored(client, earlier))["1.1.3"]

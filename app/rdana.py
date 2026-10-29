@@ -166,7 +166,10 @@ def _event_at(ctx: RuleContext):
     refs = [_incident_ref(incident, [first.id])]
     if ctx.event.at is not None:
         note = f"Earliest report: {manila_time(first.at)}."
-        return _filled(manila_time(ctx.event.at), "officer", refs, note)
+        filled = _filled(manila_time(ctx.event.at), "officer", refs, note)
+        if ctx.event.at > first.at:
+            filled["warning"] = "Later than the earliest report: check the date."
+        return filled
     note = "Time of the earliest report; the event itself may be earlier."
     return _filled(manila_time(first.at), "reports", refs, note)
 
