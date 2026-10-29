@@ -7,6 +7,7 @@ token has a webhook (it would otherwise delete the webhook and take the bot from
 """
 
 import asyncio
+import contextlib
 import logging
 import sys
 from collections.abc import Awaitable, Callable, Coroutine
@@ -412,10 +413,15 @@ def add_handlers(application: Application) -> None:
 
 
 def build_application(
-    settings: Settings, *, engine: Engine | None = None, request: BaseRequest | None = None
+    settings: Settings,
+    *,
+    engine: Engine | None = None,
+    request: BaseRequest | None = None,
+    polling: bool = False,
 ) -> Application:
     """The bot with its handlers, intake and background assessor. `engine` shares the web app's
-    database pool in webhook mode; `request` replaces the HTTP layer to Telegram (tests)."""
+    database pool in webhook mode; `request` replaces the HTTP layer to Telegram (tests).
+    `polling` (python -m app.bot) starts the upkeep with the bot; the web app starts it itself."""
     if engine is None:
         engine = make_engine(settings)
         init_db(engine)
@@ -423,11 +429,8 @@ def build_application(
     transcriber = make_transcriber(settings, recorder)
     assessor = make_assessor(settings, engine, recorder, transcriber=transcriber)
 
-    async def post_init(application: Application) -> None:
-        application.bot_data["purge_task"] = asyncio.create_task(purge_loop(settings, engine))
-
     async def post_shutdown(application: Application) -> None:
-        application.bot_data["purge_task"].cancel()
+        await stop_upkeep(application)
         await transcriber.aclose()
         await assessor.llm.aclose()
         await assessor.sam.aclose()
@@ -443,7 +446,9 @@ def build_application(
             .write_timeout(TELEGRAM_READ_WRITE_TIMEOUT_S)
             .get_updates_connect_timeout(TELEGRAM_CONNECT_TIMEOUT_S)
         )
-    application = builder.post_init(post_init).post_shutdown(post_shutdown).build()
+    if polling:  # the polling process owns the upkeep; in webhook mode the web app starts it
+        builder = builder.post_init(start_upkeep)
+    application = builder.post_shutdown(post_shutdown).build()
     application.bot_data["settings"] = settings
     application.bot_data["intake"] = IntakeService(settings, engine, transcriber)
     application.bot_data["assessor"] = assessor
@@ -451,6 +456,29 @@ def build_application(
     application.bot_data["inflight"] = Inflight()
     add_handlers(application)
     return application
+
+
+async def start_upkeep(application: Application) -> None:
+    """Start, once per process, the work it owns besides answering updates: the hourly
+    retention purge (RA 10173: raw media must go even while Telegram is down or the token is
+    revoked, so this never depends on the bot starting). Polling runs it as post_init; the web
+    app calls it from its lifespan in webhook mode. stop_upkeep ends it."""
+    data = application.bot_data
+    if data.get("purge_task") is not None:
+        return
+    data["purge_task"] = asyncio.create_task(
+        purge_loop(data["settings"], data["intake"].engine), name="retention-purge"
+    )
+
+
+async def stop_upkeep(application: Application) -> None:
+    """Cancel the purge and settle background assessments (bounded). Idempotent."""
+    if (task := application.bot_data.pop("purge_task", None)) is not None:
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+    if (inflight := application.bot_data.get("inflight")) is not None:
+        await inflight.settle(SHUTDOWN_ASSESS_S)
 
 
 async def start_application(application: Application) -> None:
@@ -530,7 +558,8 @@ def main(request: BaseRequest | None = None) -> int:
         host = url.split("/")[2] if url.count("/") >= 2 else "set"
         print(WEBHOOK_SET_MESSAGE.format(url=f"https://{host}/…"), file=sys.stderr)
         return 3
-    build_application(settings, request=request).run_polling(allowed_updates=ALLOWED_UPDATES)
+    application = build_application(settings, request=request, polling=True)
+    application.run_polling(allowed_updates=ALLOWED_UPDATES)
     return 0
 
 

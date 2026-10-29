@@ -508,6 +508,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-30 | "Meta models at work" on the overview: calls, cache-hit share, cost and median live-call latency per model over the spend cap's 24-hour window, in one query (window functions over the `at` index), Meta model family and host from the same table as the trace, live through the spend topic; a test checks every number against a direct SQL aggregate |
 | 2026-10-30 | Retention fix: the synthetic demo's media (channel `demo`, generated photos, invented reporters, no personal data) is no longer purged after the TTL, so a deployed demo keeps its photo evidence the day after seeding; every real channel is still purged, tested on both sides |
 | 2026-10-30 | Review fix: a report the bot acknowledged survives a restart or crash: the bot asks for a database snapshot after every update it handles (at once, at most one per 5 s, with the history thinned to keep its 1-minute spacing), and shutdown is bounded to fit Modal's 30 s: refuse new webhook calls with 503, handle the queued updates, snapshot, give in-flight assessments 8 s with the summary's quiet period skipped, then stop the bot |
+| 2026-10-30 | Review fix (RA 10173): the retention purge no longer depends on the bot starting: in webhook mode the web app starts exactly one purge loop from its lifespan (a revoked token or unreachable Telegram no longer stops it, and start retries no longer pile up loops); the polling bot starts it with itself |
 
 ### Third-party code and assets
 

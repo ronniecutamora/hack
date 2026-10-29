@@ -50,7 +50,7 @@ from app.auth import (
     install_login_gate,
     safe_next,
 )
-from app.bot import build_application
+from app.bot import build_application, start_upkeep, stop_upkeep
 from app.config import Settings, get_settings
 from app.dashboard import active_incidents, incident_trust, overview
 from app.db import init_db, make_engine, make_recorder
@@ -404,6 +404,7 @@ def create_app(
             )
             if snapshots is not None:  # an acknowledged report is in a snapshot within seconds
                 application.bot_data["after_update"] = snapshots.request
+            await start_upkeep(application)  # the retention purge, whether or not Telegram starts
             secret = settings.telegram_webhook_secret.get_secret_value()
             app.state.telegram = TelegramWebhook(application, secret)
             await app.state.telegram.start()
@@ -417,6 +418,7 @@ def create_app(
                 (lambda: asyncio.to_thread(snapshots.backup)) if snapshots is not None else None
             )
             await app.state.telegram.stop(checkpoint)
+            await stop_upkeep(app.state.telegram.application)
         if snapshot_loop is not None:
             snapshot_loop.cancel()
             with contextlib.suppress(asyncio.CancelledError):

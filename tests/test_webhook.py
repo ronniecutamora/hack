@@ -5,16 +5,19 @@ import logging
 import sqlite3
 import threading
 import time
+from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 from sqlmodel import Session, select
 
-from app import bot
+from app import bot, telegram_webhook
 from app.config import Settings
+from app.db import init_db, make_engine
+from app.intake import IntakeService
 from app.main import create_app
-from app.models import STATUS_ASSESSED, Report
+from app.models import STATUS_ASSESSED, Media, Report, utcnow
 from app.reporter_summary import HEADER, Acknowledgements
 from app.telegram_webhook import SECRET_HEADER, WEBHOOK_PREFIX, webhook_path
 from tests.fake_telegram import FakeTelegram, text_update
@@ -288,3 +291,57 @@ def test_a_report_acknowledged_just_before_shutdown_survives_the_restart(
     ):
         (report,) = session.exec(select(Report)).all()
     assert report.text == "Bagsak ang bubong sa Casile"
+
+
+# --- The retention purge does not depend on Telegram -------------------------------------------
+
+
+async def expired_photo(settings):
+    """A reporter's photo past the retention TTL, stored before the app starts."""
+    engine = make_engine(settings)
+    init_db(engine)
+    report = await IntakeService(settings, engine).ingest_photo(1, b"old-photo")
+    with Session(engine) as session:
+        media = session.exec(select(Media).where(Media.report_id == report.id)).one()
+        media.created_at = utcnow() - timedelta(hours=settings.raw_media_ttl_hours + 1)
+        session.add(media)
+        session.commit()
+        path = settings.data_dir / media.path
+    engine.dispose()
+    assert path.exists()
+    return path
+
+
+@pytest.mark.parametrize("get_me_status", [401, 502])  # a revoked token, Telegram unreachable
+async def test_the_purge_runs_when_the_bot_cannot_start(webhook_settings, get_me_status):
+    photo = await expired_photo(webhook_settings)
+    fake = FakeTelegram(get_me_status=get_me_status)
+    with TestClient(webhook_app(webhook_settings, fake), base_url=f"https://{HOST}") as client:
+        assert not client.app.state.telegram.ready
+        assert wait_for(lambda: not photo.exists()), "raw media outlived its TTL"
+
+
+def test_exactly_one_purge_loop_per_process_across_start_retries(webhook_settings, monkeypatch):
+    starts = []
+
+    async def counting_purge(settings, engine):
+        starts.append(engine)
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(bot, "purge_loop", counting_purge)
+    monkeypatch.setattr(telegram_webhook, "START_RETRY_S", 0.01)  # failed starts in a row
+    fake = FakeTelegram(get_me_status=502)
+    app = webhook_app(webhook_settings, fake)
+    with TestClient(app, base_url=f"https://{HOST}") as client:
+        telegram = client.app.state.telegram
+        assert wait_for(lambda: len([n for n, _ in fake.calls if n == "getMe"]) >= 3)
+        assert len(starts) == 1
+        purge = telegram.application.bot_data["purge_task"]
+    assert purge.cancelled()  # stopped with the app
+
+
+def test_polling_starts_the_purge_with_the_bot(settings):
+    application = bot.build_application(polling_settings(settings), polling=True)
+    assert application.post_init is bot.start_upkeep
+    webhook = bot.build_application(polling_settings(settings))
+    assert webhook.post_init is None  # the web app starts the upkeep itself

@@ -55,12 +55,12 @@ class TelegramWebhook:
     """The bot Application inside the web app: started in the lifespan, fed by the route."""
 
     def __init__(
-        self, application: Application, secret: str, *, retry_s: float = START_RETRY_S
+        self, application: Application, secret: str, *, retry_s: float | None = None
     ) -> None:
         self.application = application
         self._secret = secret
         self.path = webhook_path(secret)
-        self.retry_s = retry_s
+        self.retry_s = START_RETRY_S if retry_s is None else retry_s
         self.ready = False
         self._starter: asyncio.Task[None] | None = None
 
