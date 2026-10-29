@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import Engine, func
+from sqlalchemy import Engine, func, update
 from sqlmodel import Session, col, select
 
 from app.config import Settings
@@ -34,6 +34,7 @@ from app.models import (
     MANILA,
     Draft,
     DraftEvent,
+    ModelCall,
     manila_time,
     utcnow,
 )
@@ -50,6 +51,7 @@ from app.nol_form import COMMODITIES, Commodity, commodity_for_kind
 from app.rdana import EventInput, count_field, fill_rdana, summary_counts
 from app.rdana_form import CITY, PROVINCE, REGION
 from app.rdana_summary import summarize
+from app.trace import Step, traced
 from app.trust import model_spend
 
 KIND_RDANA = "rdana"
@@ -345,7 +347,9 @@ class DraftService:
         if event.at is not None:
             check_event_at(event.at, evidence.members[0].at, utcnow())
         counts = summary_counts(evidence)
-        summary = await summarize(self.llm, evidence, counts, blocked=self.spend_block)
+        calls: list[int] = []  # the summary's logged model calls, linked to the draft below
+        with traced(step=Step.RDANA_SUMMARY, call_ids=calls):
+            summary = await summarize(self.llm, evidence, counts, blocked=self.spend_block)
         drafted_at = utcnow()
         content = fill_rdana(evidence, event, drafted_at, summary)
         draft = Draft(
@@ -369,7 +373,7 @@ class DraftService:
             "summary_fallback": summary.fallback,
             "fallback_reason": summary.fallback_reason,
         }
-        return self._insert(draft, detail)
+        return self._insert(draft, detail, model_calls=calls)
 
     def generate_damaged_houses(self) -> Draft:
         city = self.evidence()
@@ -416,8 +420,11 @@ class DraftService:
         detail = {"reports": len(incident.report_ids), "commodity": commodity.key}
         return self._insert(draft, detail)
 
-    def _insert(self, draft: Draft, detail: dict[str, Any]) -> Draft:
-        """Number the version and supersede open drafts in one write transaction."""
+    def _insert(
+        self, draft: Draft, detail: dict[str, Any], *, model_calls: list[int] | None = None
+    ) -> Draft:
+        """Number the version and supersede open drafts in one write transaction, and link the
+        model calls that wrote the draft (`model_calls`, ModelCall ids) to it."""
         with Session(self.engine, expire_on_commit=False) as session:
             session.connection().exec_driver_sql("BEGIN IMMEDIATE")
             same = same_output(draft)
@@ -425,6 +432,12 @@ class DraftService:
             draft.version = (latest or 0) + 1
             session.add(draft)
             session.flush()
+            if model_calls:
+                session.exec(
+                    update(ModelCall)
+                    .where(col(ModelCall.id).in_(model_calls))
+                    .values(draft_id=draft.id)
+                )
             for old in session.exec(select(Draft).where(same, Draft.status == DRAFT_OPEN)).all():
                 if old.id == draft.id:
                     continue

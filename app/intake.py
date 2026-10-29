@@ -35,6 +35,7 @@ from app.models import (
     utcnow,
 )
 from app.privacy import pseudonymize
+from app.trace import Step, traced
 from app.trust import HASH_UNAVAILABLE, HOLD_BLOCKED, hold_reason, photo_hash
 
 logger = logging.getLogger(__name__)
@@ -77,10 +78,13 @@ async def transcribe_file(
     """Convert any audio file to WAV chunks, transcribe each and join the text."""
     parts: list[str] = []
     with tempfile.TemporaryDirectory() as tmp:  # converted audio is never kept
-        for chunk in await (convert or to_wav_chunks)(audio_path, Path(tmp)):
-            result = await transcriber.transcribe(
-                chunk.read_bytes(), language_bias=language_bias, keywords=keywords
-            )
+        chunks = await (convert or to_wav_chunks)(audio_path, Path(tmp))
+        for number, chunk in enumerate(chunks, 1):
+            # A long note is several requests; the trace names each part.
+            with traced(subject=f"part:{number}" if len(chunks) > 1 else None):
+                result = await transcriber.transcribe(
+                    chunk.read_bytes(), language_bias=language_bias, keywords=keywords
+                )
             if result.text:
                 parts.append(result.text)
     return " ".join(parts)
@@ -360,7 +364,8 @@ class IntakeService:
         if reason:
             return report
         try:
-            report.transcript = await self._transcribe(self.settings.data_dir / media.path)
+            with traced(report_id=report.id):
+                report.transcript = await self._transcribe(self.settings.data_dir / media.path)
         except (MetaError, AudioConversionError) as exc:
             logger.warning("voice transcription failed: %s", exc)
             report.status = STATUS_TRANSCRIPTION_FAILED
@@ -372,13 +377,15 @@ class IntakeService:
     async def _transcribe(self, audio_path: Path) -> str:
         if self.transcriber is None:
             raise AudioConversionError("no transcriber configured")
-        return await transcribe_file(
-            self.transcriber,
-            audio_path,
-            language_bias=LANGUAGE_BIAS,
-            keywords=transcription_keywords(),  # barangay names: 4/9 -> 9/9 place names in tests
-            convert=self.convert,
-        )
+        with traced(step=Step.TRANSCRIBE):
+            return await transcribe_file(
+                self.transcriber,
+                audio_path,
+                language_bias=LANGUAGE_BIAS,
+                # barangay names: 4/9 -> 9/9 place names in tests
+                keywords=transcription_keywords(),
+                convert=self.convert,
+            )
 
     async def ingest_location(
         self, user_ref: int | str, lat: float, lon: float, *, channel: str = "telegram"

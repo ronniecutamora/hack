@@ -500,6 +500,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-30 | Telegram webhook mode (`TELEGRAM_MODE=webhook`): the web app runs the bot in its own event loop; `POST /telegram/webhook/<derived path>` checks Telegram's secret header in constant time and queues the update, so updates are handled in order as with polling, and the assessor and the summary reply share the process; the dashboard stays up when Telegram is unreachable (503 until the bot starts). Polling refuses to start while the token has a webhook. Log lines mask every configured secret |
 | 2026-10-30 | Durable SQLite for a wiped-on-restart container: the database stays on local disk and is snapshotted to a volume with SQLite's backup API every 2 minutes and at shutdown (atomic rename, volume commit, unchanged databases skipped, 15 newest plus 7 daily kept), restored at start, with a restore-by-name request and a writer lease so a restart never restores before the old container's last snapshot; tested with backup, restore, backup, restore round-trips and a fake volume |
 | 2026-10-30 | Modal deploy (`deploy/modal_app.py`, `python -m app.deploy`): one always-on container per target (staging on the dev bot, production) with its own secret, volume, URL and spend cap; commands for secrets (from `.env`, never echoed), demo assets, deploying the committed HEAD, the webhook, snapshots, restore, logs and stop; a fresh volume seeds the synthetic demo through the real pipeline. Staging verified end to end: login, seeded overview, signed webhook update, a forced container restart that kept every report, no secret in the logs |
+| 2026-10-30 | Agent trace plumbing: every logged model call now names the report, pipeline step (one enumerated list in `app/trace.py`: transcribe, facts, photo judge, SAM roof and floodwater, pair judge, RDANA summary, and the rule steps) and subject (the photo, the compared incident, the voice-note part) it served, set by the pipeline in a request-scoped context the call recorder reads, so no client signature changed; RDANA summary calls are linked to the draft they wrote in the draft's own insert. A test runs two assessments concurrently and checks that no call carries the other report's id; older databases get the nullable columns on startup |
 
 ### Third-party code and assets
 
@@ -556,6 +557,7 @@ app/
                        openai_compatible.py (shared chat), llm.py (AgentLLM switch),
                        schema.py (output validation), base.py, factory.py
   models.py, db.py     SQLModel tables including Incident, immutable AgentDecision and OfficerAction
+  trace.py             Agent trace context: the pipeline steps, the Meta model families, the call-to-report link
   gazetteer.py         Biñan's 24 barangays: names, aliases, matching in text, transcription keywords
   geo.py, data/        Point-in-barangay lookup on COD-AB boundaries; photo EXIF GPS
   transcript_cleanup.py  Removes repeated-word artifacts from transcripts

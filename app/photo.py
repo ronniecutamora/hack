@@ -21,6 +21,7 @@ from PIL import Image, ImageDraw, ImageOps, UnidentifiedImageError
 
 from app.meta.llm import AgentLLM
 from app.meta.sam import SamClient, SamResult
+from app.trace import SAM_STEPS, Step, in_step
 
 JUDGE_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -123,9 +124,9 @@ async def assess_photo(
 ) -> PhotoResult:
     """Judge and measure one photo; the three model calls run concurrently."""
     judgment, roof, floodwater = await asyncio.gather(
-        judge(llm, image, mime),
-        sam.segment(image, "roof", image_mime=mime),
-        sam.segment(image, "floodwater", image_mime=mime),
+        in_step(Step.PHOTO_JUDGE, judge(llm, image, mime)),
+        in_step(SAM_STEPS["roof"], sam.segment(image, "roof", image_mime=mime)),
+        in_step(SAM_STEPS["floodwater"], sam.segment(image, "floodwater", image_mime=mime)),
     )
     overlay = await asyncio.to_thread(  # Pillow work would block the bot's event loop
         render_overlay,

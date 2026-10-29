@@ -85,6 +85,12 @@ class ModelCall(SQLModel, table=True):
     latency_ms: int
     cached: bool
     cost_estimate: float = 0.0  # USD, 0 for cache hits or when the price is unknown
+    # The agent trace (app.trace): what the call served. NULL for calls outside a pipeline step
+    # (evals, the CLI's ad-hoc calls) and for every call logged before the trace existed.
+    report_id: int | None = Field(default=None, foreign_key="report.id", index=True)
+    draft_id: int | None = Field(default=None, foreign_key="draft.id", index=True)
+    step: str | None = None  # an app.trace.Step value
+    subject: str | None = None  # "media:<id>", "incident:<id>" or "part:<n>"
 
 
 class Assessment(SQLModel, table=True):

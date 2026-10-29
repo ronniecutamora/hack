@@ -39,6 +39,7 @@ from app.models import (
     Report,
 )
 from app.pair_judge import judge_pair, redacted_place, report_context
+from app.trace import Step, traced
 from app.trust import flagging, signal_key
 
 GPS_DISTANCE_CAP_M = 500.0
@@ -463,6 +464,11 @@ class IncidentService:
 
     async def group_locked(self, report_id: int, *, retry_failed: bool = False) -> Report | None:
         """The assessor already owns the same per-report lock when calling this method."""
+        # Pair judgments are logged against this report, from any caller (app.trace).
+        with traced(report_id=report_id):
+            return await self._group_locked(report_id, retry_failed=retry_failed)
+
+    async def _group_locked(self, report_id: int, *, retry_failed: bool) -> Report | None:
         async with self.locks.grouping:
             for _attempt in range(5):
                 with Session(self.engine, expire_on_commit=False) as session:
@@ -521,9 +527,10 @@ class IncidentService:
                         -RECENT_REPORT_LIMIT:
                     ]
                     try:
-                        judgment = await judge_pair(
-                            self.judge, [m.context for m in recent], new.context
-                        )
+                        with traced(step=Step.PAIR_JUDGE, subject=f"incident:{fit.incident_id}"):
+                            judgment = await judge_pair(
+                                self.judge, [m.context for m in recent], new.context
+                            )
                     except Exception as exc:
                         # Preserve the actual provider's availability error, without a fallback.
                         error = f"{type(exc).__name__}: {exc}"

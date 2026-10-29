@@ -6,6 +6,7 @@ from sqlmodel import Session, SQLModel, create_engine
 from app import models
 from app.config import Settings
 from app.meta.base import CallRecord, Recorder
+from app.trace import current as trace_context
 
 # The bot and the web app are separate processes sharing one file: WAL lets readers run
 # during a write, and the busy timeout makes a writer wait instead of failing at once.
@@ -69,6 +70,13 @@ def init_db(engine: Engine) -> None:
             "photoassessment": {"taken_at": "DATETIME"},
             "assessment": {"signals": "JSON"},
             "draft": {"incident_id": "INTEGER REFERENCES incident(id)"},
+            # The agent trace (app.trace); calls logged before it stay NULL ("not recorded").
+            "modelcall": {
+                "report_id": "INTEGER REFERENCES report(id)",
+                "draft_id": "INTEGER REFERENCES draft(id)",
+                "step": "VARCHAR",
+                "subject": "VARCHAR",
+            },
         }
         for table, additions_by_column in additions.items():
             columns = {c["name"] for c in inspect(connection).get_columns(table)}
@@ -83,6 +91,10 @@ def init_db(engine: Engine) -> None:
             "CREATE INDEX IF NOT EXISTS ix_draft_incident_id ON draft (incident_id)"
         )
         connection.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_modelcall_at ON modelcall (at)")
+        for column in ("report_id", "draft_id"):
+            connection.exec_driver_sql(
+                f"CREATE INDEX IF NOT EXISTS ix_modelcall_{column} ON modelcall ({column})"
+            )
         connection.exec_driver_sql(
             "CREATE INDEX IF NOT EXISTS ix_report_reporter_received "
             "ON report (reporter_id, received_at)"
@@ -128,18 +140,23 @@ AUDIT_TRIGGERS = {
 
 
 def make_recorder(engine: Engine) -> Recorder:
-    """Return a model-client recorder that writes each call to the ModelCall table."""
+    """Return a model-client recorder that writes each call to the ModelCall table, linked to
+    the report, step and subject of the trace context it was made in (app.trace)."""
 
     def record(call: CallRecord) -> None:
-        with Session(engine) as session:
-            session.add(
-                models.ModelCall(
-                    model=call.model,
-                    latency_ms=call.latency_ms,
-                    cached=call.cached,
-                    cost_estimate=call.cost_estimate,
-                )
-            )
+        context = trace_context()
+        row = models.ModelCall(
+            model=call.model,
+            latency_ms=call.latency_ms,
+            cached=call.cached,
+            cost_estimate=call.cost_estimate,
+        )
+        if context is not None:
+            row.report_id, row.step, row.subject = context.report_id, context.step, context.subject
+        with Session(engine, expire_on_commit=False) as session:
+            session.add(row)
             session.commit()
+        if context is not None and context.call_ids is not None:
+            context.call_ids.append(row.id)
 
     return record

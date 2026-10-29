@@ -58,6 +58,7 @@ from app.models import (
     utcnow,
 )
 from app.photo import assess_photo
+from app.trace import Step, traced
 from app.transcript_cleanup import clean_transcript
 from app.trust import compute_signals, hold_reason, pending_photo_hashes, photo_taken_at
 
@@ -171,6 +172,11 @@ class AssessmentService:
 
         Returns None if the report does not exist.
         """
+        # Every model call below is logged against this report (app.trace).
+        with traced(report_id=report_id):
+            return await self._assess_locked(report_id)
+
+    async def _assess_locked(self, report_id: int) -> Report | None:
         async with self._locks[report_id]:  # a pin and a photo may arrive moments apart
             with self._session() as session:
                 report = session.get(Report, report_id)
@@ -318,7 +324,8 @@ class AssessmentService:
 
     async def _facts(self, text: str) -> tuple[dict[str, Any] | None, str | None]:
         try:
-            return await extract_facts(self.llm, text), None
+            with traced(step=Step.FACTS):
+                return await extract_facts(self.llm, text), None
         except MetaError as exc:
             logger.warning("fact extraction failed: %s", exc)
             return None, f"facts: {exc}"
@@ -328,7 +335,8 @@ class AssessmentService:
         try:
             outcome.gps = await asyncio.to_thread(exif_gps, photo.data)
             outcome.taken_at = await asyncio.to_thread(photo_taken_at, photo.data)
-            result = await assess_photo(self.llm, self.sam, photo.data, photo.mime)
+            with traced(subject=f"media:{photo.media_id}"):
+                result = await assess_photo(self.llm, self.sam, photo.data, photo.mime)
         except MetaError as exc:
             logger.warning("photo assessment failed: %s", exc)
             outcome.error = f"photo {photo.media_id}: {exc}"
