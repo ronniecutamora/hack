@@ -24,6 +24,7 @@ from sqlmodel import Session, select
 
 from app.config import Settings, get_settings
 from app.db import init_db, make_engine, make_recorder
+from app.facts import LIVELIHOOD_DAMAGE
 from app.meta.factory import LLM_BACKENDS, make_pair_judge
 from app.meta.llm import AgentLLM
 from app.models import (
@@ -136,6 +137,13 @@ def rollup(members: list[Observation]) -> dict[str, Any]:
     for key in TOTAL_FIELDS:
         values = [m.facts.get(key) for m in ordered if m.facts.get(key) is not None]
         totals[key] = sum(values) if values else None
+    # Kinds of livelihood damage any report states, in first-reported order (no counts).
+    livelihood = [
+        value
+        for m in ordered
+        for value in (m.facts.get("livelihood_damage") or [])
+        if value in LIVELIHOOD_DAMAGE
+    ]
     return {
         "report_count": len(ordered),
         "reporter_count": len({m.reporter_id for m in ordered if m.reporter_id is not None}),
@@ -143,6 +151,7 @@ def rollup(members: list[Observation]) -> dict[str, Any]:
         "latest_depth": depths[-1] if depths else "unknown",
         "max_depth": max(known, key=DEPTH_ORDER.index) if known else "unknown",
         "totals": totals,
+        "livelihood_damage": list(dict.fromkeys(livelihood)),
         "caveat": ROLLUP_CAVEAT,
     }
 

@@ -118,7 +118,14 @@ def fact_lines(facts: dict[str, Any] | None) -> list[str]:
         if facts.get("crop_damage_percent") is not None:
             crop += f", {facts['crop_damage_percent']:g}% damaged"
         lines.append(crop)
-    for key, label in (("hazards", "hazards"), ("infrastructure", "damaged"), ("needs", "needs")):
+    if facts.get("fishery_area_hectares") is not None:
+        lines.append(f"{facts['fishery_area_hectares']:g} ha of fish pens, cages or ponds")
+    for key, label in (
+        ("hazards", "hazards"),
+        ("livelihood_damage", "livelihood damage"),
+        ("infrastructure", "damaged"),
+        ("needs", "needs"),
+    ):
         if facts.get(key):
             lines.append(f"{label}: {', '.join(v.replace('_', ' ') for v in facts[key])}")
     if facts.get("place_detail"):

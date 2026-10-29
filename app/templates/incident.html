@@ -14,6 +14,9 @@
     {% for key, value in incident.latest_facts.get("totals", {}).items() %}
       {% if value is not none %}<li class="chip">{{ key|replace("_", " ") }}: {{ value }}</li>{% endif %}
     {% endfor %}
+    {% for value in incident.latest_facts.get("livelihood_damage", []) %}
+      <li class="chip">livelihood damage: {{ value|replace("_", " ") }}</li>
+    {% endfor %}
   </ul>
   <p class="muted">{{ incident.latest_facts.get("caveat", "Totals may double-count reports; officer verification required.") }}</p>
   <h2>Timeline</h2>

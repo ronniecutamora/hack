@@ -495,6 +495,8 @@ SECTIONS: tuple[FormSection, ...] = (
             FormField(
                 "18.2",
                 "Most immediate need on livelihood/early recovery",
+                "evidence",
+                rule="livelihood_need",
                 options=("Transport", "Cash for Work", "Debris clearance", "Cash", "Others"),
             ),
         ),

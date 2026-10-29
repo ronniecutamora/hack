@@ -77,7 +77,7 @@ submitted by), filled by a deterministic rule over typed report facts, or writte
 | 2.1, 2.3, 2.4, 2.9, 2.12, 2.15 | Families affected, families and persons evacuated, missing, injured, dead (totals only) |
 | 3.3, 3.4, 4.2, 8.1, 8.2 | Damaged roads or bridges, transport or clearing needs, power (a note only), rescue requests (Water SRR only where rescue was asked for in a flood or storm-surge incident) |
 | 10.1, 10.2, 10.3, 11.5, 12.5, 15.5 (sic) | Houses totally and partially damaged; shelter, food, water and medicine needs (no item is invented) |
-| 18.1 | An evidence note on fish cages or pens and crops damaged |
+| 18.1, 18.2 | An evidence note on livelihood damage (fish pens or cages, fishponds, fishing gear or boats, crops, livestock; with a count only when one is stated); "Others" when reports ask for livelihood materials such as nets, bamboo or boats |
 
 Everything else, such as the male/female splits, accessibility, communications, evacuation centers, relief,
 law and order and the overall assessment, is marked "— not in reports (for the RDANA team)". Missing evidence is
@@ -244,6 +244,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-29 | Review fix (round 2): every number in the 1.4 summary needs a label naming exactly one computed count; unlabelled numbers, people with no qualifier and "one of" followed by a count word are rejected |
 | 2026-10-29 | Review fix (round 2): open drafts generated before the pending grouping-review bucket count as stale, so approving one needs the confirmation and the page says why |
 | 2026-10-29 | Review fix (round 2): a host allowlist (ALLOWED_HOSTS, default localhost and 127.0.0.1, enforced by Starlette TrustedHostMiddleware) stops DNS rebinding around the same-origin check |
+| 2026-10-29 | Livelihood facts: a report can state livelihood damage without a count (fish pens or cages, fishponds, fishing gear, boats, crops, livestock), a stated fishery area and a livelihood-materials need, with Taglish cues (baklad, kulungan, lambat, kawayan, bangka); the pair judge, incident rollups and RDANA 18.1/18.2 use them, so the two De La Paz fish-pen reports are no longer judged "no damage stated". Older stored facts keep working |
 
 ### Third-party code and assets
 

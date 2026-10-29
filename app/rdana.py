@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import Any
 
 from app.counting import COUNT_FIELDS, COUNTING_RULE, BarangayEvidence, Count, IncidentEvidence
+from app.facts import LIVELIHOOD_DAMAGE
 from app.incidents import distance_m
 from app.models import manila_time
 from app.rdana_form import (
@@ -280,9 +281,17 @@ def _count(name: str) -> Callable[[RuleContext], dict[str, Any] | None]:
     return lambda ctx: count_field(ctx.evidence.count(name))
 
 
+def livelihood_label(value: str) -> str:
+    return value.replace("_", " ")
+
+
 def _livelihood(ctx: RuleContext):
     """An evidence note on livelihood losses; it does not claim the main livelihood."""
     parts, refs = [], []
+    damage_refs, damage = _listing(ctx.evidence, "livelihood_damage", LIVELIHOOD_DAMAGE)
+    if damage:
+        parts.append("damage reported to " + ", ".join(map(livelihood_label, damage)))
+        refs += damage_refs
     pens = ctx.evidence.count("fish_cages_or_pens_damaged")
     if pens is not None:
         parts.append(f"fish cages or pens damaged: {figure_text(pens)}")
@@ -313,6 +322,12 @@ def _livelihood(ctx: RuleContext):
     return _filled("; ".join(parts), "reports", refs, note)
 
 
+def _livelihood_need(ctx: RuleContext):
+    refs, found = _listing(ctx.evidence, "needs", ("livelihood_materials",))
+    note = "Livelihood materials requested (such as nets, bamboo or boats); no item is invented."
+    return _filled("Others", "reports", refs, note) if found else None
+
+
 RULES: dict[str, Callable[[RuleContext], dict[str, Any] | None]] = {
     "event_name": _event_name,
     "event_type": _event_type,
@@ -328,6 +343,7 @@ RULES: dict[str, Callable[[RuleContext], dict[str, Any] | None]] = {
     "srr_needed": _srr_needed,
     "srr_type": _srr_type,
     "livelihood": _livelihood,
+    "livelihood_need": _livelihood_need,
     **{f"need:{n}": _need(n) for n in NEED_VALUES},
 }
 

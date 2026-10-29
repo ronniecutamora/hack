@@ -28,6 +28,7 @@ def facts(**fields):
         flood_depth="unknown",
         crop="none",
         infrastructure=[],
+        livelihood_damage=[],
         needs=[],
         is_correction=False,
         summary_en="Flooding reported.",
