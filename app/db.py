@@ -61,6 +61,38 @@ def init_db(engine: Engine) -> None:
             "CREATE INDEX IF NOT EXISTS ix_report_reporter_received "
             "ON report (reporter_id, received_at)"
         )
+        for statement in DRAFT_TRIGGERS:
+            connection.exec_driver_sql(statement)
+
+
+# The audit is append-only and a decided draft is frozen, even against a stray UPDATE: the
+# only change a draft ever takes is its single decision (draft -> approved/rejected/superseded).
+DRAFT_GENERATED_COLUMNS = (
+    "kind",
+    "barangay",
+    "version",
+    "event_name",
+    "event_type",
+    "event_at",
+    "content",
+    "evidence_fingerprint",
+    "summary_model",
+    "summary_fallback",
+    "summary_validation",
+    "created_at",
+)
+DRAFT_TRIGGERS = (
+    "CREATE TRIGGER IF NOT EXISTS draftevent_no_update BEFORE UPDATE ON draftevent "
+    "BEGIN SELECT RAISE(ABORT, 'draft audit rows are immutable'); END",
+    "CREATE TRIGGER IF NOT EXISTS draftevent_no_delete BEFORE DELETE ON draftevent "
+    "BEGIN SELECT RAISE(ABORT, 'draft audit rows are immutable'); END",
+    "CREATE TRIGGER IF NOT EXISTS draft_no_delete BEFORE DELETE ON draft "
+    "BEGIN SELECT RAISE(ABORT, 'drafts are never deleted'); END",
+    "CREATE TRIGGER IF NOT EXISTS draft_frozen BEFORE UPDATE ON draft "
+    "WHEN OLD.status != 'draft' OR "
+    + " OR ".join(f"NEW.{c} IS NOT OLD.{c}" for c in DRAFT_GENERATED_COLUMNS)
+    + " BEGIN SELECT RAISE(ABORT, 'a decided draft or generated content never changes'); END",
+)
 
 
 def make_recorder(engine: Engine) -> Recorder:

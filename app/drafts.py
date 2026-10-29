@@ -1,0 +1,376 @@
+"""Officer drafts: generate versioned RDANA forms and damaged-houses tables, then approve or reject.
+
+A draft is generated once and never edited. Generating again makes version n+1 and marks the
+previous undecided draft of the same output `superseded`; approved and rejected drafts stay as
+they were decided. Every generate, supersede, approve and reject writes an append-only
+DraftEvent. No database transaction is held across the summary model call.
+"""
+
+import csv
+import hashlib
+import io
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
+
+from sqlalchemy import Engine, func
+from sqlmodel import Session, select
+
+from app.config import Settings
+from app.counting import COUNTING_RULE, BarangayEvidence, CityEvidence, collect
+from app.meta.llm import AgentLLM
+from app.models import (
+    DRAFT_APPROVED,
+    DRAFT_OPEN,
+    DRAFT_REJECTED,
+    DRAFT_SUPERSEDED,
+    MANILA,
+    Draft,
+    DraftEvent,
+    manila_time,
+    utcnow,
+)
+from app.rdana import EventInput, count_field, fill_rdana, summary_counts
+from app.rdana_form import CITY, PROVINCE, REGION
+from app.rdana_summary import summarize
+from app.trust import model_spend
+
+KIND_RDANA = "rdana"
+KIND_DAMAGED_HOUSES = "damaged_houses"
+KINDS = (KIND_RDANA, KIND_DAMAGED_HOUSES)
+DECISIONS = {"approve": DRAFT_APPROVED, "reject": DRAFT_REJECTED}
+REASON_MIN, REASON_MAX = 5, 1000
+DECIDED_BY_MAX = 120
+EVENT_NAME_MAX, EVENT_TYPE_MAX = 160, 80
+CSV_HEADER = (
+    "Region",
+    "Province",
+    "City/Municipality",
+    "Barangay",
+    "Total",
+    "Totally",
+    "Partially",
+    "Evidence report ids",
+)
+CITY_TOTAL = "City total"
+CSV_BOM = "\ufeff"  # spreadsheets then read the file as UTF-8 ("Biñan")
+
+
+class DraftError(Exception):
+    status_code = 422
+
+
+class DraftNotFound(DraftError):
+    status_code = 404
+
+
+class DraftConflict(DraftError):
+    status_code = 409
+
+
+def clean_text(
+    value: str | None, *, label: str, max_length: int, min_length: int = 0
+) -> str | None:
+    """Trimmed single-spaced text or None; DraftError when too short or too long."""
+    text = " ".join((value or "").split())
+    if len(text) > max_length:
+        raise DraftError(f"{label} must be at most {max_length} characters.")
+    if len(text) < min_length:
+        raise DraftError(f"{label} must be at least {min_length} characters.")
+    return text or None
+
+
+def city_fingerprint(city: CityEvidence) -> str:
+    joined = "|".join(f"{n}:{e.fingerprint()}" for n, e in city.barangays.items())
+    return hashlib.sha256(joined.encode()).hexdigest()
+
+
+def damaged_houses(city: CityEvidence) -> dict[str, Any]:
+    """DROMIC damaged-houses rows per barangay (counting rule applied) and the city total.
+
+    Only barangays whose reports state a house-damage count are listed; an unstated count is
+    empty, never 0. Total is the sum of the stated counts.
+    """
+    rows = []
+    for evidence in city.barangays.values():
+        totally = count_field(evidence.count("houses_totally_damaged"))
+        partially = count_field(evidence.count("houses_partially_damaged"))
+        if totally is None and partially is None:
+            continue
+        parts = [p for p in (totally, partially) if p is not None]
+        report_ids = sorted({r for p in parts for e in p["evidence"] for r in e["report_ids"]})
+        rows.append(
+            {
+                "barangay": evidence.barangay,
+                "total": sum(p["count"]["value"] for p in parts),
+                "totally": totally and totally["count"]["value"],
+                "partially": partially and partially["count"]["value"],
+                "single_source": sum(p["count"]["single_source"] for p in parts),
+                "flagged": sum(p["count"]["flagged"] for p in parts),
+                "report_ids": report_ids,
+                "evidence": [e for p in parts for e in p["evidence"]],
+            }
+        )
+
+    def column(name: str) -> int | None:
+        values = [r[name] for r in rows if r[name] is not None]
+        return sum(values) if values else None
+
+    return {
+        "region": REGION,
+        "province": PROVINCE,
+        "city": CITY,
+        "rows": rows,
+        "total": {
+            "total": column("total"),
+            "totally": column("totally"),
+            "partially": column("partially"),
+            "single_source": column("single_source"),
+            "flagged": column("flagged"),
+            "report_ids": sorted({r for row in rows for r in row["report_ids"]}),
+        },
+        "counting_rule": COUNTING_RULE,
+        "unplaced_incidents": len(city.unplaced),
+    }
+
+
+def damaged_houses_csv(table: dict[str, Any]) -> str:
+    """CSV in the DROMIC column order, with a UTF-8 BOM so spreadsheets read "Biñan" right."""
+    out = io.StringIO()
+    writer = csv.writer(out, lineterminator="\r\n")
+    writer.writerow(CSV_HEADER)
+
+    def cell(value: int | None) -> str:
+        return "" if value is None else f"{value:g}"
+
+    for row in [*table["rows"], {"barangay": CITY_TOTAL, **table["total"]}]:
+        writer.writerow(
+            [
+                table["region"],
+                table["province"],
+                table["city"],
+                row["barangay"],
+                cell(row["total"]),
+                cell(row["totally"]),
+                cell(row["partially"]),
+                ";".join(str(r) for r in row["report_ids"]),
+            ]
+        )
+    return CSV_BOM + out.getvalue()
+
+
+@dataclass
+class BarangayStatus:
+    barangay: str
+    evidence: BarangayEvidence | None
+    latest: Draft | None
+    approved: Draft | None
+
+    @property
+    def stale(self) -> bool:
+        """The counted evidence changed after the latest draft was generated."""
+        if self.latest is None:
+            return False
+        current = self.evidence.fingerprint() if self.evidence else None
+        return self.latest.evidence_fingerprint != current
+
+
+class DraftService:
+    def __init__(self, settings: Settings, engine: Engine, llm: AgentLLM | None) -> None:
+        self.settings, self.engine, self.llm = settings, engine, llm
+
+    def evidence(self) -> CityEvidence:
+        with Session(self.engine) as session:
+            return collect(session)
+
+    def spend_block(self) -> str | None:
+        with Session(self.engine) as session:
+            spend = model_spend(session)
+        cap = self.settings.daily_spend_cap_usd
+        if spend >= cap:
+            return f"Spend cap reached (${spend:.2f} of ${cap:.2f} in 24 h); no model call."
+        return None
+
+    async def generate_rdana(self, barangay: str, event: EventInput | None = None) -> Draft:
+        event = event or EventInput()
+        evidence = self.evidence().barangays.get(barangay)
+        if evidence is None:
+            raise DraftError(f"No assessed reports are placed in {barangay!r}.")
+        counts = summary_counts(evidence)
+        summary = await summarize(self.llm, evidence, counts, blocked=self.spend_block)
+        drafted_at = utcnow()
+        content = fill_rdana(evidence, event, drafted_at, summary)
+        draft = Draft(
+            kind=KIND_RDANA,
+            barangay=barangay,
+            version=0,
+            event_name=event.name,
+            event_type=event.type,
+            event_at=event.at,
+            content=content,
+            evidence_fingerprint=evidence.fingerprint(),
+            summary_model=summary.model,
+            summary_fallback=summary.fallback,
+            summary_validation=summary.attempts,
+            created_at=drafted_at,
+        )
+        detail = {
+            "reports": len(evidence.report_ids),
+            "incidents": len(evidence.incidents),
+            "summary_model": summary.model,
+            "summary_fallback": summary.fallback,
+            "fallback_reason": summary.fallback_reason,
+        }
+        return self._insert(draft, detail)
+
+    def generate_damaged_houses(self) -> Draft:
+        city = self.evidence()
+        table = damaged_houses(city)
+        if not table["rows"]:
+            raise DraftError("No report states a number of damaged houses yet.")
+        now = utcnow()
+        draft = Draft(
+            kind=KIND_DAMAGED_HOUSES,
+            barangay=None,
+            version=0,
+            content={**table, "drafted_at": manila_time(now)},
+            evidence_fingerprint=city_fingerprint(city),
+            created_at=now,
+        )
+        return self._insert(draft, {"rows": len(table["rows"]), "total": table["total"]["total"]})
+
+    def _insert(self, draft: Draft, detail: dict[str, Any]) -> Draft:
+        """Number the version and supersede open drafts in one write transaction."""
+        with Session(self.engine, expire_on_commit=False) as session:
+            session.connection().exec_driver_sql("BEGIN IMMEDIATE")
+            same = (Draft.kind == draft.kind) & (
+                Draft.barangay == draft.barangay
+                if draft.barangay is not None
+                else Draft.barangay.is_(None)
+            )
+            latest = session.exec(select(func.max(Draft.version)).where(same)).one()
+            draft.version = (latest or 0) + 1
+            session.add(draft)
+            session.flush()
+            for old in session.exec(select(Draft).where(same, Draft.status == DRAFT_OPEN)).all():
+                if old.id == draft.id:
+                    continue
+                old.status = DRAFT_SUPERSEDED
+                session.add(old)
+                session.add(
+                    DraftEvent(
+                        draft_id=old.id,
+                        action=DRAFT_SUPERSEDED,
+                        reason=f"Version {draft.version} was generated.",
+                        detail={"superseded_by": draft.id},
+                    )
+                )
+            session.add(
+                DraftEvent(
+                    draft_id=draft.id,
+                    action="generated",
+                    detail={"version": draft.version, **detail},
+                    created_at=draft.created_at,
+                )
+            )
+            session.commit()
+            return draft
+
+    def decide(
+        self, draft_id: int, action: str, *, reason: str | None, decided_by: str | None
+    ) -> Draft:
+        if action not in DECISIONS:
+            raise DraftNotFound(f"Unknown decision {action!r}.")
+        status = DECISIONS[action]
+        reason = clean_text(
+            reason,
+            label="A rejection reason" if status == DRAFT_REJECTED else "The reason",
+            max_length=REASON_MAX,
+            min_length=REASON_MIN if status == DRAFT_REJECTED else 0,
+        )
+        decided_by = clean_text(decided_by, label="Decided by", max_length=DECIDED_BY_MAX)
+        with Session(self.engine, expire_on_commit=False) as session:
+            session.connection().exec_driver_sql("BEGIN IMMEDIATE")
+            draft = session.get(Draft, draft_id)
+            if draft is None:
+                raise DraftNotFound("Draft not found.")
+            if draft.status != DRAFT_OPEN:
+                raise DraftConflict(
+                    f"Draft {draft_id} is {draft.status}; only a draft can be decided."
+                )
+            draft.status, draft.decided_at = status, utcnow()
+            draft.decision_reason, draft.decided_by = reason, decided_by
+            session.add(draft)
+            session.add(
+                DraftEvent(
+                    draft_id=draft.id,
+                    action=status,
+                    reason=reason,
+                    actor=decided_by,
+                    created_at=draft.decided_at,
+                )
+            )
+            session.commit()
+            return draft
+
+    def get(self, draft_id: int) -> tuple[Draft, list[DraftEvent], Draft | None]:
+        """A draft, its audit trail and the newest version of the same output."""
+        with Session(self.engine) as session:
+            draft = session.get(Draft, draft_id)
+            if draft is None:
+                raise DraftNotFound("Draft not found.")
+            events = session.exec(
+                select(DraftEvent)
+                .where(DraftEvent.draft_id == draft_id)
+                .order_by(DraftEvent.created_at, DraftEvent.id)
+            ).all()
+            newest = session.exec(
+                select(Draft)
+                .where(
+                    Draft.kind == draft.kind,
+                    Draft.barangay == draft.barangay
+                    if draft.barangay is not None
+                    else Draft.barangay.is_(None),
+                )
+                .order_by(Draft.version.desc())
+            ).first()
+            return draft, list(events), newest
+
+    def overview(self) -> tuple[CityEvidence, list[BarangayStatus], list[Draft]]:
+        """Barangays with evidence or drafts, each with its latest and approved RDANA draft."""
+        with Session(self.engine) as session:
+            city = collect(session)
+            drafts = list(
+                session.exec(select(Draft).order_by(Draft.created_at.desc(), Draft.id.desc())).all()
+            )
+        statuses = []
+        names = set(city.barangays) | {d.barangay for d in drafts if d.kind == KIND_RDANA}
+        for name in sorted(n for n in names if n):
+            mine = [d for d in drafts if d.kind == KIND_RDANA and d.barangay == name]
+            statuses.append(
+                BarangayStatus(
+                    name,
+                    city.barangays.get(name),
+                    max(mine, key=lambda d: d.version, default=None),
+                    max(
+                        (d for d in mine if d.status == DRAFT_APPROVED),
+                        key=lambda d: d.version,
+                        default=None,
+                    ),
+                )
+            )
+        return city, statuses, drafts
+
+
+def parse_event_at(value: str | None) -> datetime | None:
+    """An HTML datetime-local value in Philippine time, as naive UTC."""
+    text = (value or "").strip()
+    if not text:
+        return None
+    try:
+        local = datetime.fromisoformat(text)
+    except ValueError as exc:
+        raise DraftError("Date and time of event must look like 2026-10-03T19:10.") from exc
+    if local.tzinfo is not None:
+        raise DraftError("Date and time of event is Philippine time; leave out the offset.")
+    return local.replace(tzinfo=MANILA).astimezone(UTC).replace(tzinfo=None)

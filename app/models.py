@@ -1,6 +1,6 @@
 """Database tables. Times are naive UTC. No names, phone numbers or raw Telegram ids are stored."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Any
 
 from pydantic import NaiveDatetime
@@ -16,8 +16,16 @@ STATUS_ASSESSMENT_FAILED = "assessment_failed"  # partial results are still save
 STATUS_HELD = "held"
 
 
+MANILA = timezone(timedelta(hours=8))  # Philippine time, no daylight saving
+
+
 def utcnow() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
+
+
+def manila_time(value: datetime) -> str:
+    """Format a naive-UTC datetime as Philippine local time."""
+    return value.replace(tzinfo=UTC).astimezone(MANILA).strftime("%Y-%m-%d %H:%M")
 
 
 class Reporter(SQLModel, table=True):
@@ -129,4 +137,50 @@ class AgentDecision(SQLModel, table=True):
     decision: str
     confidence: float | None = None
     reason: str
+    created_at: NaiveDatetime = Field(default_factory=utcnow)
+
+
+# Draft.status values. Only a draft can be decided; an approved draft never changes.
+DRAFT_OPEN = "draft"
+DRAFT_APPROVED = "approved"
+DRAFT_REJECTED = "rejected"
+DRAFT_SUPERSEDED = "superseded"  # a newer version of the same output was generated undecided
+
+
+class Draft(SQLModel, table=True):
+    """An officer output drafted from report evidence: one RDANA form or the damaged-houses table.
+
+    `content` is the complete filled output (values, evidence and sources) as generated; pages
+    render it, never a recomputation, so an approved draft reads exactly as it was approved.
+    """
+
+    id: int | None = Field(default=None, primary_key=True)
+    kind: str = Field(index=True)  # rdana | damaged_houses
+    barangay: str | None = Field(default=None, index=True)  # None for the city-wide table
+    version: int
+    status: str = DRAFT_OPEN
+    event_name: str | None = None  # officer input (RDANA 1.1.1)
+    event_type: str | None = None  # officer override of 1.1.2
+    event_at: NaiveDatetime | None = None  # officer override of 1.1.3, naive UTC
+    content: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    evidence_fingerprint: str | None = None  # changes when the counted evidence changes
+    summary_model: str | None = None  # model that wrote the accepted summary; None = rule
+    summary_fallback: bool = False
+    summary_validation: list[dict[str, Any]] | None = Field(default=None, sa_column=Column(JSON))
+    created_at: NaiveDatetime = Field(default_factory=utcnow, index=True)
+    decided_at: NaiveDatetime | None = None
+    decision_reason: str | None = None
+    decided_by: str | None = None  # an officer's designation (free text), never a reporter
+
+
+class DraftEvent(SQLModel, table=True):
+    """Append-only draft audit (generated, superseded, approved, rejected); database triggers
+    reject updates and deletes. Separate from AgentDecision, which is per report and incident."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    draft_id: int = Field(foreign_key="draft.id", index=True)
+    action: str
+    reason: str | None = None
+    actor: str | None = None
+    detail: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON))
     created_at: NaiveDatetime = Field(default_factory=utcnow)

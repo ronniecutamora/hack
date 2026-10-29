@@ -10,7 +10,6 @@ import mimetypes
 from collections import defaultdict
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -21,18 +20,21 @@ from sqlmodel import Session, col, select
 
 from app.config import Settings, get_settings
 from app.db import init_db, make_engine
-from app.models import AgentDecision, Assessment, Incident, Media, PhotoAssessment, Report, Reporter
+from app.models import (
+    AgentDecision,
+    Assessment,
+    Incident,
+    Media,
+    PhotoAssessment,
+    Report,
+    Reporter,
+    manila_time,
+)
 from app.trust import model_spend
 
-MANILA = timezone(timedelta(hours=8))  # Philippine time, no daylight saving
 REPORT_LIMIT = 200
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
-
-
-def manila_time(value: datetime) -> str:
-    """Format a naive-UTC datetime as Philippine local time."""
-    return value.replace(tzinfo=UTC).astimezone(MANILA).strftime("%Y-%m-%d %H:%M")
 
 
 templates.env.filters["manila_time"] = manila_time
