@@ -29,6 +29,7 @@
             {% set chosen = (form["values"].get("incident_id") if form and form.report_id == r.id and form.action == "merge" else "")|string %}
             {% if card.targets %}
               <label>Incident <select name="incident_id" required>
+                <option value=""{% if not chosen %} selected{% endif %}>Choose…</option>
                 {% for i in card.targets %}<option value="{{ i.id }}"{% if chosen == i.id|string %} selected{% endif %}>#{{ i.id }} · {{ i.title }}{% if i.status == "needs_officer" %} (waits for review){% endif %}</option>{% endfor %}
               </select></label>
               {{ _officer(card, form, "merge", back) }}
@@ -49,7 +50,7 @@
           <fieldset><legend>Set or correct the barangay</legend>
             {% set picked = form["values"].get("barangay") if form and form.report_id == r.id and form.action == "place" else r.barangay %}
             <label>Barangay <select name="barangay" required>
-              <option value="">Choose…</option>
+              <option value=""{% if not picked %} selected{% endif %}>Choose…</option>
               {% for name in BARANGAY_NAMES %}<option{% if picked == name %} selected{% endif %}>{{ name }}</option>{% endfor %}
             </select></label>
             {{ _officer(card, form, "place", back, "Reason (required)", true) }}

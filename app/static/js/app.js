@@ -103,7 +103,12 @@
 
   function fieldChanged(field) {
     if (field.type === "checkbox" || field.type === "radio") return field.checked !== field.defaultChecked;
-    if (field.tagName === "SELECT") return Array.from(field.options).some((o) => o.selected !== o.defaultSelected);
+    if (field.tagName === "SELECT") {
+      // A single select with no option marked selected shows its first option by default.
+      const options = Array.from(field.options);
+      if (!field.multiple && !options.some((o) => o.defaultSelected)) return field.selectedIndex > 0;
+      return options.some((o) => o.selected !== o.defaultSelected);
+    }
     if (["hidden", "submit", "button", "reset", "image", "file"].includes(field.type)) return false;
     return field.value !== field.defaultValue;
   }
