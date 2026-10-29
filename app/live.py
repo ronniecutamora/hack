@@ -39,7 +39,9 @@ MAX_SUBSCRIBERS = 64  # open dashboard tabs per process; the app listens on loca
 TOPICS: dict[str, tuple[str, ...]] = {
     "reports": (
         "SELECT id, status, incident_id, barangay, lat, lon, hold_reason, grouping_error,"
+        " grouping_needs_officer, officer_incident_id, officer_barangay,"
         " length(text), length(transcript) FROM report ORDER BY id",
+        "SELECT id, blocked FROM reporter ORDER BY id",
         "SELECT id, updated_at, length(signals) FROM assessment ORDER BY id",
         "SELECT id, updated_at FROM photoassessment ORDER BY id",
         "SELECT count(*), max(id), count(purged_at), max(purged_at) FROM media",
@@ -48,6 +50,7 @@ TOPICS: dict[str, tuple[str, ...]] = {
         "SELECT id, status, active, barangay, title, last_seen, latest_facts FROM incident"
         " ORDER BY id",
         "SELECT count(*), max(id) FROM agentdecision",
+        "SELECT count(*), max(id) FROM officeraction",
     ),
     "drafts": (
         "SELECT id, status, decided_at FROM draft ORDER BY id",

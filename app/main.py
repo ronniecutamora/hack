@@ -13,6 +13,7 @@ cannot generate or approve drafts.
 import hashlib
 import json
 import mimetypes
+import re
 from collections import defaultdict
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
@@ -62,15 +63,15 @@ from app.drafts import (
     predates_pending_bucket,
     regenerate_form,
 )
-from app.gazetteer import BY_NAME
+from app.gazetteer import BARANGAYS, BY_NAME
 from app.geo import boundaries_geojson
+from app.incidents import IncidentService
 from app.live import ChangeHub, close_on_shutdown_signals, event_stream
 from app.mapdata import map_features
-from app.meta.factory import make_agent_llm
+from app.meta.factory import make_agent_llm, make_pair_judge
 from app.meta.llm import AgentLLM
 from app.models import (
     MANILA,
-    AgentDecision,
     Assessment,
     Draft,
     Incident,
@@ -84,6 +85,19 @@ from app.models import (
 from app.nol import deadline_table
 from app.nol_form import COMMODITIES, commodity_for_kind
 from app.rdana import RDANA_DEADLINE, EventInput
+from app.review import (
+    ACTION_LABELS,
+    NOTE_MAX,
+    OFFICER_MAX,
+    PLACE_REASON_MIN,
+    SIGNAL_VERDICTS,
+    TREE_VERDICTS,
+    ReviewError,
+    ReviewService,
+    queue,
+    review_cards,
+    timeline,
+)
 from app.trust import model_spend
 
 REPORT_LIMIT = 200
@@ -98,6 +112,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 # paths below it (/incidents/7 is under Incidents).
 NAV = (
     ("/", "Overview"),
+    ("/review", "Review"),
     ("/incidents", "Incidents"),
     ("/reports", "Reports"),
     ("/map", "Map"),
@@ -139,6 +154,7 @@ GEO_SOURCES = {
     "llm": "named (read by the agent)",
     "ambiguous": "several barangays named",
     "none": "not found",
+    "officer": "set by an officer",
 }
 DEPTHS = {
     "ankle": "ankle-deep",
@@ -196,6 +212,28 @@ def fact_lines(facts: dict[str, Any] | None) -> list[str]:
 
 templates.env.globals["fact_lines"] = fact_lines
 templates.env.globals["GEO_SOURCES"] = GEO_SOURCES
+templates.env.globals["BARANGAY_NAMES"] = sorted(b.name for b in BARANGAYS)
+templates.env.globals["ACTION_LABELS"] = ACTION_LABELS
+templates.env.globals["SIGNAL_VERDICTS"] = SIGNAL_VERDICTS
+templates.env.globals["TREE_VERDICTS"] = TREE_VERDICTS
+templates.env.globals["REVIEW_LIMITS"] = {
+    "officer": OFFICER_MAX,
+    "note": NOTE_MAX,
+    "place_reason": PLACE_REASON_MIN,
+}
+
+# Officer review actions (POST /reports/{id}/review/{action}) and the pages they return to.
+REVIEW_ACTIONS = ("merge", "keep", "place", "signal", "tree", "block", "unblock")
+REVIEW_RETURN = re.compile(r"/review|/incidents/\d+")
+DONE_MESSAGES = {
+    "merge": "merged into incident #{incident}",
+    "keep": "kept as its own incident #{incident}",
+    "place": "barangay set and grouped again (now incident #{incident})",
+    "signal": "trust signal reviewed",
+    "tree": "fallen tree reviewed",
+    "block": "reporter blocked: their new messages are held",
+    "unblock": "reporter unblocked",
+}
 templates.env.globals["output_label"] = output_label
 templates.env.globals["deadline_table"] = deadline_table
 
@@ -302,14 +340,58 @@ def report_page(session: Session, around: int | None) -> list[tuple[Report, str]
     return [*reversed(newer), *older]
 
 
+def incident_context(session: Session, incident_id: int) -> dict[str, Any]:
+    """Everything the incident page shows, apart from the draft clocks."""
+    incident = session.get(Incident, incident_id)
+    if incident is None:
+        raise HTTPException(404, "incident not found")
+    reports = session.exec(
+        select(Report)
+        .where(Report.incident_id == incident_id)
+        .order_by(Report.received_at, Report.id)
+    ).all()
+    ids = [r.id for r in reports]
+    assessments = {
+        a.report_id: a
+        for a in session.exec(select(Assessment).where(col(Assessment.report_id).in_(ids))).all()
+    }
+    media: defaultdict[int, list[Media]] = defaultdict(list)
+    for item in session.exec(select(Media).where(col(Media.report_id).in_(ids))).all():
+        if item.kind in ("photo", "overlay"):
+            media[item.report_id].append(item)
+    cards = {card.report.id: card for card in review_cards(session, ids)}
+    items = []
+    for report in reports:
+        available = [m for m in media[report.id] if m.purged_at is None]
+        items.append(
+            {
+                "report": report,
+                "assessment": assessments.get(report.id),
+                "media": [m for m in available if m.kind == "overlay"] or available,
+                "had_photos": bool(media[report.id]),
+                "card": cards.get(report.id),
+            }
+        )
+    return {
+        "incident": incident,
+        "items": items,
+        "review": [cards[i] for i in ids if i in cards and cards[i].needs_review],
+        "history": timeline(session, incident_id),
+        "trust": incident_trust(incident),
+        "related_incidents": related_incidents(session, list(assessments.values())),
+    }
+
+
 def create_app(
     settings: Settings | None = None,
     *,
     summary_llm: AgentLLM | None = None,
+    pair_judge: AgentLLM | None = None,
     clock: Callable[[], datetime] | None = None,
 ) -> FastAPI:
-    """`summary_llm` replaces the configured agent LLM for RDANA summaries (tests, offline);
-    `clock` (naive UTC) replaces the real clock for filing countdowns (tests only)."""
+    """`summary_llm` replaces the configured agent LLM for RDANA summaries and `pair_judge` the
+    duplicate judge the officer's "set place" re-grouping asks (tests, offline); `clock` (naive
+    UTC) replaces the real clock for filing countdowns (tests only)."""
     settings = settings or get_settings()
 
     @asynccontextmanager
@@ -317,8 +399,13 @@ def create_app(
         app.state.engine = make_engine(settings)
         init_db(app.state.engine)
         # Building a client makes no request; a missing key surfaces as a recorded fallback.
-        llm = summary_llm or make_agent_llm(settings, make_recorder(app.state.engine))
+        recorder = make_recorder(app.state.engine)
+        llm = summary_llm or make_agent_llm(settings, recorder)
+        judge = pair_judge or make_pair_judge(settings, recorder)
         app.state.drafts = DraftService(settings, app.state.engine, llm, clock or utcnow)
+        app.state.review = ReviewService(
+            app.state.engine, IncidentService(settings, app.state.engine, judge)
+        )
         app.state.live = ChangeHub(settings.db_path)
         await app.state.live.start()
         restore_signals = close_on_shutdown_signals(app.state.live)
@@ -327,6 +414,8 @@ def create_app(
         await app.state.live.stop()
         if summary_llm is None:
             await llm.aclose()
+        if pair_judge is None:
+            await judge.aclose()
         app.state.engine.dispose()
 
     app = FastAPI(title="Typhoon damage reports", lifespan=lifespan)
@@ -470,61 +559,121 @@ def create_app(
             request, "incidents.html", {"items": items, "trust": trust}
         )
 
+    def incident_page(
+        request: Request, incident_id: int, *, form: dict | None = None, status_code: int = 200
+    ) -> HTMLResponse:
+        with Session(request.app.state.engine) as session:
+            context = incident_context(session, incident_id)
+        context["nol_statuses"] = request.app.state.drafts.nol_statuses(incident_id=incident_id)
+        context["review_form"] = form
+        return templates.TemplateResponse(
+            request, "incident.html", context, status_code=status_code
+        )
+
+    def review_page(
+        request: Request, *, form: dict | None = None, status_code: int = 200
+    ) -> HTMLResponse:
+        with Session(request.app.state.engine) as session:
+            cards = queue(session)
+            related = related_incidents(
+                session, [c.assessment for c in cards if c.assessment is not None]
+            )
+        params = request.query_params
+        done = DONE_MESSAGES.get(params.get("done", ""))
+        context = {
+            "cards": cards,
+            "related_incidents": related,
+            "review_form": form,
+            # After a redirect: what the last action did (ids are digits or the line is dropped).
+            "done": (
+                f"Report #{params['report']}: " + done.format(incident=params.get("incident", "?"))
+                if done
+                and params.get("report", "").isdigit()
+                and params.get("incident", "0").isdigit()
+                else None
+            ),
+        }
+        return templates.TemplateResponse(request, "review.html", context, status_code=status_code)
+
     @app.get("/incidents/{incident_id}", response_class=HTMLResponse)
     def incident_detail(request: Request, incident_id: int) -> HTMLResponse:
-        with Session(request.app.state.engine) as session:
-            incident = session.get(Incident, incident_id)
-            if incident is None:
-                raise HTTPException(404, "incident not found")
-            reports = session.exec(
-                select(Report)
-                .where(Report.incident_id == incident_id)
-                .order_by(Report.received_at, Report.id)
-            ).all()
-            ids = [r.id for r in reports]
-            assessments = {
-                a.report_id: a
-                for a in session.exec(
-                    select(Assessment).where(col(Assessment.report_id).in_(ids))
-                ).all()
-            }
-            media: defaultdict[int, list[Media]] = defaultdict(list)
-            for item in session.exec(select(Media).where(col(Media.report_id).in_(ids))).all():
-                if item.kind in ("photo", "overlay"):
-                    media[item.report_id].append(item)
-            decisions = session.exec(
-                select(AgentDecision)
-                .where(
-                    (AgentDecision.incident_id == incident_id)
-                    | (AgentDecision.compared_incident_id == incident_id)
+        return incident_page(request, incident_id)
+
+    @app.get("/review", response_class=HTMLResponse)
+    def review(request: Request) -> HTMLResponse:
+        return review_page(request)
+
+    @app.post("/reports/{report_id:int}/review/{action}", response_model=None)
+    async def review_action(
+        request: Request, report_id: int, action: str
+    ) -> RedirectResponse | HTMLResponse:
+        """One officer override (see app.review); a rejected form comes back with its values."""
+        if action not in REVIEW_ACTIONS:
+            raise HTTPException(404, "unknown review action")
+        form = await form_fields(request)
+        back = form.get("next", "/review")
+        if not REVIEW_RETURN.fullmatch(back):
+            back = "/review"
+        service: ReviewService = request.app.state.review
+        officer, note = form.get("officer"), form.get("note")
+        try:
+            if action == "merge":
+                try:
+                    target = int(form.get("incident_id", ""))
+                except ValueError as exc:
+                    raise ReviewError("Choose the incident to merge into.") from exc
+                incident = await run_in_threadpool(
+                    service.merge, report_id, target, officer=officer, note=note
                 )
-                .order_by(AgentDecision.created_at, AgentDecision.id)
-            ).all()
-            trust = incident_trust(incident)
-            related = related_incidents(session, list(assessments.values()))
-        items = []
-        for report in reports:
-            available = [m for m in media[report.id] if m.purged_at is None]
-            items.append(
-                {
-                    "report": report,
-                    "assessment": assessments.get(report.id),
-                    "media": [m for m in available if m.kind == "overlay"] or available,
-                    "had_photos": bool(media[report.id]),
-                }
-            )
-        return templates.TemplateResponse(
-            request,
-            "incident.html",
-            {
-                "incident": incident,
-                "items": items,
-                "decisions": decisions,
-                "trust": trust,
-                "related_incidents": related,
-                "nol_statuses": request.app.state.drafts.nol_statuses(incident_id=incident_id),
-            },
+            elif action == "keep":
+                incident = await run_in_threadpool(
+                    service.keep_separate, report_id, officer=officer, note=note
+                )
+            elif action == "place":
+                incident = await service.set_place(
+                    report_id, form.get("barangay"), officer=officer, reason=note
+                )
+            elif action == "signal":
+                incident = await run_in_threadpool(
+                    service.review_signal,
+                    report_id,
+                    form.get("signal"),
+                    form.get("verdict"),
+                    officer=officer,
+                    note=note,
+                )
+            elif action == "tree":
+                incident = await run_in_threadpool(
+                    service.review_fallen_tree,
+                    report_id,
+                    form.get("verdict"),
+                    officer=officer,
+                    note=note,
+                )
+            else:
+                incident = await run_in_threadpool(
+                    service.set_reporter_blocked,
+                    report_id,
+                    action == "block",
+                    officer=officer,
+                    note=note,
+                )
+        except LookupError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        except ReviewError as exc:
+            kept = {"report_id": report_id, "action": action, "values": form, "error": str(exc)}
+            if back.startswith("/incidents/"):
+                return incident_page(
+                    request, int(back.rsplit("/", 1)[1]), form=kept, status_code=exc.status_code
+                )
+            return review_page(request, form=kept, status_code=exc.status_code)
+        if back.startswith("/incidents/") and incident is not None:
+            # Follow the report: a merge moves it to another incident's page.
+            return RedirectResponse(f"/incidents/{incident}#report-{report_id}", status_code=303)
+        query = f"?done={action}&report={report_id}" + (
+            f"&incident={incident}" if incident is not None else ""
         )
+        return RedirectResponse(f"/review{query}", status_code=303)
 
     @app.get("/drafts", response_class=HTMLResponse)
     def drafts_page(request: Request) -> HTMLResponse:

@@ -54,6 +54,11 @@ class Report(SQLModel, table=True):
     hold_reason: str | None = None
     # Telegram's media_group_id when the photos came as one album: the album is one report.
     album: str | None = None
+    # Officer overrides the agent obeys (each written with its OfficerAction audit row): the
+    # incident a merge or keep-separate pinned this report to, which grouping never changes, and
+    # the barangay an officer set, which geolocation never overwrites.
+    officer_incident_id: int | None = Field(default=None, foreign_key="incident.id")
+    officer_barangay: str | None = None
 
 
 class Media(SQLModel, table=True):
@@ -140,6 +145,38 @@ class AgentDecision(SQLModel, table=True):
     confidence: float | None = None
     reason: str
     created_at: NaiveDatetime = Field(default_factory=utcnow)
+
+
+# OfficerAction.kind values
+OFFICER_MERGED = "officer_merged"
+OFFICER_KEPT_SEPARATE = "officer_kept_separate"
+OFFICER_SET_PLACE = "officer_set_place"
+OFFICER_SIGNAL_REVIEWED = "officer_signal_reviewed"
+OFFICER_FALLEN_TREE = "officer_fallen_tree"
+OFFICER_BLOCKED = "officer_blocked"
+OFFICER_UNBLOCKED = "officer_unblocked"
+
+
+class OfficerAction(SQLModel, table=True):
+    """Append-only audit of an officer's override (database triggers reject updates and deletes).
+
+    Separate from AgentDecision, which explains the agent's own grouping per report and
+    incident: an officer also reviews trust signals and blocks reporters, which have no incident,
+    and every row names the officer. The incident timeline shows both, labelled.
+    """
+
+    id: int | None = Field(default=None, primary_key=True)
+    kind: str = Field(index=True)
+    report_id: int | None = Field(default=None, foreign_key="report.id", index=True)
+    # Where the report is after the action, and where it was before (a merge moves it).
+    incident_id: int | None = Field(default=None, foreign_key="incident.id", index=True)
+    from_incident_id: int | None = Field(default=None, foreign_key="incident.id", index=True)
+    reporter_id: int | None = Field(default=None, foreign_key="reporter.id")
+    officer: str  # initials or designation, free text until there is a login; never a reporter
+    note: str | None = None
+    # Action specifics: the barangay set and the one before, a signal's key, code and verdict.
+    detail: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON))
+    created_at: NaiveDatetime = Field(default_factory=utcnow, index=True)
 
 
 # Draft.status values. Only a draft can be decided; an approved draft never changes.

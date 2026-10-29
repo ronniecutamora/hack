@@ -55,6 +55,18 @@ def digest(data: Any) -> str:
     return hashlib.sha256(json.dumps(data, sort_keys=True, default=str).encode()).hexdigest()
 
 
+def counted_facts(member: Observation) -> dict[str, Any]:
+    """Schema-validated facts only (the redacted context), never the raw stored dict, with an
+    officer's fallen-tree verdict applied to the hazards (the models cannot see trees)."""
+    facts = member.context["facts"]
+    if member.fallen_tree is None:
+        return facts
+    hazards = [h for h in facts.get("hazards") or [] if h != "fallen_tree"]
+    if member.fallen_tree:
+        hazards.append("fallen_tree")
+    return {**facts, "hazards": hazards}
+
+
 @dataclass(frozen=True)
 class IncidentEvidence:
     """One incident's counted reports (or one ungrouped report), oldest first."""
@@ -89,8 +101,7 @@ class IncidentEvidence:
         return [m.id for m in self.members if m.flagged]
 
     def facts(self, member: Observation) -> dict[str, Any]:
-        """Schema-validated facts only (the redacted context), never the raw stored dict."""
-        return member.context["facts"]
+        return counted_facts(member)
 
     def depth(self) -> dict[str, str]:
         summary = rollup(list(self.members))

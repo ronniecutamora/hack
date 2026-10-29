@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
 from app.config import Settings
-from app.db import DRAFT_TRIGGERS, init_db, make_engine
+from app.db import AUDIT_TRIGGERS, init_db, make_engine
 from app.drafts import CSV_BOM, DraftService, damaged_houses_csv
 from app.main import REPORT_LIMIT, create_app
 from app.models import Draft, DraftEvent, Report, Reporter, manila_time, utcnow
@@ -80,10 +80,10 @@ def test_init_db_replaces_older_trigger_definitions(settings, engine):
 
     init_db(engine)
     current = triggers(path)
-    assert set(current) == set(DRAFT_TRIGGERS)  # the retired trigger is gone too
+    assert set(current) == set(AUDIT_TRIGGERS)  # the retired trigger is gone too
     assert "old definition" not in current["draft_frozen"]
     assert (
-        current["draft_frozen"] == f"CREATE TRIGGER draft_frozen {DRAFT_TRIGGERS['draft_frozen']}"
+        current["draft_frozen"] == f"CREATE TRIGGER draft_frozen {AUDIT_TRIGGERS['draft_frozen']}"
     )
     # The new definition behaves: an open draft takes its decision, a decided one is frozen.
     with Session(engine) as session:
@@ -121,7 +121,7 @@ def test_parallel_init_db_calls_on_one_file_both_succeed(settings):
         for engine in engines:
             engine.dispose()
         assert errors == []
-        assert set(triggers(settings.db_path)) == set(DRAFT_TRIGGERS)
+        assert set(triggers(settings.db_path)) == set(AUDIT_TRIGGERS)
 
 
 # --- Single-source share -----------------------------------------------------------------

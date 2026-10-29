@@ -117,6 +117,15 @@ def geolocate(
     return GeoResult(None, "none", ", ".join(notes) or None)
 
 
+def officer_place(report: Report, geo: GeoResult) -> tuple[str, str | None]:
+    """Geo source and detail to store: an officer-set barangay always wins over geolocation,
+    and the agent's own finding is kept beside it for the audit."""
+    if report.officer_barangay is None:
+        return geo.source, geo.detail
+    found = geo.barangay.name if geo.barangay else "no barangay"
+    return "officer", f"set by an officer; the agent found {found} ({geo.source})"
+
+
 @dataclass
 class _Photo:
     media_id: int
@@ -358,8 +367,7 @@ class AssessmentService:
             assessment.transcript_clean = transcript
             if facts is not None or assessment.facts is None:
                 assessment.facts = facts
-            assessment.geo_source = geo.source
-            assessment.geo_detail = geo.detail
+            assessment.geo_source, assessment.geo_detail = officer_place(report, geo)
             assessment.error = "; ".join(errors) or None
             assessment.updated_at = utcnow()
             session.add(assessment)
@@ -370,7 +378,8 @@ class AssessmentService:
                 session, report, self.settings, transcript=transcript
             )
             session.add(assessment)
-            report.barangay = geo.barangay.name if geo.barangay else None
+            if report.officer_barangay is None:
+                report.barangay = geo.barangay.name if geo.barangay else None
             current = (report.text, report.lat, report.lon, self._photo_ids(session, report_id))
             if current != inputs:
                 report.status = STATUS_NEW

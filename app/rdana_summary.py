@@ -16,7 +16,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from app.counting import BarangayEvidence
+from app.counting import BarangayEvidence, counted_facts
 from app.incidents import DEPTH_ORDER
 from app.meta.llm import AgentLLM
 from app.rdana_form import CITY
@@ -455,7 +455,7 @@ def fallback_summary(evidence: BarangayEvidence, counts: dict[str, int | float])
         dict.fromkeys(
             HAZARD_LABELS.get(h, h)
             for m in evidence.members
-            for h in m.context["facts"].get("hazards") or []
+            for h in counted_facts(m).get("hazards") or []
         )
     )
     places = list(dict.fromkeys(p for i in evidence.incidents if (p := i.place())))

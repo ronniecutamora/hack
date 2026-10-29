@@ -14,7 +14,7 @@ _TBD: one paragraph on who suffers, how much, and why now, with sourced numbers.
 
 1. Residents send photos, voice notes, texts and location pins; the agent extracts damage facts and maps the report to a barangay. Reporters often send a photo and then type its words: a text within 2 minutes of the same reporter's caption-less photo, with nothing in between, becomes that photo's caption (the bot answers "Idinugtong sa iyong larawan. / Added to your photo."), and the photo is re-assessed and re-grouped with it, like a late location pin. Photos sent as one Telegram album (one `media_group_id`) are one report: one "received" reply, every photo assessed, and a text after a caption-less album captions all of it.
 2. Deterministic place/time/GPS filters find candidate incidents. A text-only Meta pair judge decides whether reports describe the same situation; uncertainty stays separate for officer review. Every candidate is judged, not just the first, so a correction ("mali po… dalawang bahay lang, hindi tatlo") lands in the incident that holds the figure it corrects.
-3. Officers read incident timelines, depth changes and the stored reasons for grouping. Reported totals explicitly warn about double-counting, including corrections.
+3. Officers read incident timelines, depth changes and the stored reasons for grouping, and resolve what the agent could not settle in a review queue: merge, keep separate, set the place, check trust signals, confirm fallen trees, block a reporter (see [Officer review](#officer-review)). Reported totals explicitly warn about double-counting, including corrections.
 4. The agent drafts each barangay's RDANA form and the city's damaged-houses table from that evidence; the officer checks every value against its linked reports, then approves or rejects the draft (see [Officer outputs](#officer-outputs)).
 5. For each incident of fish cage, fish pen or fishpond damage, the agent drafts the fisherfolk's PCIC Notice of Loss with an evidence annex for the adjuster and counts down its 2-day filing deadline; the officer approves it for filing, and the assured files it (see [Insurance: fisheries Notice of Loss](#insurance-fisheries-notice-of-loss)). Crop insurance is later work.
 
@@ -242,6 +242,36 @@ tiles are the basemap; the boundaries and markers still draw when the tiles cann
 shows Live, Reconnecting or Offline with the time of the last update in Philippine time; when the
 stream keeps failing, the page checks `/events/token` every 20 seconds instead.
 
+### Officer review
+
+`/review` (in the header and on the overview's "Needs officer review" tile) lists every report the agent could not
+settle: an uncertain or failed duplicate check, an unknown place, a high or medium trust signal nobody has checked,
+and a fallen tree the photo judge or the text suggested (the models do not detect trees reliably). Each card shows the
+agent's latest duplicate check (compared incident, model or rule, decision, confidence, reason) and the actions; the
+incident page has the same panel, and every report on a timeline keeps the actions under "Officer actions". The
+officer can:
+
+- **merge** the report into an incident the agent compared it with, or any active incident in its barangay;
+- **keep it as its own incident**;
+- **set or correct its barangay** from the gazetteer, with a reason; the report is then grouped again (the pair judge
+  may be asked) under the new place;
+- mark a **trust signal** checked, genuine (it no longer flags the report or its incident) or a problem, with a note
+  ("photo reuse checked: same family, two phones");
+- **confirm or rule out a fallen tree**, which the RDANA hazard list then follows;
+- **block or unblock the reporter**, with the same function as `python -m app.trust block`.
+
+Every override is an append-only `OfficerAction` row (database triggers refuse updates and deletes) with the officer's
+initials (required, at most 40 characters, until the deploy slice adds a login) and an optional note, written in the
+same transaction as the change. A separate table rather than new `AgentDecision` kinds, because an officer also
+reviews signals and blocks reporters, which have no incident, and every row names a person; the incident page shows
+agent and officer entries together, labelled "Agent" and "Officer JDC". Overrides **stick**: a merge or keep-separate
+pins the report's grouping (`Report.officer_incident_id`), which re-grouping never changes and never re-judges, and a
+set barangay (`Report.officer_barangay`) is never overwritten by re-assessment (the agent's own finding is kept beside
+it). The pending bucket, the counts and the incident rollups follow at once, dependent open drafts turn stale through
+their evidence fingerprint, and open dashboards refresh over the live stream. Rejected forms (no initials, an
+incident outside the allowed set) come back with a 400, the typed values and the error beside the field;
+cross-site posts get a 403.
+
 ## Demo
 
 - Video (3 min): _TBD_
@@ -375,6 +405,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-30 | Honest bot copy: the public profile and `/start` say Ulat is a prototype being prepared for Biñan's disaster office, not yet an official city service and not monitored by the city; the name drops "Biñan" so it does not read as an LGU account ("Ulat · Bagyo at Baha (prototype)"); a test rejects any claim that reports reach the City DRRM Office. Not applied to the live bot yet |
 | 2026-10-30 | Same-reporter correction rule (fix from the live bot test): a correction joins the candidate incident where its own reporter stated the figure it corrects, before any judge call, logged as a deterministic merge (no model) naming the corrected figure and report; the most recent qualifying report wins. Report 18 ("dalawang bahay lang") had merged into an old-photo incident because the judge was only unsure about the reporter's own voice note; a regression test replays that case. Grouping fingerprint version 3, so a re-run applies the rule |
 | 2026-10-30 | Albums (gap from the late-caption fix): the photos of a Telegram album join one report instead of one report each (stored `media_group_id`, 2-minute window, same reporter, never for a blocked reporter), so a text after a caption-less album captions every photo; the bot answers "received" once per album, later album photos are exempt from the rate limit, and an album photo arriving mid-assessment keeps the report "new" for the queued re-run |
+| 2026-10-30 | Officer review: a `/review` queue (header, overview tile) and an incident-page panel for reports the agent could not settle (uncertain or failed duplicate check, unknown place, unchecked trust signals, unconfirmed fallen trees) with the judge's comparisons and audited actions: merge, keep separate, set the barangay (then re-group), review a trust signal, confirm a fallen tree, block or unblock the reporter (the CLI's function). Each is an append-only `OfficerAction` row with the officer's initials; merges and keep-separate pin the grouping so re-grouping never undoes them, a set barangay survives re-assessment, counts, rollups, the pending bucket and draft staleness follow at once, and live sections refresh. The incident page shows agent and officer decisions together |
 
 ### Third-party code and assets
 
@@ -422,7 +453,7 @@ app/
   meta/                Clients: transcribe.py, spark.py, sam.py, spark_open.py, fireworks.py;
                        openai_compatible.py (shared chat), llm.py (AgentLLM switch),
                        schema.py (output validation), base.py, factory.py
-  models.py, db.py     SQLModel tables including Incident and immutable AgentDecision
+  models.py, db.py     SQLModel tables including Incident, immutable AgentDecision and OfficerAction
   gazetteer.py         Biñan's 24 barangays: names, aliases, matching in text, transcription keywords
   geo.py, data/        Point-in-barangay lookup on COD-AB boundaries; photo EXIF GPS
   transcript_cleanup.py  Removes repeated-word artifacts from transcripts
@@ -430,6 +461,7 @@ app/
   assessment.py        Assesses a report and maps it to a barangay (python -m app.assessment)
   incidents.py         Candidates, deterministic rollups, audited grouping and rebuild CLI
   counting.py          Per-barangay evidence and the no-double-counting rule
+  review.py            Officer review queue and audited overrides (merge, keep, place, trust, trees, block)
   rdana_form.py        The 2021 RDANA form as data (sections, numbering, fill modes)
   rdana.py             Evidence rules that fill the form; rdana_summary.py: the validated 1.4 summary
   nol_form.py, nol.py  PCIC Notice of Loss commodities as data (fisheries) and the deterministic filling

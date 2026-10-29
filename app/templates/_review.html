@@ -1,0 +1,175 @@
+{# Officer review: one report's review card and its audited actions (app/review.py).
+   `back` is the page to return to; `form` is a rejected submission to show again with its error. #}
+{% from "_links.html" import report_href %}
+
+{% macro _officer(card, form, action, back, note_label="Note (optional)", note_required=false) %}
+  {% set mine = form and form.report_id == card.report.id and form.action == action %}
+  {% set values = form["values"] if mine else {} %}
+  {% if mine %}<p class="error" role="alert" id="review-error-{{ card.report.id }}-{{ action }}">{{ form.error }}</p>{% endif %}
+  <input type="hidden" name="next" value="{{ back }}">
+  <label>Your initials <input type="text" name="officer" required maxlength="{{ REVIEW_LIMITS.officer }}" autocomplete="off" value="{{ values.get('officer', '') }}" placeholder="e.g. JDC, CDRRMO"{% if mine %} aria-invalid="true" aria-describedby="review-error-{{ card.report.id }}-{{ action }}"{% endif %}></label>
+  <label>{{ note_label }} <textarea name="note" rows="2" maxlength="{{ REVIEW_LIMITS.note }}"{% if note_required %} required minlength="{{ REVIEW_LIMITS.place_reason }}"{% endif %}>{{ values.get('note', '') }}</textarea></label>
+{% endmacro %}
+
+{% macro _open(card, form, actions, default=false) -%}
+  {%- if default or (form and form.report_id == card.report.id and form.action in actions) %} open{% endif -%}
+{%- endmacro %}
+
+{# The action forms alone: used on review cards and, collapsed, on every incident timeline report. #}
+{% macro review_actions(card, back, form=none) %}
+  {% set r = card.report %}
+  {% set base = "/reports/" ~ r.id ~ "/review/" %}
+  <div class="review-actions">
+    {% if r.status == "assessed" %}
+    <details class="review-group"{{ _open(card, form, ("merge", "keep", "place"), card.grouping) }}>
+      <summary>Grouping and place</summary>
+      <div class="decision-forms">
+        <form method="post" action="{{ base }}merge">
+          <fieldset><legend>Merge into an incident</legend>
+            {% set chosen = (form["values"].get("incident_id") if form and form.report_id == r.id and form.action == "merge" else "")|string %}
+            {% if card.targets %}
+              <label>Incident <select name="incident_id" required>
+                {% for i in card.targets %}<option value="{{ i.id }}"{% if chosen == i.id|string %} selected{% endif %}>#{{ i.id }} · {{ i.title }}{% if i.status == "needs_officer" %} (waits for review){% endif %}</option>{% endfor %}
+              </select></label>
+              {{ _officer(card, form, "merge", back) }}
+              <button type="submit">Merge report #{{ r.id }}</button>
+            {% else %}
+              <p class="muted">No other active incident was compared or is in {{ r.barangay or "a known barangay" }}.{% if not r.barangay %} Set the place first.{% endif %}</p>
+            {% endif %}
+          </fieldset>
+        </form>
+        <form method="post" action="{{ base }}keep">
+          <fieldset><legend>Keep as its own incident</legend>
+            <p class="muted">It stays in {% if card.incident %}incident #{{ card.incident.id }}{% else %}a new incident{% endif %}; later re-checks never merge it elsewhere.</p>
+            {{ _officer(card, form, "keep", back) }}
+            <button type="submit">Keep separate</button>
+          </fieldset>
+        </form>
+        <form method="post" action="{{ base }}place">
+          <fieldset><legend>Set or correct the barangay</legend>
+            {% set picked = form["values"].get("barangay") if form and form.report_id == r.id and form.action == "place" else r.barangay %}
+            <label>Barangay <select name="barangay" required>
+              <option value="">Choose…</option>
+              {% for name in BARANGAY_NAMES %}<option{% if picked == name %} selected{% endif %}>{{ name }}</option>{% endfor %}
+            </select></label>
+            {{ _officer(card, form, "place", back, "Reason (required)", true) }}
+            <button type="submit">Set place and group again</button>
+          </fieldset>
+        </form>
+      </div>
+    </details>
+    {% endif %}
+    {% if card.signals %}
+    <details class="review-group"{{ _open(card, form, ("signal",), card.open_signals|length > 0) }}>
+      <summary>Trust signals</summary>
+      {% for key, s, verdict in card.signals %}
+        <form method="post" action="{{ base }}signal">
+          <fieldset><legend><span class="chip{% if s.severity == 'high' %} alert{% else %} warn{% endif %}">{{ s.code|replace('_', ' ') }}</span></legend>
+            <p>{{ s.detail }}</p>
+            {% if verdict %}<p><span class="chip {{ 'ok' if verdict == 'genuine' else 'alert' }}">{{ SIGNAL_VERDICTS[verdict] }}</span> <span class="muted">You can review it again.</span></p>{% endif %}
+            <input type="hidden" name="signal" value="{{ key }}">
+            {% set mine = form and form.report_id == r.id and form.action == "signal" and form["values"].get("signal") == key %}
+            {% set v = form["values"].get("verdict") if mine else "" %}
+            <div role="radiogroup" aria-label="Verdict">
+              {% for value, label in SIGNAL_VERDICTS.items() %}<label class="choice"><input type="radio" name="verdict" value="{{ value }}" required{% if v == value %} checked{% endif %}> {{ label|capitalize }}</label>{% endfor %}
+            </div>
+            {{ _officer(card, form if mine else none, "signal", back) }}
+            <button type="submit">Record the check</button>
+          </fieldset>
+        </form>
+      {% endfor %}
+    </details>
+    {% endif %}
+    <details class="review-group"{{ _open(card, form, ("tree",), card.tree_suggested and card.tree_verdict is none) }}>
+      <summary>Fallen tree{% if card.tree_verdict is not none %} ({{ "confirmed" if card.tree_verdict else "ruled out" }}){% elif card.tree_suggested %} (suggested, not confirmed){% endif %}</summary>
+      <form method="post" action="{{ base }}tree">
+        <fieldset><legend>Is a fallen tree there?</legend>
+          <p class="muted">The models do not detect fallen trees reliably; your answer is what the RDANA hazards count.</p>
+          {% set v = form["values"].get("verdict") if form and form.report_id == r.id and form.action == "tree" else "" %}
+          {% for value, label in TREE_VERDICTS.items() %}<label class="choice"><input type="radio" name="verdict" value="{{ value }}" required{% if v == value %} checked{% endif %}> {{ label|capitalize }}</label>{% endfor %}
+          {{ _officer(card, form, "tree", back) }}
+          <button type="submit">Record</button>
+        </fieldset>
+      </form>
+    </details>
+    <details class="review-group"{{ _open(card, form, ("block", "unblock")) }}>
+      <summary>Reporter <code>{{ card.reporter }}</code>{% if card.blocked %} (blocked){% endif %}</summary>
+      {% set action = "unblock" if card.blocked else "block" %}
+      <form method="post" action="{{ base }}{{ action }}">
+        <fieldset><legend>{{ "Unblock" if card.blocked else "Block" }} this reporter</legend>
+          <p class="muted">{% if card.blocked %}Their new messages will be assessed again.{% else %}Their new messages are stored as held and never reach a model; nothing already counted changes. Same as <code>python -m app.trust block</code>.{% endif %}</p>
+          {{ _officer(card, form, action, back) }}
+          <button type="submit">{{ "Unblock" if card.blocked else "Block" }} reporter {{ card.reporter }}</button>
+        </fieldset>
+      </form>
+    </details>
+  </div>
+{% endmacro %}
+
+{# A full review card: what waits, the agent's comparisons, and the actions. #}
+{% macro review_card(card, back, form=none) %}
+  {% set r = card.report %}{% set a = card.assessment %}
+  <article class="card review-card" id="review-{{ r.id }}" data-key="review-{{ r.id }}">
+    <div class="review-card__head">
+      <h3><a href="{{ report_href(r.id, r.incident_id) }}">Report #{{ r.id }}</a> <span class="muted">· <time>{{ r.received_at|manila_time }}</time></span></h3>
+      <ul class="chips" aria-label="Waiting for">{% for reason in card.reasons %}<li class="chip warn">{{ reason }}</li>{% endfor %}</ul>
+    </div>
+    <p>
+      <strong>{{ r.barangay or "Place unknown" }}</strong>{% if a %} <span class="muted">({{ GEO_SOURCES.get(a.geo_source, a.geo_source) }})</span>{% endif %}
+      · {% if card.incident %}in <a href="/incidents/{{ card.incident.id }}">incident #{{ card.incident.id }}</a>{% else %}not grouped{% endif %}
+      {% if r.officer_incident_id %}<span class="chip ok">grouping set by an officer</span>{% endif %}
+      {% if r.channel == "demo" %}<span class="chip warn">Synthetic demo</span>{% endif %}
+    </p>
+    {% if a and a.facts %}
+      {% if a.facts.get("summary_en") %}<p>{{ a.facts.summary_en }}</p>{% endif %}
+      <ul class="chips">{% for line in fact_lines(a.facts) %}<li class="chip">{{ line }}</li>{% endfor %}</ul>
+    {% endif %}
+    {% if card.comparisons %}
+      <div class="table-wrap">
+      <table class="stack">
+        <caption class="muted">The agent's latest duplicate check</caption>
+        <thead><tr><th>Compared with</th><th>By</th><th>Said</th><th class="num">Confidence</th><th>Reason</th></tr></thead>
+        <tbody>
+        {% for d in card.comparisons %}
+          <tr>
+            <td data-label="Compared with"><a href="/incidents/{{ d.compared_incident_id }}">incident #{{ d.compared_incident_id }}</a>{% if d.compared_report_id %}, report #{{ d.compared_report_id }}{% endif %}</td>
+            <td data-label="By">{% if d.judge_model %}<code>{{ d.judge_model }}</code>{% else %}rule{% endif %}</td>
+            <td data-label="Said">{{ d.decision }} → {{ d.kind|replace("_", " ") }}</td>
+            <td data-label="Confidence" class="num">{% if d.confidence is not none %}{{ "%.0f%%"|format(d.confidence * 100) }}{% else %}—{% endif %}</td>
+            <td data-label="Reason">{{ d.reason }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    {% elif card.grouping %}
+      <p class="muted">No comparison was made: {% if not r.barangay %}the place is unknown. Set the barangay below.{% else %}no other incident was a candidate.{% endif %}</p>
+    {% endif %}
+    {% if r.grouping_error %}<p class="error">Duplicate check failed: {{ r.grouping_error }}</p>{% endif %}
+    {{ review_actions(card, back, form) }}
+  </article>
+{% endmacro %}
+
+{# One entry of the decision history: the agent (a model or a rule) or an officer. #}
+{% macro history_entry(entry) %}
+  {% if entry.agent %}{% set d = entry.agent %}
+    <article class="card history history--agent">
+      <p><span class="chip info">Agent</span> <strong>{{ d.kind|replace("_", " ") }}</strong> · report #{{ d.report_id }} · {{ d.created_at|manila_time }}</p>
+      <p>Model: <code>{{ d.judge_model or "Deterministic rule (no model call)" }}</code> · Decision: {{ d.decision }} · Confidence: {% if d.confidence is not none %}{{ "%.0f%%"|format(d.confidence * 100) }}{% else %}not scored{% endif %}</p>
+      <p>{{ d.reason }}</p>
+      {% if d.compared_incident_id %}<p class="muted">Compared with <a href="/incidents/{{ d.compared_incident_id }}">incident #{{ d.compared_incident_id }}</a>{% if d.compared_report_id %}, report #{{ d.compared_report_id }}{% endif %}.</p>{% endif %}
+    </article>
+  {% else %}{% set o = entry.officer %}
+    <article class="card history history--officer">
+      <p><span class="chip ok">Officer {{ o.officer }}</span> <strong>{{ ACTION_LABELS.get(o.kind, o.kind) }}</strong>{% if o.report_id %} · report #{{ o.report_id }}{% endif %} · {{ o.created_at|manila_time }}</p>
+      {% set detail = o.detail or {} %}
+      {% if o.kind == "officer_merged" %}<p>Moved{% if o.from_incident_id %} from <a href="/incidents/{{ o.from_incident_id }}">incident #{{ o.from_incident_id }}</a>{% endif %} to <a href="/incidents/{{ o.incident_id }}">incident #{{ o.incident_id }}</a>. Re-grouping never moves it again.</p>
+      {% elif o.kind == "officer_kept_separate" %}<p>Kept in incident #{{ o.incident_id }}. Re-grouping never moves it.</p>
+      {% elif o.kind == "officer_set_place" %}<p>Barangay set to <strong>{{ detail.barangay }}</strong> (was {{ detail.previous or "not found" }}); the report was grouped again.</p>
+      {% elif o.kind == "officer_signal_reviewed" %}<p>{{ detail.code|replace("_", " ") }}: {{ SIGNAL_VERDICTS.get(detail.verdict, detail.verdict) }}.</p>
+      {% elif o.kind == "officer_fallen_tree" %}<p>{{ TREE_VERDICTS.get(detail.verdict, detail.verdict)|capitalize }}.</p>
+      {% endif %}
+      {% if o.note %}<p>“{{ o.note }}”</p>{% endif %}
+    </article>
+  {% endif %}
+{% endmacro %}

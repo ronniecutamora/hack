@@ -312,6 +312,8 @@ async def test_init_db_upgrades_a_database_from_before_drafts(settings):
         "draft_no_delete",
         "draftevent_no_update",
         "draftevent_no_delete",
+        "officeraction_no_update",
+        "officeraction_no_delete",
     }
     with Session(engine) as session:
         assert session.get(Report, report).received_at == AT

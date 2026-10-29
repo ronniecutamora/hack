@@ -21,10 +21,10 @@
       </a>
     </li>
     <li>
-      <a class="kpi{% if incidents_review %} kpi--warn{% endif %}" href="/incidents">
+      <a class="kpi{% if review_total %} kpi--warn{% endif %}" href="/review">
         <span class="kpi__label">Needs officer review</span>
-        <span class="kpi__value" data-kpi="incidents_review">{{ incidents_review }}</span>
-        <span class="kpi__sub">{% if incidents_review %}grouping uncertain: check before counting{% else %}no grouping waits for you{% endif %}</span>
+        <span class="kpi__value" data-kpi="review_total">{{ review_total }}</span>
+        <span class="kpi__sub">{% if review_total %}reports: {{ review_grouping }} with uncertain grouping in <span data-kpi="incidents_review">{{ incidents_review }}</span> incident{{ "s" if incidents_review != 1 }}, the rest trust signals or fallen trees{% else %}nothing waits for you · <span data-kpi="incidents_review">{{ incidents_review }}</span> incidents uncertain{% endif %}</span>
       </a>
     </li>
     <li>

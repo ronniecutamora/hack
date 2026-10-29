@@ -41,13 +41,13 @@ def init_db(engine: Engine) -> None:
         connection.exec_driver_sql("BEGIN IMMEDIATE")
         SQLModel.metadata.create_all(connection)
         # create_all does not alter existing tables. Nullable/defaulted additions preserve
-        # older DBs. Every draft trigger is dropped first and recreated last, inside this
+        # older DBs. Every audit trigger is dropped first and recreated last, inside this
         # transaction, so a changed, renamed or removed definition reaches existing databases.
         # A backfill that must UPDATE decided drafts goes between the two, where no trigger can
         # abort it; a new column with a DEFAULT needs no UPDATE at all and is the preferred way.
         for (name,) in connection.exec_driver_sql(
             "SELECT name FROM sqlite_master WHERE type = 'trigger' "
-            "AND tbl_name IN ('draft', 'draftevent')"
+            "AND tbl_name IN ('draft', 'draftevent', 'officeraction')"
         ).all():
             connection.exec_driver_sql(f'DROP TRIGGER IF EXISTS "{name}"')
         additions = {
@@ -59,6 +59,8 @@ def init_db(engine: Engine) -> None:
                 "hold_reason": "VARCHAR",
                 "assessing_started_at": "DATETIME",
                 "album": "VARCHAR",
+                "officer_incident_id": "INTEGER REFERENCES incident(id)",
+                "officer_barangay": "VARCHAR",
             },
             "reporter": {"blocked": "BOOLEAN NOT NULL DEFAULT 0"},
             "media": {"phash": "VARCHAR"},
@@ -83,7 +85,7 @@ def init_db(engine: Engine) -> None:
             "CREATE INDEX IF NOT EXISTS ix_report_reporter_received "
             "ON report (reporter_id, received_at)"
         )
-        for name, statement in DRAFT_TRIGGERS.items():
+        for name, statement in AUDIT_TRIGGERS.items():
             connection.exec_driver_sql(f"CREATE TRIGGER {name} {statement}")
         connection.commit()
 
@@ -105,7 +107,11 @@ DRAFT_GENERATED_COLUMNS = (
     "summary_validation",
     "created_at",
 )
-DRAFT_TRIGGERS = {
+AUDIT_TRIGGERS = {
+    "officeraction_no_update": "BEFORE UPDATE ON officeraction "
+    "BEGIN SELECT RAISE(ABORT, 'officer audit rows are immutable'); END",
+    "officeraction_no_delete": "BEFORE DELETE ON officeraction "
+    "BEGIN SELECT RAISE(ABORT, 'officer audit rows are immutable'); END",
     "draftevent_no_update": "BEFORE UPDATE ON draftevent "
     "BEGIN SELECT RAISE(ABORT, 'draft audit rows are immutable'); END",
     "draftevent_no_delete": "BEFORE DELETE ON draftevent "

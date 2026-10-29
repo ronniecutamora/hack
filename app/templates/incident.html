@@ -2,6 +2,7 @@
 {% from "_trust.html" import incident_trust, signal_chips %}
 {% from "_deadline.html" import clock %}
 {% from "_status.html" import incident_status %}
+{% from "_review.html" import review_card, review_actions, history_entry %}
 {% block title %}Incident #{{ incident.id }}{% endblock %}
 {% block content %}
 <div id="live-incident" data-live="incidents reports drafts">
@@ -26,6 +27,14 @@
     {% endfor %}
   </ul>
   <p class="muted">{{ incident.latest_facts.get("caveat", "Totals may double-count reports; officer verification required.") }}</p>
+  {% set back = "/incidents/" ~ incident.id %}
+  {% if review %}
+    <section class="review-panel" id="review" aria-labelledby="review-title">
+      <h2 id="review-title">Officer review <span class="muted">({{ review|length }} report{{ "s" if review|length != 1 }})</span></h2>
+      <p class="muted">The agent could not settle these. Every action is recorded with your initials, and a later automatic re-check never undoes it.</p>
+      {% for card in review %}{{ review_card(card, back, review_form) }}{% endfor %}
+    </section>
+  {% endif %}
   <h2>Timeline</h2>
   {% if not items %}<p class="empty">No reports currently linked to this incident.</p>{% endif %}
   <ol class="timeline">
@@ -46,20 +55,18 @@
       </div>
       {% if item.had_photos and not item.media %}<p class="muted">Photo evidence deleted after retention; assessment kept.</p>{% endif %}
       {% if r.grouping_error %}<p class="error">{{ r.grouping_error }}</p>{% endif %}
+      {% if item.card %}
+        {% if item.card.needs_review %}<p><a href="#review-{{ r.id }}">Waiting for officer review: {{ item.card.reasons|join(", ") }}</a></p>
+        {% else %}<details class="officer-actions"{% if review_form and review_form.report_id == r.id %} open{% endif %}><summary>Officer actions for report #{{ r.id }}</summary>{{ review_actions(item.card, back, review_form) }}</details>{% endif %}
+      {% endif %}
     </li>
   {% endfor %}
   </ol>
-  <h2>Why the agent grouped these</h2>
-  {% if not decisions %}<p class="empty">No grouping decisions recorded yet.</p>{% endif %}
+  <h2>Why the agent grouped these, and what officers changed</h2>
+  <p class="muted">The agent's decisions (a model or a deterministic rule) and every officer override, oldest first.</p>
+  {% if not history %}<p class="empty">No grouping decisions recorded yet.</p>{% endif %}
   <div class="decisions">
-  {% for d in decisions %}
-    <article class="card">
-      <p><strong>{{ d.kind|replace("_", " ") }}</strong> · report #{{ d.report_id }} · {{ d.created_at|manila_time }}</p>
-      <p>Model: <code>{{ d.judge_model or "Deterministic rule (no model call)" }}</code> · Decision: {{ d.decision }} · Confidence: {% if d.confidence is not none %}{{ "%.0f%%"|format(d.confidence * 100) }}{% else %}not scored{% endif %}</p>
-      <p>{{ d.reason }}</p>
-      {% if d.compared_incident_id %}<p class="muted">Compared with <a href="/incidents/{{ d.compared_incident_id }}">incident #{{ d.compared_incident_id }}</a>{% if d.compared_report_id %}, report #{{ d.compared_report_id }}{% endif %}.</p>{% endif %}
-    </article>
-  {% endfor %}
+  {% for entry in history %}{{ history_entry(entry) }}{% endfor %}
   </div>
 </div>
 {% endblock %}

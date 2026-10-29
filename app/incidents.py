@@ -28,14 +28,18 @@ from app.facts import FACT_COUNT_FIELDS, LIVELIHOOD_DAMAGE
 from app.meta.factory import LLM_BACKENDS, make_pair_judge
 from app.meta.llm import AgentLLM
 from app.models import (
+    OFFICER_FALLEN_TREE,
+    OFFICER_SIGNAL_REVIEWED,
     STATUS_ASSESSED,
     AgentDecision,
     Assessment,
     Incident,
+    OfficerAction,
     PhotoAssessment,
     Report,
 )
 from app.pair_judge import judge_pair, redacted_place, report_context
+from app.trust import flagging, signal_key
 
 GPS_DISTANCE_CAP_M = 500.0
 RECENT_REPORT_LIMIT = 3
@@ -84,6 +88,9 @@ class Observation:
     # (photo assessment id, media id, overlay media id, updated_at) per photo, for staleness of
     # outputs that show the photos (the Notice of Loss annex); grouping and counting ignore it.
     photos: tuple[tuple[int | None, int, int | None, str], ...] = ()
+    # An officer's verdict on a fallen tree (the models cannot see them reliably): True
+    # confirmed, False not there, None not reviewed. Counting applies it to the hazards.
+    fallen_tree: bool | None = None
 
 
 def distance_m(a: tuple[float, float], b: tuple[float, float]) -> float:
@@ -302,7 +309,33 @@ def incident_title(member: Observation) -> str:
     )
 
 
+def officer_reviews(session: Session) -> tuple[dict[tuple[int, str], str], dict[int, bool]]:
+    """The latest officer verdict per (report, trust signal key), and per report on whether a
+    fallen tree is there. The OfficerAction log is the only store of these reviews."""
+    signals: dict[tuple[int, str], str] = {}
+    trees: dict[int, bool] = {}
+    for action in session.exec(
+        select(OfficerAction)
+        .where(col(OfficerAction.kind).in_((OFFICER_SIGNAL_REVIEWED, OFFICER_FALLEN_TREE)))
+        .order_by(OfficerAction.id)
+    ).all():
+        detail = action.detail or {}
+        if action.kind == OFFICER_SIGNAL_REVIEWED:
+            signals[(action.report_id, detail.get("key"))] = detail.get("verdict")
+        else:
+            trees[action.report_id] = detail.get("verdict") == "confirmed"
+    return signals, trees
+
+
+def is_flagged(report_id: int, signals: list[dict] | None, reviews: dict) -> bool:
+    """A high or medium trust signal the officer has not reviewed as genuine."""
+    return any(
+        flagging(s) and reviews.get((report_id, signal_key(s))) != "genuine" for s in signals or []
+    )
+
+
 def observations(session: Session) -> dict[int, Observation]:
+    signal_reviews, tree_reviews = officer_reviews(session)
     assessments = {a.report_id: a for a in session.exec(select(Assessment)).all()}
     photos: defaultdict[int, list[PhotoAssessment]] = defaultdict(list)
     for photo in session.exec(select(PhotoAssessment).order_by(PhotoAssessment.id)).all():
@@ -339,20 +372,46 @@ def observations(session: Session) -> dict[int, Observation]:
             facts,
             context,
             report.reporter_id,
-            any(
-                s.get("severity") in ("high", "medium")
-                for s in (assessments[report.id].signals or [])
-            ),
+            is_flagged(report.id, assessments[report.id].signals, signal_reviews),
             tuple(
                 (p.id, p.media_id, p.overlay_media_id, p.updated_at.isoformat())
                 for p in photos[report.id]
             ),
+            tree_reviews.get(report.id),
         )
     return result
 
 
-def revision(session: Session) -> int:
-    return session.exec(select(func.max(AgentDecision.id))).one() or 0
+def revision(session: Session) -> tuple[int, int]:
+    """Changes with every grouping decision and every officer action, so a grouping plan made
+    before either is re-planned instead of applied."""
+    return (
+        session.exec(select(func.max(AgentDecision.id))).one() or 0,
+        session.exec(select(func.max(OfficerAction.id))).one() or 0,
+    )
+
+
+def refresh_incidents(session: Session, incident_ids: set[int | None]) -> None:
+    """Recompute rollup, place, title, status and activity of incidents whose members changed."""
+    refreshed = observations(session)
+    for incident_id in incident_ids - {None}:
+        incident = session.get(Incident, incident_id)
+        members = [m for m in refreshed.values() if m.incident_id == incident_id]
+        incident.active = bool(members)
+        incident.latest_facts = rollup(members)
+        if members:
+            incident.barangay = next((m.barangay for m in reversed(members) if m.barangay), None)
+            incident.title = incident_title(replace(members[-1], barangay=incident.barangay))
+            review = session.exec(
+                select(Report.id).where(
+                    Report.incident_id == incident_id,
+                    Report.grouping_needs_officer == True,  # noqa: E712
+                )
+            ).first()
+            incident.status = "needs_officer" if review is not None else "open"
+            incident.first_seen = min(m.at for m in members)
+            incident.last_seen = max(m.at for m in members)
+        session.add(incident)
 
 
 class IncidentService:
@@ -396,6 +455,10 @@ class IncidentService:
                     ):
                         return report
                     epoch = revision(session)
+                    # An officer's merge or keep-separate sticks: no judge, no move.
+                    pinned = report.officer_incident_id
+                    if pinned is not None and session.get(Incident, pinned) is None:
+                        pinned = None
                     groups: defaultdict[int, list[Observation]] = defaultdict(list)
                     for member in all_members.values():
                         if member.incident_id is not None:
@@ -404,6 +467,11 @@ class IncidentService:
                     candidates = candidate_incidents(
                         new, groups, window_days=self.settings.incident_window_days
                     )
+                if pinned is not None:
+                    out = self._apply(new, fingerprint, epoch, pinned, False, [], None)
+                    if out is not None:
+                        return out
+                    continue
                 rule = own_correction(new, groups, candidates)
                 if rule is not None:
                     # Deterministic and certain: no judge call is needed or paid for.
@@ -562,29 +630,7 @@ class IncidentService:
                     )
                 )
             session.flush()
-            refreshed = observations(session)
-            for incident_id in {old_id, target.id} - {None}:
-                incident = session.get(Incident, incident_id)
-                members = [m for m in refreshed.values() if m.incident_id == incident_id]
-                incident.active = bool(members)
-                incident.latest_facts = rollup(members)
-                if members:
-                    incident.barangay = next(
-                        (m.barangay for m in reversed(members) if m.barangay), None
-                    )
-                    incident.title = incident_title(
-                        replace(members[-1], barangay=incident.barangay)
-                    )
-                    review = session.exec(
-                        select(Report.id).where(
-                            Report.incident_id == incident_id,
-                            Report.grouping_needs_officer == True,  # noqa: E712
-                        )
-                    ).first()
-                    incident.status = "needs_officer" if review is not None else "open"
-                    incident.first_seen = min(m.at for m in members)
-                    incident.last_seen = max(m.at for m in members)
-                session.add(incident)
+            refresh_incidents(session, {old_id, target.id})
             session.commit()
             return report
 

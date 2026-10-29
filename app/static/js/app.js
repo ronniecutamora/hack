@@ -21,6 +21,26 @@
   setInterval(tickCountdowns, 30000);
   document.addEventListener("htmx:afterSwap", () => tickCountdowns());
 
+  // ---------- Officer initials ----------
+  // Review forms ask for the officer's initials (no login yet). Remember the last ones on this
+  // device and fill them in as the field's default, so a prefilled form does not count as edited
+  // (a live refresh may still replace it) and the server still receives them on every action.
+  const INITIALS_KEY = "ulat.officer";
+  function fillInitials(root) {
+    let saved = null;
+    try { saved = localStorage.getItem(INITIALS_KEY); } catch (e) { return; }
+    if (!saved) return;
+    (root || document).querySelectorAll('input[name="officer"]').forEach((input) => {
+      if (!input.value && !input.defaultValue) { input.defaultValue = saved; }
+    });
+  }
+  document.addEventListener("submit", (event) => {
+    const input = event.target.querySelector && event.target.querySelector('input[name="officer"]');
+    if (input && input.value.trim()) { try { localStorage.setItem(INITIALS_KEY, input.value.trim()); } catch (e) { /* private mode */ } }
+  });
+  fillInitials();
+  document.addEventListener("htmx:afterSwap", () => fillInitials());
+
   // ---------- Live updates ----------
   // The server sends which topics changed (reports, incidents, drafts, spend) over SSE
   // (GET /events, app/live.py). Each region marked data-live="<topics>" re-fetches this page

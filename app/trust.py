@@ -6,6 +6,7 @@ uv run python -m app.trust unblock <pseudonym-prefix>
 
 import argparse
 import contextlib
+import hashlib
 import io
 import re
 import sys
@@ -25,6 +26,19 @@ HOLD_BLOCKED = "reporter blocked"
 HOLD_SPEND = "spend cap"
 # Empty string means hashing was attempted but no usable image/file was available.
 HASH_UNAVAILABLE = ""
+
+
+def signal_key(signal: dict) -> str:
+    """A stable id for one trust signal of a report (its code and detail), so an officer's
+    review of it survives a re-assessment that finds the same evidence again; new evidence
+    (another photo, another related report) is a new signal and needs its own review."""
+    raw = f"{signal.get('code')}|{signal.get('detail')}".encode()
+    return hashlib.blake2b(raw, digest_size=6).hexdigest()
+
+
+def flagging(signal: dict) -> bool:
+    """High and medium signals flag a report until an officer reviews them as genuine."""
+    return signal.get("severity") in ("high", "medium")
 
 
 def model_spend(session: Session, now: datetime | None = None) -> float:

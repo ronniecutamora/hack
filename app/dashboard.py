@@ -10,6 +10,7 @@ from sqlmodel import Session, col, func, select
 from app.deadlines import Countdown
 from app.drafts import DraftService
 from app.models import DRAFT_OPEN, STATUS_HELD, Assessment, Incident, Report
+from app.review import queue
 from app.trust import model_spend
 
 STATUS_NEEDS_OFFICER = "needs_officer"
@@ -96,9 +97,13 @@ def overview(session: Session, drafts: DraftService, now: datetime) -> dict[str,
             .limit(LATEST_REPORTS)
         ).all()
     )
+    waiting = queue(session)
     return {
         "incidents_open": len(incidents),
         "incidents_review": sum(1 for i in incidents if i.status == STATUS_NEEDS_OFFICER),
+        # The /review queue, counted by the same helper as that page.
+        "review_total": len(waiting),
+        "review_grouping": sum(1 for card in waiting if card.grouping),
         "reports_total": sum(report_counts.values()),
         "reports_recent": recent,
         "reports_held": report_counts.get(STATUS_HELD, 0),
