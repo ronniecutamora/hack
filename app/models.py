@@ -52,6 +52,8 @@ class Report(SQLModel, table=True):
     status: str = STATUS_NEW
     assessing_started_at: NaiveDatetime | None = None
     hold_reason: str | None = None
+    # Telegram's media_group_id when the photos came as one album: the album is one report.
+    album: str | None = None
 
 
 class Media(SQLModel, table=True):

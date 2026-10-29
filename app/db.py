@@ -58,6 +58,7 @@ def init_db(engine: Engine) -> None:
                 "grouping_needs_officer": "BOOLEAN NOT NULL DEFAULT 0",
                 "hold_reason": "VARCHAR",
                 "assessing_started_at": "DATETIME",
+                "album": "VARCHAR",
             },
             "reporter": {"blocked": "BOOLEAN NOT NULL DEFAULT 0"},
             "media": {"phash": "VARCHAR"},

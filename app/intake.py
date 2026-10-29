@@ -46,6 +46,10 @@ LOCATION_JOIN_WINDOW = timedelta(minutes=15)
 # Reporters send a photo, then type its words as a separate message (live test 2026-10-29: 1 s
 # and 14 s gaps). A text this soon after a caption-less photo becomes the photo's caption.
 CAPTION_JOIN_WINDOW = timedelta(minutes=2)
+# Telegram delivers an album as one message per photo, sharing a media_group_id, within seconds.
+# The photos join one report (one situation, one assessment, one acknowledgement), so a text
+# sent after a caption-less album captions all of it through the caption join above.
+ALBUM_JOIN_WINDOW = timedelta(minutes=2)
 
 ConvertFn = Callable[[Path, Path], Awaitable[list[Path]]]
 
@@ -160,6 +164,20 @@ class IntakeService:
         ).first()
         return latest if photo is not None else None
 
+    def _album_target(self, session: Session, reporter_id: int, album: str | None) -> Report | None:
+        """The reporter's recent report started by an earlier photo of the same album."""
+        if not album:
+            return None
+        return session.exec(
+            select(Report)
+            .where(
+                Report.reporter_id == reporter_id,
+                Report.album == album,
+                Report.received_at >= utcnow() - ALBUM_JOIN_WINDOW,
+            )
+            .order_by(col(Report.received_at).desc(), col(Report.id).desc())
+        ).first()
+
     def _can_attach(
         self, user_ref: int | str, find: Callable[[Session, int], Report | None]
     ) -> bool:
@@ -179,6 +197,12 @@ class IntakeService:
     def can_attach_caption(self, user_ref: int | str) -> bool:
         """A text would become a photo's caption (so it is not a new report for the rate limit)."""
         return self._can_attach(user_ref, self._caption_target)
+
+    def can_attach_album_photo(self, user_ref: int | str, album: str | None) -> bool:
+        """A photo would join its album's report (so it is not a new report for the rate limit)."""
+        return self._can_attach(
+            user_ref, lambda session, reporter_id: self._album_target(session, reporter_id, album)
+        )
 
     def _session(self) -> Session:
         return Session(self.engine, expire_on_commit=False)
@@ -275,12 +299,25 @@ class IntakeService:
         caption: str | None = None,
         ext: str = "jpg",
         channel: str = "telegram",
+        album: str | None = None,
     ) -> Report:
+        """Store a photo as a new report, or add it to its album's report (`album` is the
+        message's media_group_id). A joining photo's caption becomes the report's text when it
+        has none; an assessed report goes back to "new" so the new photo is assessed too. A
+        blocked reporter's photo never joins an earlier report."""
         phash = await asyncio.to_thread(photo_hash, data) or HASH_UNAVAILABLE
+        caption = (caption or "").strip() or None
         with self._session() as session:
-            report = self._new_report(
-                session, user_ref, channel, text=(caption or "").strip() or None
-            )
+            reporter = self._reporter(session, user_ref)
+            report = None if reporter.blocked else self._album_target(session, reporter.id, album)
+            if report is None:
+                report = self._new_report(session, user_ref, channel, text=caption, album=album)
+            else:
+                if caption and not report.text:
+                    report.text = caption
+                if report.status == STATUS_ASSESSED:
+                    report.status = STATUS_NEW
+                session.add(report)
             self._store_media(session, report, "photo", data, ext, phash=phash)
             session.commit()
             return report

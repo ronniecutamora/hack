@@ -143,11 +143,11 @@ def _assess_later(context: ContextTypes.DEFAULT_TYPE, report: Report) -> None:
         context.application.create_task(assessor.assess(report.id), name=f"assess-{report.id}")
 
 
-def _admitted(*, attaches: Callable[[IntakeService, int], bool] | None = None):
+def _admitted(*, attaches: Callable[[IntakeService, int, object], bool] | None = None):
     """One admission per report message, before download.
 
-    A message that `attaches` to the sender's existing report (a late pin, a late caption)
-    creates no report, so it is exempt from the rate limit.
+    A message that `attaches` to the sender's existing report (a late pin, a late caption, the
+    next photo of an album) creates no report, so it is exempt from the rate limit.
     """
 
     def decorate(handler):
@@ -157,7 +157,9 @@ def _admitted(*, attaches: Callable[[IntakeService, int], bool] | None = None):
             user_ref = update.effective_user.id
             async with intake.admission_lock(user_ref):
                 admission = intake.admit(user_ref)
-                attached = attaches is not None and attaches(intake, user_ref)
+                attached = attaches is not None and attaches(
+                    intake, user_ref, update.effective_message
+                )
                 if admission == Admission.RATE_LIMITED and not attached:
                     await _reply(update.effective_message, RATE_LIMITED)
                     return
@@ -176,7 +178,11 @@ async def on_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 
-@_admitted(attaches=IntakeService.can_attach_caption)
+def _album(message: object) -> str | None:
+    return getattr(message, "media_group_id", None)
+
+
+@_admitted(attaches=lambda intake, user_ref, _message: intake.can_attach_caption(user_ref))
 async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     intake = _intake(context)
@@ -190,19 +196,33 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     _assess_later(context, report)  # re-assesses and re-groups a photo that got its caption
 
 
-@_admitted()
-async def on_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+def _joins_album(intake: IntakeService, user_ref: int, message: object) -> bool:
+    return intake.can_attach_album_photo(user_ref, _album(message))
+
+
+async def _ingest_photo(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, data: bytes, ext: str
+) -> None:
+    """One report per photo, or per album: later photos of an album join the first one's report
+    silently (one "received" per album, not one per photo)."""
     message = update.effective_message
-    photo = message.photo[-1]  # Telegram lists sizes smallest to largest
-    data = await _download(photo)
-    report = await _intake(context).ingest_photo(
-        update.effective_user.id, data, caption=message.caption, ext="jpg"
+    intake = _intake(context)
+    joins = _joins_album(intake, update.effective_user.id, message)
+    report = await intake.ingest_photo(
+        update.effective_user.id, data, caption=message.caption, ext=ext, album=_album(message)
     )
-    await _reply(message, RECEIVED)
+    if not joins:
+        await _reply(message, RECEIVED)
     _assess_later(context, report)
 
 
-@_admitted()
+@_admitted(attaches=_joins_album)
+async def on_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    photo = update.effective_message.photo[-1]  # Telegram lists sizes smallest to largest
+    await _ingest_photo(update, context, await _download(photo), "jpg")
+
+
+@_admitted(attaches=_joins_album)
 async def on_image_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     document = message.document
@@ -213,12 +233,7 @@ async def on_image_document(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if (document.file_size or 0) > MAX_DOWNLOAD_BYTES:
         await _reply(message, TOO_LARGE)
         return
-    data = await _download(document)
-    report = await _intake(context).ingest_photo(
-        update.effective_user.id, data, caption=message.caption, ext=ext
-    )
-    await _reply(message, RECEIVED)
-    _assess_later(context, report)
+    await _ingest_photo(update, context, await _download(document), ext)
 
 
 @_admitted()
@@ -233,7 +248,7 @@ async def on_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     _assess_later(context, report)
 
 
-@_admitted(attaches=IntakeService.can_attach_location)
+@_admitted(attaches=lambda intake, user_ref, _message: intake.can_attach_location(user_ref))
 async def on_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     report = await _intake(context).ingest_location(

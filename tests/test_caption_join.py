@@ -1,4 +1,5 @@
-"""A text sent right after a caption-less photo becomes its caption (live test 2026-10-29)."""
+"""A text sent right after a caption-less photo or album becomes its caption (live test
+2026-10-29); an album is one report."""
 
 import asyncio
 from datetime import timedelta
@@ -10,8 +11,8 @@ from app import bot
 from app.assessment import AssessmentService
 from app.db import init_db, make_engine
 from app.incidents import IncidentService
-from app.intake import CAPTION_JOIN_WINDOW, IntakeService
-from app.models import Assessment, Incident, Report
+from app.intake import ALBUM_JOIN_WINDOW, CAPTION_JOIN_WINDOW, IntakeService
+from app.models import Assessment, Incident, Media, PhotoAssessment, Report
 from tests.test_abuse_guards import add_cost, block, context, rows
 from tests.test_assessment import FakeLLM, FakeSam, jpeg
 from tests.test_bot import Downloadable, image_document, make_update
@@ -189,3 +190,73 @@ async def test_caption_during_assessment_survives_a_spend_hold(settings, engine)
     resumed = await assessor.assess(report.id)
     assert (resumed.status, resumed.barangay) == ("assessed", "Casile")
     assert any(CAPTION in text for text in facts_texts(llm))
+
+
+def album_photo(index, album="album-1", caption=None):
+    """One photo of a Telegram album: each arrives as its own message sharing media_group_id."""
+    return make_update(
+        photo=[Downloadable(jpeg(size=(800 + index, 400)))],
+        caption=caption,
+        media_group_id=album,
+    )
+
+
+async def test_caption_less_album_then_one_text_is_one_captioned_report(settings, engine):
+    """Live gap from 6a: a text after a caption-less album captioned only the last photo.
+    The album is one report, so the text reaches every photo, and each photo is assessed."""
+    ctx, tasks, llm = context(settings, engine)
+    updates = [album_photo(i) for i in range(3)]
+    for update in updates:
+        await bot.on_photo(update, ctx)
+    updates[0].effective_message.reply_text.assert_awaited_once_with(bot.RECEIVED)
+    for later in updates[1:]:
+        later.effective_message.reply_text.assert_not_awaited()  # one "received" per album
+    text = make_update(text=CAPTION)
+    await bot.on_text(text, ctx)
+    text.effective_message.reply_text.assert_awaited_once_with(bot.CAPTION_ADDED)
+    await asyncio.gather(*tasks)
+    (report,) = rows(engine, Report)
+    assert (report.text, report.status, report.barangay) == (CAPTION, "assessed", "Casile")
+    photos = [m for m in rows(engine, Media) if m.kind == "photo"]
+    assert len(photos) == 3 and {m.report_id for m in photos} == {report.id}
+    judged = {p.media_id for p in rows(engine, PhotoAssessment)}
+    assert judged == {m.id for m in photos}
+    # The photos of one album are not "resent" duplicates of each other.
+    assert not rows(engine, Assessment)[0].signals
+
+
+async def test_album_caption_on_a_later_photo_and_separate_albums(settings, engine):
+    intake = IntakeService(settings, engine)
+    first = await intake.ingest_photo(7, jpeg(), album="a")
+    joined = await intake.ingest_photo(7, jpeg(size=(900, 500)), caption=CAPTION, album="a")
+    assert (joined.id, joined.text) == (first.id, CAPTION)
+    # Another album, a photo without an album, and another reporter's same id start new reports.
+    other = await intake.ingest_photo(7, jpeg(), album="b")
+    loose = await intake.ingest_photo(7, jpeg())
+    stranger = await intake.ingest_photo(8, jpeg(), album="a")
+    assert len({first.id, other.id, loose.id, stranger.id}) == 4
+    # Too late for the album window: a new report.
+    age(engine, other.id, ALBUM_JOIN_WINDOW + timedelta(seconds=1))
+    assert (await intake.ingest_photo(7, jpeg(), album="b")).id != other.id
+
+
+async def test_album_photos_count_once_toward_the_rate_limit(settings, engine):
+    settings.reports_per_hour = 1
+    ctx, tasks, _ = context(settings, engine)
+    for index in range(4):
+        await bot.on_photo(album_photo(index), ctx)
+    refused = album_photo(9, album="album-2")
+    await bot.on_photo(refused, ctx)
+    refused.effective_message.reply_text.assert_awaited_once_with(bot.RATE_LIMITED)
+    await asyncio.gather(*tasks)
+    (report,) = rows(engine, Report)
+    assert len([m for m in rows(engine, Media) if m.kind == "photo"]) == 4
+
+
+async def test_blocked_reporters_album_photo_never_joins(settings, engine):
+    intake = IntakeService(settings, engine)
+    first = await intake.ingest_photo(7, jpeg(), album="a")
+    block(engine, first.reporter_id)
+    assert not intake.can_attach_album_photo(7, "a")
+    held = await intake.ingest_photo(7, jpeg(), album="a")
+    assert held.id != first.id and held.status == "held"

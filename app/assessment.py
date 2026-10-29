@@ -227,6 +227,7 @@ class AssessmentService:
                 ).all()
                 if (self.settings.data_dir / m.path).is_file()
             ]
+            photo_ids = self._photo_ids(session, report_id)
             untranscribed_voice = not report.transcript and (
                 session.exec(
                     select(Media.id).where(Media.report_id == report_id, Media.kind == "voice")
@@ -299,7 +300,7 @@ class AssessmentService:
             errors.append("raw media expired while held")
         if untranscribed_voice:  # part of the report is missing: not "assessed"
             errors.insert(0, "voice note not transcribed")
-        inputs = (report.text, report.lat, report.lon)
+        inputs = (report.text, report.lat, report.lon, photo_ids)
         return self._save(report_id, transcript, facts, geo, outcomes, errors, inputs)
 
     async def _facts(self, text: str) -> tuple[dict[str, Any] | None, str | None]:
@@ -336,11 +337,11 @@ class AssessmentService:
         geo: GeoResult,
         outcomes: list[_PhotoOutcome],
         errors: list[str],
-        inputs: tuple[str | None, float | None, float | None],
+        inputs: tuple[str | None, float | None, float | None, tuple[int, ...]],
     ) -> Report:
-        """Store the results. `inputs` are the report's text and pin this pass read: if a late
-        caption or pin changed them meanwhile, the report stays "new" (not grouped) and the
-        re-assessment queued with that change finishes it."""
+        """Store the results. `inputs` are the report's text, pin and photos this pass read: if
+        a late caption, pin or album photo changed them meanwhile, the report stays "new" (not
+        grouped) and the re-assessment queued with that change finishes it."""
         # Legacy hashing reads files/decodes images, so finish it before any SQLite write.
         hashes = pending_photo_hashes(self.engine, self.settings)
         with self._session() as session:
@@ -370,7 +371,8 @@ class AssessmentService:
             )
             session.add(assessment)
             report.barangay = geo.barangay.name if geo.barangay else None
-            if (report.text, report.lat, report.lon) != inputs:
+            current = (report.text, report.lat, report.lon, self._photo_ids(session, report_id))
+            if current != inputs:
                 report.status = STATUS_NEW
             else:
                 report.status = STATUS_ASSESSMENT_FAILED if errors else STATUS_ASSESSED
@@ -390,6 +392,16 @@ class AssessmentService:
                     session.add(incident)
             session.commit()
             return report
+
+    @staticmethod
+    def _photo_ids(session: Session, report_id: int) -> tuple[int, ...]:
+        return tuple(
+            session.exec(
+                select(Media.id)
+                .where(Media.report_id == report_id, Media.kind == "photo")
+                .order_by(Media.id)
+            ).all()
+        )
 
     def _save_photo(self, session: Session, report_id: int, outcome: _PhotoOutcome) -> None:
         row = session.exec(
