@@ -5,6 +5,12 @@ Taglish text (a photo caption when there is a photo), an optional ``photo_prompt
 scene for Muse Image, and an optional ``barangay`` pin name. Reports that must not
 be pinned (ambiguous or placeless) leave ``barangay`` null on purpose. A shared
 ``place`` keeps reports' synthetic pins near each other inside that barangay.
+``photo_from`` resends another report's photo file byte for byte (a reused-photo
+fake), so no new image is generated for it.
+
+Times are fixed offsets from a fictional landfall. ``anchor_shift`` moves them all by
+the same amount so the latest report lands just before a chosen moment (the demo
+loader's ``--anchor-now``), keeping every gap between reports.
 """
 
 import json
@@ -35,11 +41,24 @@ class ScenarioReport:
     flood_cm: int | None = None  # stated water depth, for series reports
     corrects: str | None = None  # key of the earlier report this one corrects
     place: str | None = None  # shared synthetic location anchor within the barangay
+    photo_from: str | None = None  # key of a report whose photo this one resends
 
 
-def received_at(report: ScenarioReport) -> datetime:
-    """When the report supposedly arrived: landfall day + offset, at the given hour."""
-    return (LANDFALL_AT + timedelta(days=report.day)).replace(hour=report.hour, minute=10)
+# --anchor-now puts the latest report this long before the load time.
+ANCHOR_LEAD = timedelta(hours=1)
+
+
+def received_at(report: ScenarioReport, shift: timedelta = timedelta(0)) -> datetime:
+    """When the report supposedly arrived: landfall day + offset, at the given hour, moved by
+    `shift` (see `anchor_shift`)."""
+    return (LANDFALL_AT + timedelta(days=report.day)).replace(hour=report.hour, minute=10) + shift
+
+
+def anchor_shift(reports: list[ScenarioReport], now: datetime) -> timedelta:
+    """The whole-minute shift that puts the latest report ANCHOR_LEAD before `now` (naive UTC),
+    so a fresh demo load shows live filing countdowns; every gap between reports is kept."""
+    shift = now - ANCHOR_LEAD - max(received_at(r) for r in reports)
+    return shift - timedelta(seconds=shift.total_seconds() % 60)
 
 
 def load_scenario(path: Path) -> list[ScenarioReport]:
@@ -69,6 +88,12 @@ def validate(reports: list[ScenarioReport]) -> list[str]:
             errors.append(f"{r.key}: place needs a nonempty name and a barangay pin")
         if r.corrects is not None and r.corrects not in by_key:
             errors.append(f"{r.key}: corrects unknown report {r.corrects!r}")
+        if r.photo_from is not None:
+            source = by_key.get(r.photo_from)
+            if source is None or source.photo_prompt is None or source.key == r.key:
+                errors.append(f"{r.key}: photo_from must name another report with a photo")
+            if r.photo_prompt is not None:
+                errors.append(f"{r.key}: a resent photo cannot also have its own photo_prompt")
     if len({r.barangay for r in reports if r.barangay}) < 4:
         errors.append("need reports in at least 4 different barangays")
     errors.extend(_validate_series(reports))
@@ -132,4 +157,8 @@ def _validate_story_beats(
         errors.append("need a fisherfolk report about damaged fish cages/pens")
     if not any("juan dela cruz" in r.text.lower() for r in reports):
         errors.append("need a reporter introducing themself with an obviously fake name")
+    if not any(
+        r.photo_from in by_key and by_key[r.photo_from].reporter != r.reporter for r in reports
+    ):
+        errors.append("need a report resending another reporter's photo (photo_from)")
     return errors

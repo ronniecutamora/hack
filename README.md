@@ -209,6 +209,18 @@ deadlines are verified for Biñan.
 - Live app: _TBD_
 - X post: _TBD_
 
+The synthetic scenario ([data/demo/scenario.json](data/demo/scenario.json), no real people) has 18 Taglish reports
+over two weeks after a fictional typhoon: a Malaban street flooding ankle-, knee-, then waist-deep and receding; a
+Casile roof count corrected from five houses to three; an evacuation center in Poblacion; an ambiguous report naming
+two barangays and one with no place at all; a reporter who introduces himself as "Juan dela Cruz" (redacted); a
+De La Paz fisherfolk's broken fish pens and a follow-up asking for nets and bamboo, which should become one incident
+with one Notice of Loss; and a new reporter in San Antonio who claims fish-pen damage with the De La Paz photo
+(`"photo_from": "r05"`, the same file byte for byte), so the reused-photo warning shows in red on that Notice of
+Loss. The loader assesses each report as it arrives, as the bot does, so only the later copy is flagged.
+`--anchor-now` moves every scenario time so the latest report arrives an hour before the load: the San Antonio
+claim then shows a live "due in" countdown, while the De La Paz loss, first reported ten days before, shows
+"overdue" with the first-notice fallback.
+
 ## Getting started
 
 Requires Python 3.12+, [uv](https://docs.astral.sh/uv/), and `ffmpeg` (voice notes are converted to WAV; macOS: `brew install ffmpeg`).
@@ -241,6 +253,7 @@ uv run python -m scripts.eval_dedupe --judge muse-glimmer
 # Synthetic demo: a typhoon scenario in a separate database (var/demo)
 DATA_DIR=var/demo uv run python -m app.demo images   # Muse Image photos; shows the cost and asks first
 DATA_DIR=var/demo uv run python -m app.demo load     # runs every report through the real pipeline
+DATA_DIR=var/demo uv run python -m app.demo load --reset --anchor-now  # fresh load, times end an hour ago
 DATA_DIR=var/demo uv run uvicorn app.main:app        # dashboard on the demo data
 # Evals on your own labelled data (folders OUTSIDE this repo; each prints its cost first)
 uv run python -m scripts.eval_transcribe /path/to/recordings --keywords barangays   # WER, raw and cleaned
@@ -300,6 +313,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-29 | Deadlines table (`app/data/deadlines.json`): PCIC fisheries Notice of Loss (2 calendar days) and Claim for Indemnity (7), and RDANA forms to the EOC (72 hours), each row with its source; a countdown in Philippine time with an injected clock; the RDANA drafts page reads its deadline from the table, and a test keeps deadline literals out of the code |
 | 2026-10-29 | PCIC fisheries Notice of Loss draft (FIP CAS Form No. 1) per incident, defined as commodity data: location, cause, first-reported time, stated area and extent filled from the reports with evidence links, identity and policy fields left for the assured, the PCIC Region IV office fixed, and an evidence annex for the adjuster (photo and SAM overlay links, judgments, SAM measurements as evidence only, name-redacted excerpts, trust chips, a red banner for a reused photo); deterministic, no model call |
 | 2026-10-29 | Filing clock: Notice of Loss and Claim for Indemnity countdowns from the first report on `/drafts`, the draft page and the incident page, with the Citizen's Charter first-notice fallback; approval reads "approved for filing, not filed" and does not stop the clock. Notice of Loss drafts reuse the versioning, staleness, approval, audit and same-origin rules (a draft now records its incident) |
+| 2026-10-29 | Demo: an 18th synthetic report (a San Antonio fish-pen claim resending the De La Paz photo through a validated `photo_from`, no new image) so the reused-photo warning appears on a Notice of Loss; the loader assesses each report as it arrives, so only the later copy is flagged; `--anchor-now` places scenario times relative to the load so the filing countdowns are live |
 
 ### Third-party code and assets
 

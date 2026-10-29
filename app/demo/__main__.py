@@ -7,7 +7,7 @@ from app.config import get_settings
 
 def main(argv: list[str] | None = None) -> int:
     from app.demo.images import images_command
-    from app.demo.loader import load_command
+    from app.demo.loader import add_anchor_argument, load_command
 
     parser = argparse.ArgumentParser(description="Synthetic typhoon demo scenario.")
     which = parser.add_subparsers(dest="command", required=True)
@@ -18,11 +18,12 @@ def main(argv: list[str] | None = None) -> int:
         "--reset", action="store_true", help="delete the demo data (keeps generated images)"
     )
     load.add_argument("--yes", action="store_true", help="delete without asking")
+    add_anchor_argument(load)
     args = parser.parse_args(argv)
     settings = get_settings()
     if args.command == "images":
         return images_command(settings, assume_yes=args.yes)
-    return load_command(settings, reset=args.reset, assume_yes=args.yes)
+    return load_command(settings, reset=args.reset, assume_yes=args.yes, anchor_now=args.anchor_now)
 
 
 if __name__ == "__main__":

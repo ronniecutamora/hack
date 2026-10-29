@@ -160,5 +160,14 @@
     "text": "Okay na po sa Purok 2 dito sa Casile, wala na pong baha. Yung tatlong bahay po na nasira ang bubong, dalawa na po ang naayos. Maraming salamat po!",
     "barangay": "Casile",
     "place": "casile-purok2-houses"
+  },
+  {
+    "key": "r18",
+    "reporter": "demo-17",
+    "day": 14,
+    "hour": 15,
+    "text": "Taga San Antonio po ako, may fish pen po kami sa tabing-lawa. Sira po lahat ng fish cage namin dahil sa bagyo, inanod pa po yung lambat. Paano po mag-claim sa PCIC?",
+    "barangay": "San Antonio",
+    "photo_from": "r05"
   }
 ]

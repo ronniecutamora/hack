@@ -59,6 +59,16 @@ def jobs_for(reports: list[ScenarioReport], images_dir: Path) -> list[ImageJob]:
     return jobs
 
 
+def photo_paths(reports: list[ScenarioReport], images_dir: Path) -> dict[str, Path]:
+    """The photo file each report sends: its own job's, or the one it resends (photo_from)."""
+    own = {job.report.key: job.path for job in jobs_for(reports, images_dir)}
+    return {
+        r.key: own[r.photo_from] if r.photo_from in own else own[r.key]
+        for r in reports
+        if r.key in own or r.photo_from in own
+    }
+
+
 def stamp_label(data: bytes) -> bytes:
     """Stamp the synthetic-content label into the bottom-left corner; return JPEG bytes."""
     with Image.open(io.BytesIO(data)) as source:

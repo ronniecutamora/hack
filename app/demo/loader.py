@@ -1,16 +1,23 @@
 """Feed the scenario through the real intake and assessment pipeline.
 
-``python -m app.demo load [--reset] [--yes]`` ingests every scenario report with
-``channel="demo"`` into a separate demo database (DATA_DIR must end in "demo"),
-backdates each report to scenario time, then assesses them all. A manifest in the
-demo data dir maps scenario keys to report ids, so re-running skips loaded reports
-instead of duplicating them.
+``python -m app.demo load [--reset] [--yes] [--anchor-now]`` ingests every scenario
+report with ``channel="demo"`` into a separate demo database (DATA_DIR must end in
+"demo"), backdates it to scenario time and assesses it before the next one arrives, as
+the bot does: a check such as "this photo was already sent by another reporter" sees
+only earlier reports. A manifest in the demo data dir maps scenario keys to report ids,
+so re-running skips loaded reports instead of duplicating them.
+
+Scenario times are fixed (a fictional landfall in early October 2026). ``--anchor-now``
+moves them all so the latest report arrives an hour before the load, which makes the
+filing countdowns live in a fresh load; use it with ``--reset``, since loaded reports
+keep their times. Production code never shifts the clock.
 """
 
 import argparse
 import asyncio
 import json
 import shutil
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from sqlalchemy import Engine
@@ -21,10 +28,16 @@ from app.config import Settings, get_settings
 from app.db import init_db, make_engine, make_recorder
 from app.demo import SCENARIO_PATH, DemoDirError, require_demo_dir
 from app.demo.geo import pick_point
-from app.demo.images import jobs_for
-from app.demo.scenario import ScenarioReport, load_scenario, received_at, validate
+from app.demo.images import jobs_for, photo_paths
+from app.demo.scenario import (
+    ScenarioReport,
+    anchor_shift,
+    load_scenario,
+    received_at,
+    validate,
+)
 from app.intake import IntakeService
-from app.models import Report
+from app.models import Report, manila_time, utcnow
 
 MANIFEST_NAME = "manifest.json"
 CHANNEL = "demo"
@@ -51,6 +64,7 @@ async def _ingest_one(
     engine: Engine,
     report: ScenarioReport,
     photo: bytes | None,
+    shift: timedelta = timedelta(0),
 ) -> list[int]:
     """Ingest one scenario report (photo + pin when present) and backdate it.
 
@@ -70,7 +84,7 @@ async def _ingest_one(
         assert pin.id is not None
         if pin.id not in ids:
             ids.append(pin.id)
-    when = received_at(report)
+    when = received_at(report, shift)
     with Session(engine) as session:
         for report_id in ids:
             row = session.get(Report, report_id)
@@ -95,10 +109,11 @@ async def load_reports(
     data_dir: Path,
     *,
     assessor: AssessmentService | None = None,
+    shift: timedelta = timedelta(0),
 ) -> dict:
-    """Ingest new reports, assess them, and return a summary dict."""
+    """Ingest and assess new reports one at a time, in scenario order; return a summary."""
     manifest = _read_manifest(data_dir)
-    images = {job.report.key: job.path for job in jobs_for(reports, data_dir / "images")}
+    images = photo_paths(reports, data_dir / "images")
     intake = IntakeService(settings, engine)
     owned = assessor is None
     assessor = assessor or make_assessor(settings, engine, make_recorder(engine))
@@ -111,7 +126,7 @@ async def load_reports(
                 if session.get(Report, report_id) is not None
             }
         manifest = {k: v for k, v in manifest.items() if v in known}
-        new_ids: list[int] = []
+        assessed, failed = 0, 0
         for report in reports:
             if report.key in manifest:
                 existing += 1
@@ -119,21 +134,19 @@ async def load_reports(
             photo = None
             if report.key in images:
                 photo = images[report.key].read_bytes()
-            ids = await _ingest_one(intake, engine, report, photo)
+            ids = await _ingest_one(intake, engine, report, photo, shift)
             manifest[report.key] = ids[0]
-            new_ids.extend(ids)
             _write_manifest(data_dir, manifest)
             loaded += 1
-        # Assess exactly the reports created by this run.
-        assessed, failed = 0, 0
-        for report_id in new_ids:
-            out = await assessor.assess(report_id)
-            if out is None:
-                continue
-            if out.status == "assessed":
-                assessed += 1
-            else:
-                failed += 1
+            # Assess exactly the reports this run created, before the next one arrives.
+            for report_id in ids:
+                out = await assessor.assess(report_id)
+                if out is None:
+                    continue
+                if out.status == "assessed":
+                    assessed += 1
+                else:
+                    failed += 1
         with Session(engine) as session:
             barangays = sorted(
                 {
@@ -163,6 +176,8 @@ def load_command(
     assume_yes: bool = False,
     scenario_path: Path = SCENARIO_PATH,
     assessor: AssessmentService | None = None,
+    anchor_now: bool = False,
+    now: datetime | None = None,
 ) -> int:
     """Run the load (see module docstring); returns a process exit code."""
     try:
@@ -202,7 +217,13 @@ def load_command(
         print(f"Missing {len(missing)} image(s) for: {', '.join(missing)}.")
         print("Generate them first: DATA_DIR=var/demo uv run python -m app.demo images")
         return 1
-    summary = asyncio.run(load_reports(reports, settings, engine, data_dir, assessor=assessor))
+    shift = anchor_shift(reports, now or utcnow()) if anchor_now else timedelta(0)
+    if anchor_now:
+        latest = max(received_at(r, shift) for r in reports)
+        print(f"Scenario times anchored to now: the latest report arrives {manila_time(latest)}.")
+    summary = asyncio.run(
+        load_reports(reports, settings, engine, data_dir, assessor=assessor, shift=shift)
+    )
     print(
         f"Reports loaded: {summary['loaded']} "
         f"({summary['existing']} already loaded), "
@@ -219,8 +240,19 @@ def main(argv: list[str] | None = None) -> int:
         "--reset", action="store_true", help="delete the demo data (keeps generated images)"
     )
     parser.add_argument("--yes", action="store_true", help="delete without asking")
+    add_anchor_argument(parser)
     args = parser.parse_args(argv)
-    return load_command(get_settings(), reset=args.reset, assume_yes=args.yes)
+    return load_command(
+        get_settings(), reset=args.reset, assume_yes=args.yes, anchor_now=args.anchor_now
+    )
+
+
+def add_anchor_argument(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--anchor-now",
+        action="store_true",
+        help="move scenario times so the latest report arrives an hour before now",
+    )
 
 
 if __name__ == "__main__":
