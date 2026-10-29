@@ -14,7 +14,7 @@ from app.deadlines import DEADLINES, Deadline
 from app.main import create_app
 from app.models import Draft, DraftEvent, Media, PhotoAssessment, utcnow
 from app.nol import SAM_LABEL
-from app.nol_form import ASSURED, COMMODITIES, FISHERIES, NolField
+from app.nol_form import ASSURED, COMMODITIES, FISHERIES, NolField, check
 from tests.test_rdana import AT, SummaryLLM, add_incident, add_report, cite_all
 
 PENS = "fish_pens_or_cages"
@@ -325,6 +325,23 @@ def test_versions_staleness_approval_and_rejection_reuse_the_draft_machinery(cli
                 connection.execute(statement, (second,))
 
 
+def test_versions_follow_the_incident_when_its_barangay_changes(client, engine):
+    from app.models import Incident
+
+    incident, *_ = fisherfolk_incident(engine)
+    first = generate(client, incident)
+    with Session(engine) as session:
+        row = session.get(Incident, incident)
+        row.barangay = "Malaban"  # e.g. a late pin moved the incident
+        session.add(row)
+        session.commit()
+    second = generate(client, incident)
+    assert stored(engine, first).status == "superseded"
+    assert (stored(engine, second).version, stored(engine, second).barangay) == (2, "Malaban")
+    page = client.get(f"/drafts/{first}").text
+    assert f'<a href="/drafts/{second}">version 2</a>' in page
+
+
 def test_a_pending_grouping_review_needs_a_reason_to_approve(client, engine):
     incident = add_incident(engine, barangay="De La Paz", status="needs_officer")
     report = add_report(
@@ -413,6 +430,7 @@ def test_a_new_commodity_needs_one_definition_and_no_code_change(client, engine,
         extent_counts=(),
         area_facts=("crop_area_hectares",),
     )
+    check(crops)  # the same checks as the built-in entries
     monkeypatch.setitem(COMMODITIES, crops.key, crops)
     incident = add_incident(engine, barangay="Casile")
     add_report(

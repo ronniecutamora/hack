@@ -133,11 +133,14 @@ def is_stale(draft: Draft, city: CityEvidence) -> bool:
 
 
 def same_output(draft: Draft):
-    """SQL condition for every version of the same output as `draft` (NULL-safe)."""
-    condition = Draft.kind == draft.kind
-    for column, value in ((Draft.barangay, draft.barangay), (Draft.incident_id, draft.incident_id)):
-        condition &= column.is_(None) if value is None else column == value
-    return condition
+    """SQL condition for every version of the same output as `draft`: a per-incident output is
+    its incident's, wherever the incident is placed now; the others are per barangay or city."""
+    if draft.incident_id is not None:
+        return (Draft.kind == draft.kind) & (Draft.incident_id == draft.incident_id)
+    barangay = Draft.barangay
+    return (Draft.kind == draft.kind) & (
+        barangay.is_(None) if draft.barangay is None else barangay == draft.barangay
+    )
 
 
 def output_label(draft: Draft) -> str:
