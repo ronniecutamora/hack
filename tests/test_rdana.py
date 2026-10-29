@@ -14,7 +14,6 @@ from app.rdana import EventInput
 from app.rdana_form import SECTIONS, all_fields
 from app.rdana_summary import (
     SUMMARY_SCHEMA,
-    allowed_numbers,
     fallback_summary,
     summary_input,
     validate_summary,
@@ -368,7 +367,7 @@ def payload_for(engine):
     return ev, summary_input(ev, {"houses_partially_damaged": 4})
 
 
-def test_numbers_must_come_from_counts_or_facts_and_report_ids_are_not_numbers(engine):
+def test_numbers_must_be_computed_counts_and_place_digits_only_quoted(engine):
     add_report(engine, houses_partially_damaged=4, place_detail="Purok 3", flood_depth="knee")
     _ev, payload = payload_for(engine)
     report_id = payload["incidents"][0]["reports"][0]["report_id"]
@@ -376,13 +375,13 @@ def test_numbers_must_come_from_counts_or_facts_and_report_ids_are_not_numbers(e
     def check(text, cited=(report_id,)):
         return validate_summary({"summary": text, "cited_report_ids": list(cited)}, payload)
 
+    not_accepted = "Every number must be a computed count, next to what it counts. Not accepted: "
     assert check("Four houses were reported damaged in Purok 3.") == []
-    assert 4.0 in allowed_numbers(payload) and 3.0 in allowed_numbers(payload)
-    assert check("12 houses.") == ["The summary writes numbers that are not in the input: 12."]
-    assert allowed_numbers({"report_id": 77, "incident": "incident 78"}) == set()
+    assert check("12 houses.") == [not_accepted + "12 (computed: houses partially damaged 4)."]
     assert check("Seven houses.") == [
-        "The summary writes numbers that are not in the input: Seven."
+        not_accepted + "Seven (computed: houses partially damaged 4)."
     ]
+    assert check(f"{report_id} houses.") != []  # a report id is not a count
     assert check("Flooding.", [999]) == ["cited_report_ids [999] are not in the input."]
     assert check("Flooding.", []) != []
     assert any("5 sentences" in e for e in check("A. B. C. D. E."))
@@ -417,7 +416,7 @@ async def test_invented_numbers_are_retried_once_then_the_fallback_is_stored(eng
     )
     draft, _ = await generate(engine, settings, llm=llm)
     assert len(llm.calls) == 2
-    assert "not in the input: 40" in llm.calls[1]["user_text"]  # the retry sees the error
+    assert "40 (computed: houses partially damaged 4)" in llm.calls[1]["user_text"]  # retry
     assert draft.summary_fallback is True and draft.summary_model is None
     assert [a["errors"] != [] for a in draft.summary_validation] == [True, True]
     assert fields(draft)["1.4"]["source"] == "rule"
@@ -430,7 +429,7 @@ async def test_invented_numbers_are_retried_once_then_the_fallback_is_stored(eng
 
 
 async def test_unknown_citation_is_rejected_and_a_valid_retry_is_accepted(engine, settings):
-    report = add_report(engine, houses_partially_damaged=4)
+    report = add_report(engine, incident=add_incident(engine), houses_partially_damaged=4)
     llm = SummaryLLM(
         {"summary": "4 houses were reported damaged.", "cited_report_ids": [report, 999]},
         {"summary": "4 houses were reported damaged.", "cited_report_ids": [report]},

@@ -72,7 +72,7 @@
       {% if draft.summary_fallback %}
         <p class="banner warn">Deterministic summary used. {{ c.summary.fallback_reason }}</p>
       {% else %}
-        <p>Written by <code>{{ draft.summary_model }}</code> and accepted: it cites only these reports, every number in it is a computed count or a value in the reports' facts, and it has at most four sentences.</p>
+        <p>Written by <code>{{ draft.summary_model }}</code> and accepted: it cites only these reports, every number in it is a confirmed computed count (or the number of reports, incidents or reporters) written next to what it counts, it writes no date, time, ordinal, report id or vague amount, and it has at most four sentences.</p>
       {% endif %}
       {% if draft.summary_validation %}
         <ol>{% for a in draft.summary_validation %}<li>Attempt {{ a.attempt }} · <code>{{ a.model }}</code> · {% if a.errors %}<span class="error">rejected: {{ a.errors|join(" ") }}</span>{% else %}accepted{% endif %}</li>{% endfor %}</ol>

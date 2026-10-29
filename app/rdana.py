@@ -221,7 +221,10 @@ def _summary(ctx: RuleContext):
     if summary.fallback:
         note = f"Deterministic summary. {summary.fallback_reason or ''}".strip()
     else:
-        note = f"Drafted by {summary.model}; numbers and citations checked against the reports."
+        note = (
+            f"Drafted by {summary.model}; every number checked against the computed count it "
+            "describes, and every citation against the reports."
+        )
     return _filled(summary.text, source, refs, note)
 
 

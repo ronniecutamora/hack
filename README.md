@@ -102,8 +102,23 @@ reports.
 
 **The agent's summary (1.4).** One agent-LLM call per draft sees only redacted, typed facts per incident and the
 computed counts: no reporter ids, raw messages, transcripts or names. The reply is accepted only if every report it
-cites was in the input, every number it writes (as digits or words) is a computed count or a value in the facts, and
-it has at most four sentences. A rejected reply is retried once with the errors; after that, or when the model fails
+cites was in the input, it has at most four sentences, and every number passes an allowlist:
+
+- A number must be a confirmed computed count from the form (after the counting rule, pending figures excluded) or
+  the number of reports, incidents or reporters, and it must match the words next to it: "4 houses partially
+  damaged" passes only if 4 is that count, and "3 dead" fails when 3 is a families count. A single report's figure
+  (such as one superseded by a correction), an id, or a sum the agent made up is never allowed.
+- Spelled numbers are read whole ("twenty-five" is 25, "a dozen" is 12) and checked the same way; "one" is allowed
+  only in idioms ("no one", "one of") or when 1 is the count. Vague amounts ("hundreds of", "dozens of") are
+  rejected.
+- Times (7:30, 7 pm), dates (month or weekday names, 10/28), ordinals (28th, twenty-eighth; "first" is allowed as
+  plain English) and report or incident references ("report 12", "#12") are rejected: the form has its own fields
+  for them.
+- Place digits pass only inside a place written exactly as the reports give it ("Purok 3"); "Purok 5" fails when no
+  report names it.
+
+The prompt asks for counts as digits next to their words and for no dates or ids. A rejected reply is retried once
+with the errors; after that, or when the model fails
 or the daily spend cap is reached, a deterministic summary is used and the reason is stored on the draft and shown.
 
 **Damaged-houses table.** `/damaged-houses` (and `.csv`, UTF-8 with a byte-order mark for spreadsheets) lists
@@ -204,6 +219,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-29 | Review fix: the single-source share is per value, not per incident: a value counts as corroborated only when two different reporters stated it or more |
 | 2026-10-29 | Review fix: startup drops and recreates every draft trigger, so changed definitions reach existing databases and a backfill can run between the two |
 | 2026-10-29 | Review fix: figures from reports waiting for grouping review (`needs_officer`, grouping errors, never grouped) form a pending bucket beside each count and CSV row instead of being summed, with a draft banner and a required reason to approve |
+| 2026-10-29 | Review fix: the 1.4 summary validator is an allowlist of the confirmed computed counts, each matched to the words next to it; spelled numbers are read whole; times, dates, ordinals, report ids, vague amounts and unquoted place numbers are rejected, and the prompt asks for digits |
 
 ### Third-party code and assets
 
