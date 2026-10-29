@@ -236,6 +236,8 @@ uv sync
 cp .env.example .env   # add META_API_KEY, TELEGRAM_BOT_TOKEN, PSEUDONYM_SALT (openssl rand -hex 32); BASETEN_API_KEY for Baseten; FIREWORKS_API_KEY for Fireworks
 # AGENT_LLM=muse-spark-1.3 (default); optional independent PAIR_JUDGE_LLM
 uv run python -m app.bot                  # Telegram intake bot (long polling)
+uv run python -m app.bot_profile --dry-run  # bot name, descriptions and commands: print what would change
+uv run python -m app.bot_profile --photo    # apply only what differs, and upload assets/brand/ulat-avatar.png
 uv run uvicorn app.main:app --reload      # web app: /health, /reports, /incidents, /drafts, /damaged-houses (.csv), /media/<id> (localhost only: no login yet)
 uv run pytest                             # tests (all HTTP is mocked, no API calls)
 uv run ruff check . && uv run ruff format --check .
@@ -330,6 +332,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-29 | Officer dashboard design system: one stylesheet with colour, spacing and type tokens (16 px body text, AA contrast, visible focus rings, 40 px controls), an "Ulat" header bar with the active page marked (`aria-current`), status badges that always carry text, sticky table headers, tables that scroll inside a wrapper on narrow screens and become stacked cards under 640 px, and A4 print rules that drop the dashboard chrome |
 | 2026-10-29 | Correction routing (fix from the live bot test): the pair judge now compares a report with every candidate incident up to `MAX_JUDGED_CANDIDATES` instead of stopping at the first match, and the best accepted match wins: an incident not waiting for review, then for a correction the incident stating the corrected figure, then confidence. A Casile "2 houses, not 3" correction had merged into an unconfirmed old-photo incident; re-grouping moves such a report, and the stored reason names why the incident won |
 | 2026-10-29 | Late captions (fix from the live bot test): a text sent within 2 minutes of the same reporter's caption-less photo or image file, with no other report in between, becomes the photo's caption instead of a caption-only report; the bot confirms it, the photo is re-assessed (cached photo calls, new facts and barangay from the caption) and re-grouped, and the joined text is exempt from the rate limit. An assessment whose text or pin changed while it ran no longer ends "assessed" with stale facts: the report stays new for the queued re-run, also across a spend-cap hold |
+| 2026-10-29 | Bot profile as data (`app/bot_profile.py`): the name, short description, description and command list for @UlatPH_bot in Taglish and English (what to send, Biñan typhoon and flood damage, reports go to the City DRRM Office, not an emergency line: call 911, the same privacy line as `/start`), with Telegram's length limits enforced by a test; an idempotent CLI compares the live values and sets only what differs (`--dry-run` prints the changes), and `--photo` uploads the avatar as a square JPEG; `/help` repeats `/start` |
 
 ### Third-party code and assets
 
@@ -352,6 +355,7 @@ Licenses read from each installed package's metadata. No third-party source code
 | [respx](https://github.com/lundberg/respx) | BSD-3-Clause | HTTP mocking in tests (dev) |
 | [Ruff](https://github.com/astral-sh/ruff) | MIT | Lint and format (dev) |
 | [FFmpeg](https://ffmpeg.org) (external program, not bundled) | LGPL/GPL depending on build | Voice note conversion to WAV |
+| Ulat bot avatar (`assets/brand/ulat-avatar.png`), generated for this project with OpenAI's image model through the Codex CLI ("GPT Terra") | Output owned by the user under OpenAI's [terms of use](https://openai.com/policies/terms-of-use/) | Branding only: the Telegram bot's profile photo. Not part of the report pipeline |
 
 Data:
 
@@ -393,6 +397,7 @@ app/
   intake.py            Ingest text, photo, voice and location into reports
   retention.py         Purge raw media after the TTL
   bot.py               Telegram bot (python -m app.bot)
+  bot_profile.py       The bot's public profile (name, descriptions, commands) as data; idempotent CLI that applies it
   main.py, templates/  FastAPI officer pages: reports, incidents, timelines, decision audit, drafts and media
   static/              Dashboard stylesheet (css/app.css, design tokens), script (js/app.js) and favicon
   evaluation.py        WER, Cohen's kappa and F1 helpers
@@ -401,6 +406,7 @@ scripts/
   eval_vision.py       Photo judge and SAM vs hand labels, per agent LLM
   eval_facts.py        Fact extraction from voice notes vs hand labels, per agent LLM
   eval_dedupe.py       Cached pair-judge P/R/F1, review rate and per-pair misses
+assets/brand/          Bot avatar (branding only)
 data/demo/scenario.json  The synthetic typhoon scenario (no real people)
 tests/                 Mocked-HTTP tests and synthetic dedupe_pairs.json (64 labelled pairs)
 ```

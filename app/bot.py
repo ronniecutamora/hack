@@ -43,14 +43,20 @@ MISSING_TOKEN_MESSAGE = (
 )
 
 
+# Shared by /start and the bot's public profile (app.bot_profile), so both promise the same.
+NO_NAMES_STORED = (
+    "Hindi namin iniimbak ang pangalan o numero mo, pseudonymous ID lang. / "
+    "We store no names or phone numbers, only a pseudonymous ID."
+)
+
+
 def start_text(ttl_hours: int, held_max_hours: int) -> str:
     return (
         "Kumusta! Ito ang bot para sa pag-report ng pinsala ng bagyo. Magpadala ng larawan, "
         "voice note, text, o location ng pinsala.\n"
         "Hello! Send photos, voice notes, text or your location to report typhoon damage.\n\n"
         "Privacy:\n"
-        "- Hindi namin iniimbak ang pangalan o numero mo, pseudonymous ID lang. / "
-        "We store no names or phone numbers, only a pseudonymous ID.\n"
+        f"- {NO_NAMES_STORED}\n"
         f"- Binubura ang orihinal na larawan at audio pagkatapos ng {ttl_hours} oras, "
         f"o hanggang {held_max_hours} oras kung nakahinto ang pagproseso; "
         "text at assessment lang ang itinatabi. / "
@@ -236,7 +242,8 @@ async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 def add_handlers(application: Application) -> None:
     private = filters.ChatType.PRIVATE
-    application.add_handler(CommandHandler("start", on_start, filters=private))
+    # /help repeats /start: Telegram clients offer both (see the command list in app.bot_profile).
+    application.add_handler(CommandHandler(["start", "help"], on_start, filters=private))
     application.add_handler(MessageHandler(private & filters.TEXT & ~filters.COMMAND, on_text))
     application.add_handler(MessageHandler(private & filters.PHOTO, on_photo))
     application.add_handler(MessageHandler(private & filters.Document.IMAGE, on_image_document))
