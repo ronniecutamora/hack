@@ -63,8 +63,10 @@ def is_public(path: str) -> bool:
 
 def login_required(settings: Settings) -> bool:
     """True unless this is a localhost-only dev server without a passcode."""
-    return bool(settings.officer_passcode.get_secret_value()) or any(
-        host.lower() not in LOOPBACK_HOSTS for host in settings.allowed_hosts
+    return (
+        bool(settings.officer_passcode.get_secret_value())
+        or settings.telegram_mode == "webhook"
+        or any(host.lower() not in LOOPBACK_HOSTS for host in settings.allowed_hosts)
     )
 
 
@@ -180,6 +182,8 @@ class OfficerAuth:
         if self.enabled:
             if not passcode:
                 where = ", ".join(settings.allowed_hosts)
+                if settings.telegram_mode == "webhook":
+                    where += " and runs the Telegram webhook"
                 raise AuthConfigError(
                     f"Refusing to start without an officer login: the app answers to {where}. "
                     "Set OFFICER_PASSCODE and SESSION_SECRET (openssl rand -hex 32), or keep "

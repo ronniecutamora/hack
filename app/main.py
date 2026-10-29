@@ -37,6 +37,7 @@ from sqlalchemy import Engine
 from sqlmodel import Session, col, select
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.trustedhost import TrustedHostMiddleware
+from telegram.ext import Application
 
 from app.auth import (
     LOGIN_PATH,
@@ -45,6 +46,7 @@ from app.auth import (
     install_login_gate,
     safe_next,
 )
+from app.bot import build_application
 from app.config import Settings, get_settings
 from app.dashboard import active_incidents, incident_trust, overview
 from app.db import init_db, make_engine, make_recorder
@@ -104,6 +106,7 @@ from app.review import (
     review_cards,
     timeline,
 )
+from app.telegram_webhook import WEBHOOK_PREFIX, TelegramWebhook
 from app.trust import model_spend
 
 REPORT_LIMIT = 200
@@ -395,10 +398,13 @@ def create_app(
     summary_llm: AgentLLM | None = None,
     pair_judge: AgentLLM | None = None,
     clock: Callable[[], datetime] | None = None,
+    telegram_application: Application | None = None,
 ) -> FastAPI:
     """`summary_llm` replaces the configured agent LLM for RDANA summaries and `pair_judge` the
     duplicate judge the officer's "set place" re-grouping asks (tests, offline); `clock` (naive
-    UTC) replaces the real clock for filing countdowns (tests only)."""
+    UTC) replaces the real clock for filing countdowns (tests only). With TELEGRAM_MODE=webhook
+    the app also runs the bot (app.telegram_webhook); `telegram_application` replaces the one
+    built from the settings (tests)."""
     settings = settings or get_settings()
     auth = OfficerAuth(settings)  # refuses to build a public app without a passcode
 
@@ -417,8 +423,19 @@ def create_app(
         app.state.live = ChangeHub(settings.db_path)
         await app.state.live.start()
         restore_signals = close_on_shutdown_signals(app.state.live)
+        app.state.telegram = None
+        if settings.telegram_mode == "webhook":
+            application = telegram_application or build_application(
+                settings, engine=app.state.engine
+            )
+            secret = settings.telegram_webhook_secret.get_secret_value()
+            app.state.telegram = TelegramWebhook(application, secret)
+            await app.state.telegram.start()
         yield
         restore_signals()
+        if app.state.telegram is not None:
+            # First, while the database is open: it handles queued updates and assessments.
+            await app.state.telegram.stop()
         await app.state.live.stop()
         if summary_llm is None:
             await llm.aclose()
@@ -512,6 +529,14 @@ def create_app(
         response = RedirectResponse(LOGIN_PATH if auth.enabled else "/", status_code=303)
         auth.sign_out(response, request)
         return response
+
+    @app.post(WEBHOOK_PREFIX + "{path_token}")
+    async def telegram_webhook(request: Request, path_token: str) -> Response:
+        """Telegram's update delivery in webhook mode (public: it checks Telegram's secret)."""
+        hook: TelegramWebhook | None = request.app.state.telegram
+        if hook is None:
+            raise HTTPException(404, "not found")
+        return await hook.handle(request, path_token)
 
     @app.get("/events")
     async def events(request: Request) -> StreamingResponse:

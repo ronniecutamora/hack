@@ -1,6 +1,9 @@
 """Telegram bot intake: text, photos, voice notes and locations become Reports.
 
-Run with: uv run python -m app.bot
+Run with: uv run python -m app.bot (long polling, local development). A deploy runs the same
+Application inside the web app instead and Telegram posts updates to it (app.telegram_webhook).
+A token has either a webhook or polling, never both, so polling refuses to start while the
+token has a webhook (it would otherwise delete the webhook and take the bot from the deploy).
 """
 
 import asyncio
@@ -9,8 +12,9 @@ import sys
 from collections.abc import Awaitable, Callable
 from functools import wraps
 
+from sqlalchemy import Engine
 from sqlmodel import Session, select
-from telegram import Update
+from telegram import Bot, Update
 from telegram.error import BadRequest, NetworkError, TelegramError
 from telegram.ext import (
     Application,
@@ -19,11 +23,13 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
+from telegram.request import BaseRequest
 
 from app.assessment import make_assessor
 from app.config import Settings, get_settings
 from app.db import init_db, make_engine, make_recorder
 from app.intake import Admission, IntakeService
+from app.logs import configure_logging
 from app.meta.factory import make_transcriber
 from app.models import STATUS_HELD, Assessment, Incident, Report
 from app.reporter_summary import Acknowledgements, summary_text
@@ -38,6 +44,9 @@ TELEGRAM_READ_WRITE_TIMEOUT_S = 30
 # The TLS handshake to Telegram sometimes takes 1-8 s from a PH home line (measured
 # 2026-10-27), and now and then a connect fails outright, so network calls are retried.
 TELEGRAM_RETRY_DELAYS_S = (1, 3)
+
+# The handlers below read only new messages, so Telegram need not send anything else.
+ALLOWED_UPDATES = [Update.MESSAGE]
 
 MISSING_TOKEN_MESSAGE = (
     "TELEGRAM_BOT_TOKEN is not set. Create a bot with @BotFather on Telegram, then put the "
@@ -335,9 +344,14 @@ def add_handlers(application: Application) -> None:
     application.add_error_handler(on_error)
 
 
-def build_application(settings: Settings) -> Application:
-    engine = make_engine(settings)
-    init_db(engine)
+def build_application(
+    settings: Settings, *, engine: Engine | None = None, request: BaseRequest | None = None
+) -> Application:
+    """The bot with its handlers, intake and background assessor. `engine` shares the web app's
+    database pool in webhook mode; `request` replaces the HTTP layer to Telegram (tests)."""
+    if engine is None:
+        engine = make_engine(settings)
+        init_db(engine)
     recorder = make_recorder(engine)
     transcriber = make_transcriber(settings, recorder)
     assessor = make_assessor(settings, engine, recorder, transcriber=transcriber)
@@ -352,17 +366,17 @@ def build_application(settings: Settings) -> Application:
         await assessor.sam.aclose()
         await assessor.incidents.judge.aclose()
 
-    application = (
-        Application.builder()
-        .token(settings.telegram_bot_token.get_secret_value())
-        .connect_timeout(TELEGRAM_CONNECT_TIMEOUT_S)
-        .read_timeout(TELEGRAM_READ_WRITE_TIMEOUT_S)
-        .write_timeout(TELEGRAM_READ_WRITE_TIMEOUT_S)
-        .get_updates_connect_timeout(TELEGRAM_CONNECT_TIMEOUT_S)
-        .post_init(post_init)
-        .post_shutdown(post_shutdown)
-        .build()
-    )
+    builder = Application.builder().token(settings.telegram_bot_token.get_secret_value())
+    if request is not None:
+        builder = builder.request(request).get_updates_request(request)
+    else:
+        builder = (
+            builder.connect_timeout(TELEGRAM_CONNECT_TIMEOUT_S)
+            .read_timeout(TELEGRAM_READ_WRITE_TIMEOUT_S)
+            .write_timeout(TELEGRAM_READ_WRITE_TIMEOUT_S)
+            .get_updates_connect_timeout(TELEGRAM_CONNECT_TIMEOUT_S)
+        )
+    application = builder.post_init(post_init).post_shutdown(post_shutdown).build()
     application.bot_data["settings"] = settings
     application.bot_data["intake"] = IntakeService(settings, engine, transcriber)
     application.bot_data["assessor"] = assessor
@@ -371,17 +385,59 @@ def build_application(settings: Settings) -> Application:
     return application
 
 
-def main() -> int:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
-    logging.getLogger("httpx").setLevel(logging.WARNING)  # request URLs contain the bot token
+async def start_application(application: Application) -> None:
+    """Start the bot without polling (webhook mode), with the same hooks run_polling calls."""
+    await application.initialize()
+    if application.post_init:
+        await application.post_init(application)
+    await application.start()
+
+
+async def stop_application(application: Application) -> None:
+    """Handle the updates already queued and finish background tasks, then close the clients."""
+    if application.running:
+        await application.stop()
+    await application.shutdown()
+    if application.post_shutdown:
+        await application.post_shutdown(application)
+
+
+WEBHOOK_SET_MESSAGE = (
+    "This bot token has a webhook ({url}), so a deployed Ulat receives its messages. Polling "
+    "here would delete that webhook and take the bot from the deploy. To run the bot locally "
+    "on purpose, first roll back: uv run python -m app.deploy webhook delete --target <target>"
+)
+
+
+async def current_webhook(bot: Bot) -> str:
+    """The webhook URL Telegram has for this token ("" when none is set)."""
+    async with bot:
+        return (await _with_retries(bot.get_webhook_info)).url or ""
+
+
+def main(request: BaseRequest | None = None) -> int:
     settings = get_settings()
+    configure_logging(settings.secret_values())
     if not settings.telegram_bot_token.get_secret_value():
         print(MISSING_TOKEN_MESSAGE, file=sys.stderr)
         return 2
     if not settings.pseudonym_salt.get_secret_value():
         print("PSEUDONYM_SALT is not set. Generate one: openssl rand -hex 32", file=sys.stderr)
         return 2
-    build_application(settings).run_polling(allowed_updates=Update.ALL_TYPES)
+    if settings.telegram_mode == "webhook":
+        print(
+            "TELEGRAM_MODE=webhook: the web app runs the bot (uvicorn app.main:app). "
+            "Unset it to poll from this machine.",
+            file=sys.stderr,
+        )
+        return 2
+    token = settings.telegram_bot_token.get_secret_value()
+    bot = Bot(token, request=request, get_updates_request=request)
+    if url := asyncio.run(current_webhook(bot)):
+        host = url.split("/")[2] if url.count("/") >= 2 else "set"
+        print(WEBHOOK_SET_MESSAGE.format(url=f"https://{host}/…"), file=sys.stderr)
+        return 3
+    build_application(settings, request=request).run_polling(allowed_updates=ALLOWED_UPDATES)
     return 0
 
 
