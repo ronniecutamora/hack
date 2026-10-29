@@ -323,8 +323,21 @@ def rollup(members: list[Observation]) -> dict[str, Any]:
     }
 
 
+def counted_facts(member: Observation) -> dict[str, Any]:
+    """Schema-validated facts only (the redacted context), never the raw stored dict, with an
+    officer's fallen-tree verdict applied to the hazards (the models cannot see trees)."""
+    facts = member.context["facts"]
+    if member.fallen_tree is None:
+        return facts
+    hazards = [h for h in facts.get("hazards") or [] if h != "fallen_tree"]
+    if member.fallen_tree:
+        hazards.append("fallen_tree")
+    return {**facts, "hazards": hazards}
+
+
 def incident_title(member: Observation) -> str:
-    hazards = member.facts.get("hazards") or ["damage"]
+    """Barangay, first hazard and place, from the facts as the officer adjusted them."""
+    hazards = counted_facts(member).get("hazards") or ["damage"]
     place = redacted_place(member.facts.get("place_detail"))
     return " · ".join(
         part

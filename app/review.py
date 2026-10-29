@@ -509,6 +509,8 @@ class ReviewService:
                     detail={"verdict": verdict},
                 )
             )
+            session.flush()
+            refresh_incidents(session, {report.incident_id})  # its title and hazards
         return report.incident_id
 
     def set_reporter_blocked(

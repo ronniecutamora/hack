@@ -371,6 +371,28 @@ def test_fallen_tree_confirmation_reaches_the_counted_hazards(client, engine, se
         assert incident.reports_listing("hazards", "fallen_tree") == []
 
 
+def test_the_incident_title_follows_the_officers_tree_verdict(client, engine, settings):
+    """The model said a fallen tree; the officer rules it out: the title stops saying so."""
+    report_id = add_report(engine, barangay="Casile")
+    with Session(engine) as session:
+        assessment = session.exec(select(Assessment).where(Assessment.report_id == report_id)).one()
+        assessment.facts = {**assessment.facts, "hazards": ["fallen_tree", "flood"]}
+        session.add(assessment)
+        session.commit()
+    report = asyncio.run(IncidentService(settings, engine, FakeJudge()).group(report_id))
+
+    def title():
+        with Session(engine) as session:
+            return session.get(Incident, report.incident_id).title
+
+    assert "fallen tree" in title()
+    assert act(client, report.id, "tree", verdict="absent").status_code == 303
+    assert "fallen tree" not in title() and "flood" in title()
+    assert act(client, report.id, "tree", verdict="confirmed").status_code == 303
+    assert "flood" in title()  # a confirmed tree counts, after the hazards stated first
+    assert "fallen tree" in client.get(f"/incidents/{report.incident_id}").text
+
+
 def test_block_from_the_ui_has_the_same_effect_as_the_cli(
     client, engine, settings, judge, monkeypatch
 ):
