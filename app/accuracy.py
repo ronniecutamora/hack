@@ -42,8 +42,9 @@ NOT_MEANING = {
     "photo_judge": "These scores say how often the agent reads a photo the way a person does. "
     "They are not a count of damaged houses: SAM's roof and floodwater outlines are evidence "
     "for the officer and the PCIC adjuster, not the loss figure.",
-    "pair_judge": "A merge only joins reports for the officer's view; it never changes a "
-    "reported figure, and the officer can split any merge in the review queue.",
+    "pair_judge": "A merge means two reports describe one situation, so their figures are "
+    "counted once instead of added. The officer can split any merged report back out from its "
+    "incident page, and its figures then count on their own again.",
 }
 
 

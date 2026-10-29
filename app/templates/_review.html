@@ -40,11 +40,19 @@
           </fieldset>
         </form>
         <form method="post" action="{{ base }}keep">
+          {% if card.splits %}
+          <fieldset><legend>Split into its own incident</legend>
+            <p class="muted">It leaves incident #{{ card.incident.id }} for a new incident of its own, and both incidents' figures are recomputed; later re-checks never merge it back.</p>
+            {{ _officer(card, form, "keep", back) }}
+            <button type="submit">Split into its own incident</button>
+          </fieldset>
+          {% else %}
           <fieldset><legend>Keep as its own incident</legend>
             <p class="muted">It stays in {% if card.incident %}incident #{{ card.incident.id }}{% else %}a new incident{% endif %}; later re-checks never merge it elsewhere.</p>
             {{ _officer(card, form, "keep", back) }}
             <button type="submit">Keep separate</button>
           </fieldset>
+          {% endif %}
         </form>
         <form method="post" action="{{ base }}place">
           <fieldset><legend>Set or correct the barangay</legend>
@@ -166,6 +174,7 @@
       {% set detail = o.detail or {} %}
       {% if o.kind == "officer_merged" %}<p>Moved{% if o.from_incident_id %} from <a href="/incidents/{{ o.from_incident_id }}">incident #{{ o.from_incident_id }}</a>{% endif %} to <a href="/incidents/{{ o.incident_id }}">incident #{{ o.incident_id }}</a>. Re-grouping never moves it again.</p>
       {% elif o.kind == "officer_kept_separate" %}<p>Kept in incident #{{ o.incident_id }}. Re-grouping never moves it.</p>
+      {% elif o.kind == "officer_split" %}<p>Split from <a href="/incidents/{{ o.from_incident_id }}">incident #{{ o.from_incident_id }}</a> into <a href="/incidents/{{ o.incident_id }}">incident #{{ o.incident_id }}</a>. Re-grouping never merges it back.</p>
       {% elif o.kind == "officer_set_place" %}<p>Barangay set to <strong>{{ detail.barangay }}</strong> (was {{ detail.previous or "not found" }}); the report was grouped again.</p>
       {% elif o.kind == "officer_signal_reviewed" %}<p>{{ detail.code|replace("_", " ") }}: {{ SIGNAL_VERDICTS.get(detail.verdict, detail.verdict) }}.</p>
       {% elif o.kind == "officer_fallen_tree" %}<p>{{ TREE_VERDICTS.get(detail.verdict, detail.verdict)|capitalize }}.</p>

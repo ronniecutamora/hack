@@ -26,7 +26,7 @@ from app.models import (
     PhotoAssessment,
     Report,
 )
-from app.review import ACTION_LABELS, SIGNAL_VERDICTS, TREE_VERDICTS
+from app.review import ACTION_LABELS, GROUPING_ACTIONS, SIGNAL_VERDICTS, TREE_VERDICTS
 from app.trace import STEP_ORDER, STEPS, ModelFamily, Step, model_family
 
 TRACE_SINCE = "2026-10-30"  # the day calls started to be linked to reports
@@ -175,7 +175,7 @@ def _officer_output(action: OfficerAction) -> str:
         return f"{label}: {code}, {SIGNAL_VERDICTS.get(detail['verdict'], detail['verdict'])}"
     if action.kind == "officer_fallen_tree" and detail.get("verdict"):
         return f"{label}: {TREE_VERDICTS.get(detail['verdict'], detail['verdict'])}"
-    if action.kind in ("officer_merged", "officer_kept_separate") and action.incident_id:
+    if action.kind in GROUPING_ACTIONS and action.incident_id:
         return f"{label} → incident #{action.incident_id}"
     return label
 

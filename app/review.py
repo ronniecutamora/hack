@@ -3,7 +3,8 @@
 The agent marks what it cannot decide (an uncertain or failed duplicate check, an unknown place),
 flags trust evidence and cannot see fallen trees. The officer resolves each of these here:
 
-- merge a report into an incident, or keep it as its own incident;
+- merge a report into an incident, or keep it as its own incident (splitting it out into a new
+  one when its incident has other reports, which undoes a wrong merge);
 - set or correct its barangay (with a reason), after which it is grouped again;
 - review a trust signal (genuine or a problem) and confirm or rule out a fallen tree;
 - block or unblock the reporter, with the same function as `python -m app.trust`.
@@ -24,7 +25,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any
 
-from sqlalchemy import Engine
+from sqlalchemy import Engine, func
 from sqlmodel import Session, col, select
 
 from app.gazetteer import BY_NAME
@@ -43,6 +44,7 @@ from app.models import (
     OFFICER_MERGED,
     OFFICER_SET_PLACE,
     OFFICER_SIGNAL_REVIEWED,
+    OFFICER_SPLIT,
     OFFICER_UNBLOCKED,
     STATUS_ASSESSED,
     AgentDecision,
@@ -60,10 +62,13 @@ NOTE_MAX = 500
 PLACE_REASON_MIN = 5
 SIGNAL_VERDICTS = {"genuine": "checked: genuine", "problem": "checked: a problem"}
 TREE_VERDICTS = {"confirmed": "fallen tree confirmed", "absent": "no fallen tree"}
+# The officer actions that put a report in an incident (and pin it there).
+GROUPING_ACTIONS = (OFFICER_MERGED, OFFICER_KEPT_SEPARATE, OFFICER_SPLIT)
 # How each officer action reads in the incident timeline.
 ACTION_LABELS = {
     OFFICER_MERGED: "merged by the officer",
     OFFICER_KEPT_SEPARATE: "kept as its own incident by the officer",
+    OFFICER_SPLIT: "split into its own incident by the officer",
     OFFICER_SET_PLACE: "place set by the officer",
     OFFICER_SIGNAL_REVIEWED: "trust signal reviewed",
     OFFICER_FALLEN_TREE: "fallen tree reviewed",
@@ -111,6 +116,8 @@ class ReviewCard:
     signals: list[tuple[str, dict[str, Any], str | None]]  # (key, signal, verdict) to review
     tree_suggested: bool  # a photo judgment or the text mentions a fallen tree
     tree_verdict: bool | None
+    # Its incident has other reports, so "keep separate" splits it out into a new incident.
+    splits: bool = False
     reasons: list[str] = field(default_factory=list)
 
     @property
@@ -155,6 +162,20 @@ def merge_targets(session: Session, report: Report, compared: set[int]) -> list[
     ]
 
 
+def member_counts(session: Session, incident_ids: set[int | None]) -> dict[int, int]:
+    """Reports per incident, for these incidents."""
+    ids = incident_ids - {None}
+    if not ids:
+        return {}
+    return dict(
+        session.exec(
+            select(Report.incident_id, func.count())
+            .where(col(Report.incident_id).in_(ids))
+            .group_by(Report.incident_id)
+        ).all()
+    )
+
+
 def tree_suggested(assessment: Assessment | None, photos: list[PhotoAssessment]) -> bool:
     hazards = ((assessment.facts or {}).get("hazards") or []) if assessment else []
     return "fallen_tree" in hazards or any((p.judgment or {}).get("fallen_tree") for p in photos)
@@ -191,6 +212,7 @@ def review_cards(session: Session, report_ids: list[int]) -> list[ReviewCard]:
     }
     waiting = review_report_ids(session)
     signal_reviews, tree_reviews = officer_reviews(session)
+    sizes = member_counts(session, {r.incident_id for r in reports.values()})
     cards = []
     for report_id in report_ids:
         report = reports.get(report_id)
@@ -217,6 +239,7 @@ def review_cards(session: Session, report_ids: list[int]) -> list[ReviewCard]:
             signals=signals,
             tree_suggested=tree_suggested(assessment, photos.get(report_id, [])),
             tree_verdict=tree_reviews.get(report_id),
+            splits=sizes.get(report.incident_id, 0) > 1,
         )
         if card.grouping:
             card.reasons.append(
@@ -350,12 +373,16 @@ class ReviewService:
         return incident_id
 
     def keep_separate(self, report_id: int, *, officer: str | None, note: str | None = None) -> int:
+        """Pin the report to an incident of its own. If its incident has other reports (a wrong
+        merge), it is split out into a new incident; both incidents' rollups are recomputed and
+        the audit records a split from the old one. Returns the report's incident."""
         officer = officer_name(officer)
         note = clean(note, label="Note", max_length=NOTE_MAX)
         with self._write() as session:
             report = self._report(session, report_id, assessed=True)
-            incident_id = report.incident_id
-            if incident_id is None:  # a failed first grouping never made an incident
+            previous = report.incident_id
+            splits = member_counts(session, {previous}).get(previous, 0) > 1
+            if previous is None or splits:  # no incident yet, or one it shares: a new one
                 member = observations(session)[report_id]
                 incident = Incident(
                     title=incident_title(member),
@@ -366,18 +393,21 @@ class ReviewService:
                 session.add(incident)
                 session.flush()
                 incident_id = incident.id
+            else:
+                incident_id = previous
             self._resolve(session, report, incident_id)
             session.add(
                 OfficerAction(
-                    kind=OFFICER_KEPT_SEPARATE,
+                    kind=OFFICER_SPLIT if splits else OFFICER_KEPT_SEPARATE,
                     report_id=report_id,
                     incident_id=incident_id,
+                    from_incident_id=previous if splits else None,
                     officer=officer,
                     note=note,
                 )
             )
             session.flush()
-            refresh_incidents(session, {incident_id})
+            refresh_incidents(session, {previous, incident_id})
         return incident_id
 
     async def set_place(

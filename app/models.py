@@ -163,6 +163,7 @@ class AgentDecision(SQLModel, table=True):
 # OfficerAction.kind values
 OFFICER_MERGED = "officer_merged"
 OFFICER_KEPT_SEPARATE = "officer_kept_separate"
+OFFICER_SPLIT = "officer_split"  # kept separate out of an incident it shared: a new incident
 OFFICER_SET_PLACE = "officer_set_place"
 OFFICER_SIGNAL_REVIEWED = "officer_signal_reviewed"
 OFFICER_FALLEN_TREE = "officer_fallen_tree"

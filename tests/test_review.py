@@ -190,6 +190,74 @@ def test_keep_separate_confirms_the_incident_and_survives_a_judge_saying_same(
     assert [a.kind for a in rows(engine, OfficerAction)] == ["officer_kept_separate"]
 
 
+def casile_wrongly_merged(engine, settings):
+    """Two Casile reports the judge confidently (and wrongly) merged into one incident."""
+    service = IncidentService(settings, engine, FakeJudge(SAME))
+    voice = asyncio.run(
+        service.group(
+            add_report(engine, barangay="Casile", houses_partially_damaged=3, reporter=HEX_A)
+        )
+    )
+    photo = asyncio.run(
+        service.group(
+            add_report(
+                engine,
+                barangay="Casile",
+                at=AT + timedelta(hours=1),
+                houses_partially_damaged=5,
+                place="Purok 5 bodega",
+                reporter=HEX_B,
+            )
+        )
+    )
+    assert photo.incident_id == voice.incident_id and not photo.grouping_needs_officer
+    return voice, photo
+
+
+def test_keep_separate_splits_a_wrong_merge_into_a_new_incident(client, engine, settings):
+    voice, photo = casile_wrongly_merged(engine, settings)
+    assert houses(engine).value == 5  # one incident: the highest figure, not the sum
+    response = client.post("/drafts", data={"barangay": "Casile"}, follow_redirects=False)
+    assert response.status_code == 303
+    page = client.get(f"/incidents/{voice.incident_id}").text
+    assert page.count("Split into its own incident</button>") == 2  # one per member
+
+    assert act(client, photo.id, "keep", note="different purok").status_code == 303
+
+    split = report(engine, photo.id)
+    assert split.incident_id not in (None, voice.incident_id)
+    assert split.officer_incident_id == split.incident_id
+    assert report(engine, voice.id).incident_id == voice.incident_id
+    (action,) = rows(engine, OfficerAction)
+    assert (action.kind, action.from_incident_id, action.incident_id) == (
+        "officer_split",
+        voice.incident_id,
+        split.incident_id,
+    )
+    with Session(engine) as session:
+        old = session.get(Incident, voice.incident_id)
+        new = session.get(Incident, split.incident_id)
+        assert (old.active, old.latest_facts["report_count"]) == (True, 1)
+        assert (new.active, new.latest_facts["report_count"], new.barangay) == (True, 1, "Casile")
+        assert "Purok 5" in new.title
+    assert houses(engine).value == 3 + 5  # two incidents now: summed
+    assert client.app.state.drafts.is_stale(rows(engine, Draft)[0])
+    # Both incident pages show the split; the lone report is now offered "Keep separate".
+    for incident_id in (voice.incident_id, split.incident_id):
+        html = client.get(f"/incidents/{incident_id}").text
+        assert "split into its own incident by the officer" in html
+        assert "Split into its own incident</button>" not in html
+    # Re-grouping, even with a judge that says "same", never merges it back.
+    with Session(engine) as session:
+        row = session.get(Report, photo.id)
+        row.grouping_fingerprint = None
+        session.add(row)
+        session.commit()
+    regrouper = FakeJudge(SAME)
+    again = asyncio.run(IncidentService(settings, engine, regrouper).group(photo.id))
+    assert again.incident_id == split.incident_id and regrouper.calls == []
+
+
 def test_set_place_regroups_with_the_new_barangay_and_reassessment_keeps_it(
     client, engine, settings, judge
 ):
