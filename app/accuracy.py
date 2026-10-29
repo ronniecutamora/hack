@@ -28,7 +28,7 @@ TASKS = {
         "floodwater on the photo. Scores compare them with labels a person set by hand.",
     ),
     "pair_judge": (
-        "Same incident?",
+        "Duplicate check",
         "The agent LLM reads two reports' facts and says whether they describe the same "
         "situation. Only a confident 'same' merges them; anything less goes to the officer.",
     ),

@@ -25,7 +25,8 @@
         <p class="muted"><strong>{{ t.provenance_note }}</strong> {{ t.dataset.source }}. Labels: {{ t.dataset.label_source }}. Data set size: {{ t.dataset.n }}.</p>
         <div class="table-wrap">
         <table class="stack accuracy__table">
-          <caption class="muted">{{ t.title }} on {{ t.dataset.title|lower }}, per model</caption>
+          <caption class="muted">{{ t.title }}: {{ t.dataset.title }}, per model</caption>
+          <colgroup><col class="accuracy__label">{% for c in t.columns %}<col>{% endfor %}</colgroup>
           <thead>
             <tr>
               <th scope="col">Score</th>
