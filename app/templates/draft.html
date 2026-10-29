@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_evidence.html" import evidence_refs, houses_table %}
+{% from "_links.html" import report_href %}
 {% block title %}{% if draft.kind == 'rdana' %}RDANA draft · {{ draft.barangay }} v{{ draft.version }}{% else %}Damaged houses v{{ draft.version }}{% endif %}{% endblock %}
 {% block content %}
   {% set gap = c.not_in_reports or "— not in reports (for the RDANA team)" %}
@@ -62,7 +63,7 @@
                   {{ evidence_refs(f.evidence) }}
                   {% if f.key == "1.4" and c.flood_depths %}
                     <div class="keep"><span class="muted">Support data: flood depth per incident</span>
-                      <ul>{% for d in c.flood_depths %}<li>{% if d.incident_id %}<a href="/incidents/{{ d.incident_id }}">incident #{{ d.incident_id }}</a>{% else %}report #{{ d.report_ids[0] }}{% endif %}{% if d.place %} ({{ d.place }}){% endif %}: latest {{ d.latest|replace("_", " ") }}, maximum {{ d.max|replace("_", " ") }}</li>{% endfor %}</ul>
+                      <ul>{% for d in c.flood_depths %}<li>{% if d.incident_id %}<a href="/incidents/{{ d.incident_id }}">incident #{{ d.incident_id }}</a>{% else %}<a href="{{ report_href(d.report_ids[0]) }}">report #{{ d.report_ids[0] }}</a>{% endif %}{% if d.place %} ({{ d.place }}){% endif %}: latest {{ d.latest|replace("_", " ") }}, maximum {{ d.max|replace("_", " ") }}</li>{% endfor %}</ul>
                     </div>
                   {% endif %}
                 </td>

@@ -9,7 +9,8 @@
   {% if not items %}
     <p class="empty">No reports yet. Send a photo, voice note or text to the Telegram bot and it will show up here.</p>
   {% else %}
-    <p class="muted">{{ items|length }} most recent report{{ "s" if items|length != 1 }}, newest first. Times are Philippine time (GMT+8). Measurements are evidence for the officer, not official counts.</p>
+    {% if around %}<p class="banner">Showing the reports around report #{{ around }}, newest first. <a href="/reports">Back to the most recent reports</a></p>{% endif %}
+    <p class="muted">{{ items|length }} {% if not around %}most recent {% endif %}report{{ "s" if items|length != 1 }}, newest first. Times are Philippine time (GMT+8). Measurements are evidence for the officer, not official counts.</p>
     <table>
       <thead>
         <tr><th>Time</th><th>Barangay</th><th>Report</th><th>Photo evidence</th><th>Status</th></tr>

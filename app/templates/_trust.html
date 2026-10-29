@@ -1,3 +1,4 @@
+{% from "_links.html" import report_href %}
 {% macro signal_chips(assessment, related_incidents) %}
   {% if assessment and assessment.signals %}
     <ul class="chips" aria-label="Trust signals">
@@ -5,7 +6,7 @@
       <li class="chip{% if signal.severity == 'high' %} alert{% elif signal.severity == 'medium' %} warn{% endif %}">
         {{ signal.code|replace('_', ' ') }}: {{ signal.detail }}{% if signal.related_report_id %}
         {% set incident_id = related_incidents.get(signal.related_report_id) %}
-        {% if incident_id %}<a href="/incidents/{{ incident_id }}#report-{{ signal.related_report_id }}">report #{{ signal.related_report_id }}</a>{% else %}report #{{ signal.related_report_id }}{% endif %}{% endif %}
+        <a href="{{ report_href(signal.related_report_id, incident_id) }}">report #{{ signal.related_report_id }}</a>{% endif %}
       </li>
     {% endfor %}
     </ul>

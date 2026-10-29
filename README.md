@@ -82,7 +82,8 @@ submitted by), filled by a deterministic rule over typed report facts, or writte
 Everything else, such as the male/female splits, accessibility, communications, evacuation centers, relief,
 law and order and the overall assessment, is marked "— not in reports (for the RDANA team)". Missing evidence is
 never turned into "No" or "0". Every filled value links to its incidents and reports, with the reporter count,
-a "single source" chip and flagged-report chips.
+a "single source" chip and flagged-report chips. A report in an incident links to its place on the incident
+timeline; any other report links to `/reports?around=<id>`, which shows the reports around it however old it is.
 
 **Counting rule.** Reports in one incident describe the same houses and people, so their numbers are never added.
 Per incident, the latest correction replaces earlier figures; otherwise, and for figures reported after that
@@ -231,6 +232,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-29 | Review fix: a same-origin check on every state-changing request (an Origin or Referer for another host gets 403) until the dashboard has a login |
 | 2026-10-29 | Review fix: every damaged-houses CSV row starts with its status (LIVE (NOT APPROVED), or the snapshot's status and version) and the CSV adds single-source and flagged columns |
 | 2026-10-29 | Review fix: the officer's event date and time is refused when it is in the future or more than 30 days before the earliest report, and flagged when it is after it |
+| 2026-10-29 | Review fix: evidence links to reports outside an incident open /reports around that report, so they work past the 200-report page; trust-signal links use the same target |
 
 ### Third-party code and assets
 

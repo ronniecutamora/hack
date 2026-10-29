@@ -1,0 +1,5 @@
+{# A stable link to one report: its place on the incident timeline, else the reports page around it. #}
+{% macro report_href(report_id, incident_id=none) -%}
+  {%- if incident_id -%}/incidents/{{ incident_id }}#report-{{ report_id }}
+  {%- else -%}/reports?around={{ report_id }}#report-{{ report_id }}{%- endif -%}
+{%- endmacro %}

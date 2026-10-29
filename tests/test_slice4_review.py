@@ -9,8 +9,8 @@ from sqlmodel import Session, select
 
 from app.db import DRAFT_TRIGGERS, init_db, make_engine
 from app.drafts import CSV_BOM, DraftService, damaged_houses_csv
-from app.main import create_app
-from app.models import Draft, DraftEvent, Report, manila_time, utcnow
+from app.main import REPORT_LIMIT, create_app
+from app.models import Draft, DraftEvent, Report, Reporter, manila_time, utcnow
 from app.rdana import summary_counts
 from app.rdana_summary import fallback_summary, summary_input, validate_summary
 from tests.test_rdana import AT, SummaryLLM, add_incident, add_report, cite_all, evidence
@@ -522,3 +522,39 @@ def test_an_event_time_after_the_first_report_is_kept_with_a_warning(client):
     assert "Later than the earliest report" in client.get(f"/drafts/{draft_id}").text
     earlier = generate(client, event_at=local(AT - timedelta(days=29)))
     assert "warning" not in form_fields(stored(client, earlier))["1.1.3"]
+
+
+# --- Evidence links beyond the /reports page ---------------------------------------------
+
+
+def test_evidence_links_reach_reports_older_than_the_reports_page(client):
+    engine = client.app.state.engine
+    old = add_report(engine, hours=-1, houses_partially_damaged=2)  # ungrouped: pending
+    with Session(engine) as session:
+        reporter = Reporter(pseudonym="bulk")
+        session.add(reporter)
+        session.flush()
+        for minute in range(REPORT_LIMIT + 5):
+            session.add(
+                Report(
+                    reporter_id=reporter.id,
+                    channel="demo",
+                    received_at=AT + timedelta(minutes=minute),
+                    status="new",
+                )
+            )
+        session.commit()
+    assert f'id="report-{old}"' not in client.get("/reports").text
+
+    draft_id = generate(client)
+    link = f'href="/reports?around={old}#report-{old}"'
+    assert link in client.get(f"/drafts/{draft_id}").text
+    assert f'href="/reports#report-{old}"' not in client.get(f"/drafts/{draft_id}").text
+    page = client.get(f"/reports?around={old}").text
+    assert f'id="report-{old}"' in page and "Showing the reports around report" in page
+    assert page.count('<tr id="report-') <= REPORT_LIMIT
+
+    newest = client.get("/reports").text.split('<tr id="report-')[1].split('"')[0]
+    middle = client.get(f"/reports?around={newest}").text
+    assert f'id="report-{newest}"' in middle  # the newest report: the window is all older ones
+    assert client.get("/reports?around=999999").status_code == 404

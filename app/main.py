@@ -191,6 +191,33 @@ def foreign_origin(request: Request) -> str | None:
     return None
 
 
+def report_page(session: Session, around: int | None) -> list[tuple[Report, str]]:
+    """Up to REPORT_LIMIT reports with pseudonyms, newest first: the most recent ones, or a
+    window centred on report `around`, so an evidence link reaches any report however old."""
+    newest_first = (col(Report.received_at).desc(), col(Report.id).desc())
+    query = select(Report, Reporter.pseudonym).join(
+        Reporter, col(Reporter.id) == Report.reporter_id
+    )
+    if around is None:
+        return list(session.exec(query.order_by(*newest_first).limit(REPORT_LIMIT)).all())
+    target = session.get(Report, around)
+    if target is None:
+        raise HTTPException(404, "report not found")
+    key = (target.received_at, target.id)
+    later = (col(Report.received_at) > key[0]) | (
+        (col(Report.received_at) == key[0]) & (col(Report.id) > key[1])
+    )
+    newer = session.exec(
+        query.where(later)
+        .order_by(col(Report.received_at), col(Report.id))
+        .limit(REPORT_LIMIT // 2)
+    ).all()
+    older = session.exec(
+        query.where(~later).order_by(*newest_first).limit(REPORT_LIMIT - len(newer))
+    ).all()
+    return [*reversed(newer), *older]
+
+
 def create_app(settings: Settings | None = None, *, summary_llm: AgentLLM | None = None) -> FastAPI:
     """`summary_llm` replaces the configured agent LLM for RDANA summaries (tests, offline)."""
     settings = settings or get_settings()
@@ -229,14 +256,9 @@ def create_app(settings: Settings | None = None, *, summary_llm: AgentLLM | None
         return {"status": "ok"}
 
     @app.get("/reports", response_class=HTMLResponse)
-    def reports(request: Request) -> HTMLResponse:
+    def reports(request: Request, around: int | None = None) -> HTMLResponse:
         with Session(request.app.state.engine) as session:
-            rows = session.exec(
-                select(Report, Reporter.pseudonym)
-                .join(Reporter, col(Reporter.id) == Report.reporter_id)
-                .order_by(col(Report.received_at).desc())
-                .limit(REPORT_LIMIT)
-            ).all()
+            rows = report_page(session, around)
             ids = [report.id for report, _ in rows]
             media = session.exec(select(Media).where(col(Media.report_id).in_(ids))).all()
             assessments = session.exec(
@@ -284,6 +306,7 @@ def create_app(settings: Settings | None = None, *, summary_llm: AgentLLM | None
             "model_spend": spend,
             "spend_cap": settings.daily_spend_cap_usd,
             "related_incidents": related,
+            "around": around,
         }
         return templates.TemplateResponse(request, "reports.html", context)
 

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Drafts{% endblock %}
+{% from "_links.html" import report_href %}
 {% block content %}
   <header>
     <h1>Officer drafts</h1>
@@ -19,7 +20,7 @@
           <td>
             {% if s.evidence %}
               {{ s.evidence.report_ids|length }} report{{ 's' if s.evidence.report_ids|length != 1 }} in {{ s.evidence.incidents|length }} incident{{ 's' if s.evidence.incidents|length != 1 }}
-              <div class="muted">{% for i in s.evidence.incidents %}{% if i.incident_id %}<a href="/incidents/{{ i.incident_id }}">#{{ i.incident_id }}</a>{% else %}ungrouped report #{{ i.report_ids[0] }}{% endif %}{{ ", " if not loop.last }}{% endfor %}</div>
+              <div class="muted">{% for i in s.evidence.incidents %}{% if i.incident_id %}<a href="/incidents/{{ i.incident_id }}">#{{ i.incident_id }}</a>{% else %}ungrouped <a href="{{ report_href(i.report_ids[0]) }}">report #{{ i.report_ids[0] }}</a>{% endif %}{{ ", " if not loop.last }}{% endfor %}</div>
               {% set waiting = s.evidence.pending_report_ids() %}
               {% if waiting %}<div class="chip warn">{{ waiting|length }} report{{ 's' if waiting|length != 1 }} with figures pending grouping review, not added</div>{% endif %}
               {% if s.evidence.unassessed_report_ids %}<div class="chip warn">{{ s.evidence.unassessed_report_ids|length }} report{{ 's' if s.evidence.unassessed_report_ids|length != 1 }} not assessed yet, not counted</div>{% endif %}
@@ -55,7 +56,7 @@
   {% endif %}
   {% if unplaced %}
     <p class="banner warn">{{ unplaced|length }} incident{{ 's' if unplaced|length != 1 }} without a barangay {{ 'are' if unplaced|length != 1 else 'is' }} in no draft until the officer places {{ 'them' if unplaced|length != 1 else 'it' }}:
-      {% for i in unplaced %}{% if i.incident_id %}<a href="/incidents/{{ i.incident_id }}">incident #{{ i.incident_id }}</a>{% else %}<a href="/reports#report-{{ i.report_ids[0] }}">report #{{ i.report_ids[0] }}</a>{% endif %}{{ ", " if not loop.last }}{% endfor %}.</p>
+      {% for i in unplaced %}{% if i.incident_id %}<a href="/incidents/{{ i.incident_id }}">incident #{{ i.incident_id }}</a>{% else %}<a href="{{ report_href(i.report_ids[0]) }}">report #{{ i.report_ids[0] }}</a>{% endif %}{{ ", " if not loop.last }}{% endfor %}.</p>
   {% endif %}
   <section class="no-print">
     <h2>Damaged-houses table</h2>

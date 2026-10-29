@@ -1,7 +1,7 @@
 {% from "_trust.html" import incident_trust %}
+{% from "_links.html" import report_href %}
 {% macro report_link(ref, report_id) -%}
-  {%- if ref.incident_id -%}<a href="/incidents/{{ ref.incident_id }}#report-{{ report_id }}">#{{ report_id }}</a>
-  {%- else -%}<a href="/reports#report-{{ report_id }}">#{{ report_id }}</a>{%- endif -%}
+  <a href="{{ report_href(report_id, ref.incident_id) }}">#{{ report_id }}</a>
 {%- endmacro %}
 
 {% macro incident_link(ref) -%}
