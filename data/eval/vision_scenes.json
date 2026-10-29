@@ -1,0 +1,562 @@
+[
+  {
+    "id": "neg-dry-street",
+    "category": "negative",
+    "scene": "Dry residential street in a Philippine lakeshore town on a calm day, small concrete houses with intact corrugated GI-sheet roofs, clean swept road, potted plants",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "none",
+      "floodwater": 0,
+      "debris": 0,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "neg-intact-house",
+    "category": "negative",
+    "scene": "One small painted concrete house with an intact red corrugated GI-sheet roof and a clean fenced front yard, dry ground",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "none",
+      "floodwater": 0,
+      "debris": 0,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "neg-lakeshore-road",
+    "category": "negative",
+    "scene": "Row of intact two-storey houses with GI-sheet roofs along a dry paved lakeshore road, calm lake visible at the end of the street",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "none",
+      "floodwater": 0,
+      "debris": 0,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "neg-covered-court",
+    "category": "negative",
+    "scene": "Empty barangay covered basketball court with an intact curved metal roof, dry concrete floor, no damage",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "none",
+      "floodwater": 0,
+      "debris": 0,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "partial-peeled-sheets",
+    "category": "roof_partial",
+    "scene": "Small concrete house whose corrugated GI-sheet roof has three sheets peeled back at one corner, exposing wooden rafters; the rest of the roof is in place; tidy dry yard",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "partial",
+      "floodwater": 0,
+      "debris": 0,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "partial-bent-sheets-yard",
+    "category": "roof_partial",
+    "scene": "House with bent, lifted roof sheets along one edge after a typhoon, a few torn GI sheets and broken plywood lying in the muddy yard",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "partial",
+      "floodwater": 0,
+      "debris": 1,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "partial-nipa-hut",
+    "category": "roof_partial",
+    "scene": "Bamboo house with a nipa thatch roof partly torn away on one side, most of the thatch still in place, dry ground",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "partial",
+      "floodwater": 0,
+      "debris": 0,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "partial-store-tarp",
+    "category": "roof_partial",
+    "scene": "Small neighbourhood store with a torn corner of its GI-sheet roof covered by a tied blue tarpaulin, otherwise intact building, dry street",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "partial",
+      "floodwater": 0,
+      "debris": 0,
+      "fallen_tree": 0,
+      "tarpaulin": 1,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "severe-roof-gone",
+    "category": "roof_severe",
+    "scene": "Concrete house with its roof completely blown off, bare walls standing open to the sky, broken rafters and roof sheets scattered inside and around it",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "severe",
+      "floodwater": 0,
+      "debris": 1,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "severe-collapsed-wood-house",
+    "category": "roof_severe",
+    "scene": "Collapsed wooden house after a typhoon, roof caved in to the ground, splintered planks and twisted GI sheets in a heap",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "severe",
+      "floodwater": 0,
+      "debris": 1,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "severe-two-houses",
+    "category": "roof_severe",
+    "scene": "Two neighbouring houses with roofs torn off and walls partly fallen, a street strewn with GI sheets, wood and rubble",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "severe",
+      "floodwater": 0,
+      "debris": 1,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "severe-tarp-cover",
+    "category": "roof_severe",
+    "scene": "Roofless concrete house with a large blue tarpaulin stretched across the top of the walls as a temporary cover, rubble piled beside it",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "severe",
+      "floodwater": 0,
+      "debris": 1,
+      "fallen_tree": 0,
+      "tarpaulin": 1,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "flood-ankle",
+    "category": "flood",
+    "scene": "Residential street with ankle-deep murky floodwater covering the whole road, intact small houses with GI-sheet roofs on both sides",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "none",
+      "floodwater": 1,
+      "debris": 0,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "flood-knee",
+    "category": "flood",
+    "scene": "Residential street flooded knee-deep with brown water reaching the bottom of the doorsteps, intact houses with GI-sheet roofs",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "none",
+      "floodwater": 1,
+      "debris": 0,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "flood-waist",
+    "category": "flood",
+    "scene": "Street flooded waist-deep, brown floodwater up to the window sills of intact concrete houses with GI-sheet roofs, a parked tricycle half submerged",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "none",
+      "floodwater": 1,
+      "debris": 0,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "flood-chest",
+    "category": "flood",
+    "scene": "Neighbourhood flooded chest-deep, only the upper halves of houses and their intact GI-sheet roofs above the brown water",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "none",
+      "floodwater": 1,
+      "debris": 0,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "flood-floating-debris",
+    "category": "flood",
+    "scene": "Lakeshore village street under knee-deep floodwater with floating plastic, wood and branches, intact stilt houses with GI-sheet roofs",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "none",
+      "floodwater": 1,
+      "debris": 1,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "flood-receding-mud",
+    "category": "flood",
+    "scene": "Floodwater receding from a street, a thin layer of brown water over mud, intact houses with GI-sheet roofs, water lines on the walls",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "none",
+      "floodwater": 1,
+      "debris": 0,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "debris-street",
+    "category": "debris",
+    "scene": "Dry street littered with storm debris after a typhoon: broken branches, torn GI sheets and plywood scattered across the road; the houses behind have intact roofs",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "none",
+      "floodwater": 0,
+      "debris": 1,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "debris-roadside-pile",
+    "category": "debris",
+    "scene": "Large roadside pile of typhoon wreckage, twisted metal roof sheets, broken lumber and branches, on a dry road with no buildings in view",
+    "labels": {
+      "roof": 0,
+      "roof_damage": "unknown",
+      "floodwater": 0,
+      "debris": 1,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "tree-across-road",
+    "category": "fallen_tree",
+    "scene": "Large mango tree uprooted and lying across a paved road, its root ball torn out of the ground, intact houses with GI-sheet roofs behind",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "none",
+      "floodwater": 0,
+      "debris": 0,
+      "fallen_tree": 1,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "tree-on-roof",
+    "category": "fallen_tree",
+    "scene": "Coconut palm fallen onto a small house, its trunk crushing part of the GI-sheet roof, broken sheets hanging down",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "partial",
+      "floodwater": 0,
+      "debris": 1,
+      "fallen_tree": 1,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "tree-leaning-street",
+    "category": "fallen_tree",
+    "scene": "Big acacia tree snapped and leaning down over a narrow street, branches resting on a fence, intact houses nearby",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "none",
+      "floodwater": 0,
+      "debris": 0,
+      "fallen_tree": 1,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "tree-uprooted-field",
+    "category": "fallen_tree",
+    "scene": "Uprooted tree lying in an open grassy field with its roots exposed, no buildings in view",
+    "labels": {
+      "roof": 0,
+      "roof_damage": "unknown",
+      "floodwater": 0,
+      "debris": 0,
+      "fallen_tree": 1,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "tarp-intact-roof",
+    "category": "hard_case",
+    "scene": "Intact house with a blue tarpaulin tied over part of its undamaged GI-sheet roof as rain protection, the roof sheets straight and complete, dry street",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "none",
+      "floodwater": 0,
+      "debris": 0,
+      "fallen_tree": 0,
+      "tarpaulin": 1,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "tarp-tents-court",
+    "category": "tarpaulin",
+    "scene": "Row of blue and orange tarpaulin tents set up under an intact covered court roof as an evacuation area, dry floor",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "none",
+      "floodwater": 0,
+      "debris": 0,
+      "fallen_tree": 0,
+      "tarpaulin": 1,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "tarp-market-awnings",
+    "category": "tarpaulin",
+    "scene": "Market street with orange and blue tarpaulin awnings over stalls, intact buildings, dry pavement, no damage",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "none",
+      "floodwater": 0,
+      "debris": 0,
+      "fallen_tree": 0,
+      "tarpaulin": 1,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "fish-cages-intact",
+    "category": "fish_pens",
+    "scene": "Intact bamboo fish pens and net cages standing in neat rows on a calm wide lake, straight bamboo poles, nets taut",
+    "labels": {
+      "roof": 0,
+      "roof_damage": "unknown",
+      "floodwater": 0,
+      "debris": 0,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 1
+    }
+  },
+  {
+    "id": "fish-cages-broken",
+    "category": "fish_pens",
+    "scene": "Typhoon-damaged bamboo fish cages on a lake: snapped bamboo poles leaning at angles, torn nets half-submerged, broken frames",
+    "labels": {
+      "roof": 0,
+      "roof_damage": "unknown",
+      "floodwater": 0,
+      "debris": 1,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 1
+    }
+  },
+  {
+    "id": "fish-pen-wreck-shore",
+    "category": "fish_pens",
+    "scene": "Broken bamboo poles and torn fish-pen nets washed up in a tangle on a muddy lakeshore after a storm",
+    "labels": {
+      "roof": 0,
+      "roof_damage": "unknown",
+      "floodwater": 0,
+      "debris": 1,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 1
+    }
+  },
+  {
+    "id": "fish-pen-guard-hut",
+    "category": "fish_pens",
+    "scene": "Intact fish pens on a lake with a small bamboo guard hut with an intact nipa roof standing on stilts over the water",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "none",
+      "floodwater": 0,
+      "debris": 0,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 1
+    }
+  },
+  {
+    "id": "hard-wet-road",
+    "category": "hard_case",
+    "scene": "Wet asphalt road just after rain with shiny reflections and a few small puddles, no flooding, intact houses with GI-sheet roofs",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "none",
+      "floodwater": 0,
+      "debris": 0,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "hard-lake-view",
+    "category": "hard_case",
+    "scene": "Calm lake seen from a dry concrete seawall, intact houses with GI-sheet roofs along the shore, no flooding",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "none",
+      "floodwater": 0,
+      "debris": 0,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "hard-rice-paddy",
+    "category": "hard_case",
+    "scene": "Irrigated rice paddy with shallow standing water between rows of green rice seedlings, a dry farm road beside it, no buildings",
+    "labels": {
+      "roof": 0,
+      "roof_damage": "unknown",
+      "floodwater": 0,
+      "debris": 0,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "hard-rusty-roof",
+    "category": "hard_case",
+    "scene": "Old house with a rusty, patched but complete corrugated GI-sheet roof, no missing sheets, dry yard",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "none",
+      "floodwater": 0,
+      "debris": 0,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "hard-canal",
+    "category": "hard_case",
+    "scene": "Drainage canal with water flowing well inside its concrete banks, dry streets and intact houses on both sides",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "none",
+      "floodwater": 0,
+      "debris": 0,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "hard-everyday-trash",
+    "category": "hard_case",
+    "scene": "A few tied garbage bags left at a roadside collection point on a dry, undamaged street, intact houses behind",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "none",
+      "floodwater": 0,
+      "debris": 0,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "combo-flood-partial-roof",
+    "category": "combo",
+    "scene": "Knee-deep floodwater in a street in front of a house whose GI-sheet roof is partly torn off, loose sheets and wood floating",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "partial",
+      "floodwater": 1,
+      "debris": 1,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "combo-flood-destroyed",
+    "category": "combo",
+    "scene": "Destroyed wooden houses with roofs gone standing in shin-deep brown floodwater, wreckage floating around them",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "severe",
+      "floodwater": 1,
+      "debris": 1,
+      "fallen_tree": 0,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  },
+  {
+    "id": "combo-tree-flood",
+    "category": "combo",
+    "scene": "Fallen tree lying across a flooded street, knee-deep brown water around its trunk, intact houses with GI-sheet roofs",
+    "labels": {
+      "roof": 1,
+      "roof_damage": "none",
+      "floodwater": 1,
+      "debris": 0,
+      "fallen_tree": 1,
+      "tarpaulin": 0,
+      "fish_cage": 0
+    }
+  }
+]
