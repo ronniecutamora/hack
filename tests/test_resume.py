@@ -13,9 +13,11 @@ from app import trust
 from app.assessment import AssessmentService, resumable_report_ids
 from app.bot import resume_interrupted
 from app.db import init_db, make_engine
+from app.incidents import IncidentService
 from app.intake import IntakeService
 from app.models import Report, Reporter, utcnow
 from tests.test_assessment import FakeLLM, FakeSam
+from tests.test_incidents import FakeJudge
 
 
 @pytest.fixture
@@ -94,3 +96,31 @@ async def test_resume_is_bounded_to_the_newest_and_says_how_many_wait(settings, 
     assert await resume_interrupted(assessor, engine, limit=2, pause_s=0) == ids[2:]
     assert "2 older interrupted report(s) not resumed" in caplog.text
     assert [status(engine, i) for i in ids] == ["new", "new", "assessed", "assessed"]
+
+
+async def test_a_report_whose_grouping_was_cut_off_is_grouped_without_reassessing(settings, engine):
+    """The restart came after the facts were saved but before grouping finished."""
+    intake = IntakeService(settings, engine)
+    llm = FakeLLM()
+    judge = FakeJudge()
+    assessor = AssessmentService(
+        settings, engine, llm, FakeSam(), IncidentService(settings, engine, judge)
+    )
+    done = await assessor.assess((await intake.ingest_text(1, "baha sa Casile")).id)
+    cut = await assessor.assess((await intake.ingest_text(2, "baha sa Malaban")).id)
+    with Session(engine) as session:  # what a cut-off grouping leaves: assessed, never grouped
+        row = session.get(Report, cut.id)
+        row.incident_id = row.grouping_fingerprint = None
+        session.add(row)
+        session.commit()
+    assert resumable_report_ids(engine, 10) == ([cut.id], 1)
+    facts_calls = len(llm.calls)
+
+    assert await resume_interrupted(assessor, engine, pause_s=0) == [cut.id]
+
+    with Session(engine) as session:
+        regrouped = session.get(Report, cut.id)
+        assert regrouped.incident_id is not None and regrouped.grouping_fingerprint
+        assert session.get(Report, done.id).incident_id == done.incident_id
+    assert len(llm.calls) == facts_calls  # grouped again, not assessed again
+    assert resumable_report_ids(engine, 10) == ([], 0)

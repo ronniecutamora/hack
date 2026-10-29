@@ -28,7 +28,7 @@ from telegram.ext import (
 )
 from telegram.request import BaseRequest
 
-from app.assessment import RESUME_STATUSES, make_assessor, resumable_report_ids
+from app.assessment import make_assessor, resumable_report_ids
 from app.config import Settings, get_settings
 from app.db import init_db, make_engine, make_recorder
 from app.intake import Admission, IntakeService
@@ -472,11 +472,12 @@ def build_application(
 async def resume_interrupted(
     assessor: Any, engine: Engine, *, limit: int = RESUME_LIMIT, pause_s: float = RESUME_PAUSE_S
 ) -> list[int]:
-    """Assess the reports a restart left new or assessing (app.assessment.RESUME_STATUSES), one
-    at a time with a pause between, so live reports and the model APIs are not swamped; the
-    spend cap still holds each one. An "assessing" row at startup was cut off: one process
-    writes the database (the lease on a deploy), and the status is re-checked under the report's
-    lock, so a report a live message assessed meanwhile is skipped. Returns the ids tried."""
+    """Finish the reports a restart left new, assessing or assessed but never grouped
+    (app.assessment.resumable_report_ids), one at a time with a pause between, so live reports
+    and the model APIs are not swamped; the spend cap still holds each one. An "assessing" row at
+    startup was cut off: one process writes the database (the lease on a deploy), and the status
+    is re-checked under the report's lock, so a report a live message assessed meanwhile is not
+    assessed again. Returns the ids tried."""
     ids, total = await asyncio.to_thread(resumable_report_ids, engine, limit)
     if not ids:
         return []
@@ -489,7 +490,7 @@ async def resume_interrupted(
     for index, report_id in enumerate(ids):
         if index:
             await asyncio.sleep(pause_s)
-        await assessor.assess(report_id, only_if=RESUME_STATUSES)
+        await assessor.resume(report_id)
     return ids
 
 

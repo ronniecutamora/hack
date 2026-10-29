@@ -20,7 +20,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import Engine, func
+from sqlalchemy import Engine, func, or_
 from sqlmodel import Session, col, select
 
 from app.audio import AudioConversionError, to_wav_chunks
@@ -72,9 +72,9 @@ PENDING_STATUSES = (
     STATUS_HELD,
 )
 # What a restart can leave half done (the bot queued it, or its run was cut off): the bot
-# process resumes these once at startup (app.bot.resume_interrupted). Held and failed reports
-# are not resumed there: they wait for the officer, a lifted cap or `--pending`, so a bad input
-# cannot loop or re-spend at every start.
+# process resumes these once at startup (app.bot.resume_interrupted), and also groups assessed
+# reports whose grouping never ran. Held and failed reports are not resumed there: they wait for
+# the officer, a lifted cap or `--pending`, so a bad input cannot loop or re-spend at every start.
 RESUME_STATUSES = (STATUS_NEW, STATUS_ASSESSING)
 
 
@@ -184,6 +184,19 @@ class AssessmentService:
         # Every model call below is logged against this report (app.trace).
         with traced(report_id=report_id):
             return await self._assess_locked(report_id, only_if)
+
+    async def resume(self, report_id: int) -> Report | None:
+        """Finish what a restart interrupted: assess the report if it is still new or assessing,
+        then group it if its grouping never ran. A finished report costs no model call."""
+        report = await self.assess(report_id, only_if=RESUME_STATUSES)
+        if (
+            report is not None
+            and report.status == STATUS_ASSESSED
+            and report.grouping_fingerprint is None
+            and report.grouping_error is None
+        ):
+            report = await self.incidents.group(report_id)
+        return report
 
     async def _assess_locked(
         self, report_id: int, only_if: tuple[str, ...] | None = None
@@ -505,12 +518,19 @@ class AssessmentService:
 
 
 def resumable_report_ids(engine: Engine, limit: int) -> tuple[list[int], int]:
-    """The newest `limit` reports a restart left new or assessing, oldest first (the order
-    grouping expects), and how many there are in all. Blocked reporters' reports are skipped."""
+    """The newest `limit` reports a restart left new or assessing, or assessed but never grouped
+    (no grouping fingerprint and no grouping error), oldest first (the order grouping expects),
+    and how many there are in all. Blocked reporters' reports are skipped."""
+    interrupted = or_(
+        col(Report.status).in_(RESUME_STATUSES),
+        (Report.status == STATUS_ASSESSED)
+        & col(Report.grouping_fingerprint).is_(None)
+        & col(Report.grouping_error).is_(None),
+    )
     pending = (
         select(Report.id)
         .join(Reporter, Reporter.id == Report.reporter_id)
-        .where(col(Report.status).in_(RESUME_STATUSES), Reporter.blocked == False)  # noqa: E712
+        .where(interrupted, Reporter.blocked == False)  # noqa: E712
     )
     with Session(engine) as session:
         newest = session.exec(

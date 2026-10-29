@@ -514,6 +514,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-30 | Review fix: the database lease is enforced, not advisory: a container whose stale lease another one took over writes no more snapshots and never overwrites or releases the new holder's lease (the final snapshot reloads the volume first to see a takeover) |
 | 2026-10-30 | Review fix: incident titles use the facts as the officer adjusted them (a ruled-out fallen tree leaves the title, a confirmed one joins the hazards), and a fallen-tree verdict refreshes its incident |
 | 2026-10-30 | Fix found in the staging restart check: a stored report is queued for assessment before the bot replies "received", so a reporter who blocked the bot (or a failed reply) no longer leaves it unassessed until the next restart |
+| 2026-10-30 | Fix found in the staging restart check: a restart that cuts off grouping after the facts were saved left the report assessed but never grouped; startup now also groups such reports (no new facts call) |
 
 ### Third-party code and assets
 

@@ -56,6 +56,8 @@ class MarkAssessed:
             session.refresh(report)
             return report
 
+    resume = assess
+
 
 def webhook_app(settings, fake: FakeTelegram):
     application = bot.build_application(settings, request=fake)
