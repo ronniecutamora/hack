@@ -158,6 +158,9 @@ def test_a_report_assessed_before_the_trace_existed_says_so(settings, client):
     trace = trace_html(client.get("/reports").text, report_id)
 
     assert "Trace not recorded" in trace and "(2026-10-30)" in trace
+    # The step still names the model its stored result came from.
+    assert "Muse Spark 1.3</span> <code>muse-spark-1.3</code>" in trace
+    assert "call not logged" in trace and "<code>None</code>" not in trace
 
 
 def test_calls_without_a_saved_output_are_still_listed_and_counted():

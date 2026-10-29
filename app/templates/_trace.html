@@ -24,9 +24,9 @@
           <div class="trace__model">
             {% if s.stats %}
               {{ model_name(s.stats.model, s.family) }}
-              <span class="trace__metrics">{{ s.stats.latency_ms|duration }} · {% if s.stats.cached %}from cache{% else %}live call{% endif %} · {{ s.stats.cost|usd }}{% if s.stats.calls > 1 %} · {{ s.stats.calls }} calls, {{ s.stats.cached_calls }} from cache{% endif %}</span>
+              <span class="trace__metrics">· {{ s.stats.latency_ms|duration }} · {% if s.stats.cached %}from cache{% else %}live call{% endif %} · {{ s.stats.cost|usd }}{% if s.stats.calls > 1 %} · {{ s.stats.calls }} calls, {{ s.stats.cached_calls }} from cache{% endif %}</span>
             {% else %}
-              {{ model_name(s.model, s.family) }} <span class="muted">· call not logged</span>
+              {% if s.model %}{{ model_name(s.model, s.family) }} · {% endif %}<span class="muted">call not logged</span>
             {% endif %}
           </div>
         {% endif %}

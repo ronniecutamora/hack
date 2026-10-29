@@ -17,6 +17,7 @@ from sqlmodel import Session, col, func, select
 
 from app.facts import fact_lines
 from app.geo import GEO_SOURCES
+from app.meta.sam import MODEL as SAM_MODEL
 from app.models import (
     AgentDecision,
     Assessment,
@@ -65,7 +66,7 @@ class TraceStep:
     actor: Literal["model", "rule", "officer"]
     output: str
     stats: CallStats | None = None
-    model: str | None = None  # a model named by a stored decision whose call was not logged
+    model: str | None = None  # the model the stored result names, for a call that was not logged
     detail: str | None = None  # the longer explanation, shown on hover
     officer: str | None = None
     at: datetime | None = None
@@ -243,20 +244,27 @@ def build_trace(
         )
     facts_calls = pending.take(Step.FACTS)
     if facts_calls or (assessment and assessment.facts is not None):
-        steps.append(_step(Step.FACTS, _facts_output(assessment and assessment.facts), facts_calls))
+        steps.append(
+            _step(
+                Step.FACTS,
+                _facts_output(assessment and assessment.facts),
+                facts_calls,
+                model=assessment.llm_model if assessment else None,
+            )
+        )
     for number, photo in enumerate(sorted(photos, key=lambda p: p.media_id), 1):
         subject = f"media:{photo.media_id}"
         suffix = f" · photo {number}" if len(photos) > 1 else ""
-        for step, output in (
-            (Step.PHOTO_JUDGE, _judgment_output(photo.judgment, photo.error)),
-            (Step.SAM_ROOF, _roof_output(photo.measurement)),
-            (Step.SAM_FLOODWATER, _flood_output(photo.measurement)),
+        for step, output, model in (
+            (Step.PHOTO_JUDGE, _judgment_output(photo.judgment, photo.error), photo.llm_model),
+            (Step.SAM_ROOF, _roof_output(photo.measurement), SAM_MODEL),
+            (Step.SAM_FLOODWATER, _flood_output(photo.measurement), SAM_MODEL),
         ):
             stats = pending.take(step, subject)
             if stats is None and photo.judgment is None:
                 continue  # a failed photo: the error is on the report
             info = STEPS[step]
-            steps.append(TraceStep(info.label + suffix, info.actor, output, stats))
+            steps.append(TraceStep(info.label + suffix, info.actor, output, stats, model=model))
     if assessment is not None:
         steps.append(_step(Step.GEOLOCATE, _geo_output(report, assessment)))
         if assessment.signals is not None:
