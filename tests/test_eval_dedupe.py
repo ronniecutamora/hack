@@ -71,7 +71,10 @@ async def test_low_confidence_different_is_not_counted_as_officer_review(capsys)
     assert "miss" not in output
 
 
-async def test_cli_fixture_with_fake_judge_prints_precision_recall_and_f1(monkeypatch, capsys):
+async def test_cli_fixture_with_fake_judge_prints_precision_recall_and_f1(
+    monkeypatch, capsys, settings
+):
+    monkeypatch.setattr(eval_dedupe, "get_settings", lambda: settings)  # spend ledger in tmp
     pairs = eval_dedupe.load_pairs(eval_dedupe.DEFAULT_PAIRS)
     judge = FakeJudge(
         *[

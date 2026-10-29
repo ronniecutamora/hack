@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "datasets": {
+    "dedupe-pairs-64": {
+      "title": "Synthetic report pairs",
+      "provenance": "synthetic",
+      "source": "64 hand-written pairs of Biñan report facts (24 same incident, 40 different, including near-identical hard negatives); in this repo at tests/fixtures/dedupe_pairs.json",
+      "label_source": "same/different labels written with each pair by the builder, 2026-10-28",
+      "n": 64,
+      "location": "tests/fixtures/dedupe_pairs.json (text only, no images or audio)"
+    },
+    "kill-test-25": {
+      "title": "Real typhoon photos",
+      "provenance": "real",
+      "source": "25 Wikimedia Commons photos of Philippine typhoon damage (Haiyan 2013, Ketsana/Ondoy 2009, Rai/Odette 2021) under CC BY 2.0, CC BY-SA 3.0/4.0 or public domain; not from Biñan, mostly severe damage",
+      "label_source": "hand labels by the builder for the 2026-10-27 model kill test",
+      "n": 25,
+      "location": "outside this repo (images are credited in the README, not copied)"
+    },
+    "synthetic-40": {
+      "title": "Synthetic Biñan-style photos",
+      "provenance": "synthetic",
+      "source": "40 Muse Image photos generated from data/eval/vision_scenes.json (lakeshore streets, GI-sheet roofs, floods ankle- to chest-deep, fish pens, hard negatives), each stamped AI-generated",
+      "label_source": "labels designed per scene, then checked against every image by eye; changed labels are noted in label_notes",
+      "n": 40,
+      "location": "outside this repo (regenerate with scripts.make_vision_set)"
+    }
+  },
+  "entries": []
+}
