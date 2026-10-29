@@ -136,6 +136,7 @@ designation of the officer. Generating again creates version n+1 and marks the p
 reject writes an append-only `DraftEvent`, kept apart from the incident grouping audit (`AgentDecision`), which is
 per report. SQLite triggers reject edits to decided drafts and to the audit; startup drops and recreates them, so a
 changed definition reaches an existing database (a backfill that must update decided drafts runs in between). The
+whole schema setup runs in one `BEGIN IMMEDIATE` transaction, so the bot and the web app can start together. The
 `/drafts` list and the draft page show when new evidence arrived after a version was generated, with a button that
 generates a new version keeping the officer's event details. Approval re-checks this inside its write transaction:
 approving a stale version needs an explicit confirmation (otherwise 409), and the audit row records `stale`. **There is no login yet** (planned):
@@ -233,6 +234,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-29 | Review fix: every damaged-houses CSV row starts with its status (LIVE (NOT APPROVED), or the snapshot's status and version) and the CSV adds single-source and flagged columns |
 | 2026-10-29 | Review fix: the officer's event date and time is refused when it is in the future or more than 30 days before the earliest report, and flagged when it is after it |
 | 2026-10-29 | Review fix: evidence links to reports outside an incident open /reports around that report, so they work past the 200-report page; trust-signal links use the same target |
+| 2026-10-29 | Review fix (round 2): schema setup, including the trigger rebuild, runs in one BEGIN IMMEDIATE transaction, so the bot and the web app starting together cannot both drop the triggers |
 
 ### Third-party code and assets
 

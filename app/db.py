@@ -30,13 +30,21 @@ def _enable_wal(dbapi_connection, _record) -> None:
 
 
 def init_db(engine: Engine) -> None:
-    SQLModel.metadata.create_all(engine)
-    # create_all does not alter existing tables. Nullable/defaulted additions preserve older DBs.
-    with engine.begin() as connection:
-        # Every draft trigger is dropped first and recreated last, in this one transaction, so
-        # a changed, renamed or removed definition reaches existing databases. A backfill that
-        # must UPDATE decided drafts goes between the two, where no trigger can abort it; a new
-        # column with a DEFAULT needs no UPDATE at all and is the preferred way.
+    """Create or upgrade the schema in one write transaction, safe when processes start together.
+
+    pysqlite runs DDL in autocommit, so `engine.begin()` alone would not make this atomic: the
+    bot and the web app starting together could both drop the triggers and the second CREATE
+    would fail. An explicit BEGIN IMMEDIATE takes SQLite's write lock first; the other process
+    waits (busy timeout), then finds the finished schema.
+    """
+    with engine.connect() as connection:
+        connection.exec_driver_sql("BEGIN IMMEDIATE")
+        SQLModel.metadata.create_all(connection)
+        # create_all does not alter existing tables. Nullable/defaulted additions preserve
+        # older DBs. Every draft trigger is dropped first and recreated last, inside this
+        # transaction, so a changed, renamed or removed definition reaches existing databases.
+        # A backfill that must UPDATE decided drafts goes between the two, where no trigger can
+        # abort it; a new column with a DEFAULT needs no UPDATE at all and is the preferred way.
         for (name,) in connection.exec_driver_sql(
             "SELECT name FROM sqlite_master WHERE type = 'trigger' "
             "AND tbl_name IN ('draft', 'draftevent')"
@@ -72,6 +80,7 @@ def init_db(engine: Engine) -> None:
         )
         for name, statement in DRAFT_TRIGGERS.items():
             connection.exec_driver_sql(f"CREATE TRIGGER {name} {statement}")
+        connection.commit()
 
 
 # The audit is append-only and a decided draft is frozen, even against a stray UPDATE: the

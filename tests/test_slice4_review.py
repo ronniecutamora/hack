@@ -1,6 +1,7 @@
 """Regression coverage for the slice 4 review. All reports and model clients are synthetic."""
 
 import sqlite3
+import threading
 from datetime import timedelta
 
 import pytest
@@ -89,6 +90,35 @@ def test_init_db_replaces_older_trigger_definitions(settings, engine):
         connection.execute("UPDATE draft SET status = 'approved' WHERE id = 1")
         with pytest.raises(sqlite3.IntegrityError, match="never changes"):
             connection.execute("UPDATE draft SET decision_reason = 'edited' WHERE id = 1")
+
+
+def start_together(engine, barrier, errors):
+    barrier.wait()
+    try:
+        init_db(engine)
+    except Exception as exc:  # collected: a thread's exception would be lost
+        errors.append(exc)
+
+
+def test_parallel_init_db_calls_on_one_file_both_succeed(settings):
+    """The bot and the web app start together: neither may see the other's half-done rebuild."""
+    first = make_engine(settings)
+    init_db(first)  # an existing database with triggers, like var/demo/app.db
+    first.dispose()
+    for _round in range(10):
+        engines = [make_engine(settings) for _ in range(4)]
+        barrier, errors = threading.Barrier(len(engines)), []
+        threads = [
+            threading.Thread(target=start_together, args=(e, barrier, errors)) for e in engines
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        for engine in engines:
+            engine.dispose()
+        assert errors == []
+        assert set(triggers(settings.db_path)) == set(DRAFT_TRIGGERS)
 
 
 # --- Single-source share -----------------------------------------------------------------
