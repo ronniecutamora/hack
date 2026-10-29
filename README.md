@@ -2,7 +2,7 @@
 
 > An entry for the **Meta Global AI Developer Hackathon** (Oct 27 – Nov 4, 2026), built for the Philippines with Meta's Muse models.
 
-**Status:** building; slices 1–3c (intake, assessment/mapping, incident coordination, abuse guards) implemented and locally tested. Typhoon and flood damage reporting for Philippine LGUs, plus crop and fisheries insurance claims: one agent turns photos, Taglish voice notes, and texts from barangays, farmers, and fisherfolk into an officer-approved RDANA report, a damaged-houses table, and PCIC Notices of Loss. Demo area: Biñan City, Laguna.
+**Status:** building; slices 1–4 (intake, assessment/mapping, incident coordination, abuse guards, RDANA draft and officer approval) implemented and locally tested. Typhoon and flood damage reporting for Philippine LGUs, plus crop and fisheries insurance claims: one agent turns photos, Taglish voice notes, and texts from barangays, farmers, and fisherfolk into an officer-approved RDANA report, a damaged-houses table, and PCIC Notices of Loss. Demo area: Biñan City, Laguna.
 
 ---
 
@@ -15,14 +15,14 @@ _TBD: one paragraph on who suffers, how much, and why now, with sourced numbers.
 1. Residents send photos, voice notes, texts and location pins; the agent extracts damage facts and maps the report to a barangay.
 2. Deterministic place/time/GPS filters find candidate incidents. A text-only Meta pair judge decides whether reports describe the same situation; uncertainty stays separate for officer review.
 3. Officers read incident timelines, depth changes and the stored reasons for grouping. Reported totals explicitly warn about double-counting, including corrections.
-4. RDANA, damaged-houses tables and PCIC Notice of Loss drafting remain planned outputs; this slice supplies their shared incident evidence.
+4. The agent drafts each barangay's RDANA form and the city's damaged-houses table from that evidence; the officer checks every value against its linked reports, then approves or rejects the draft (see [Officer outputs](#officer-outputs)). PCIC Notice of Loss drafting is the next planned output.
 
 ## Meta models used
 
 | Model | What it does in this project | Status |
 |---|---|---|
 | Muse Voice Transcribe (`muse-voice-transcribe-1.0`) | Turns Telegram voice notes (Tagalog, English, Taglish) into text, biased toward Biñan's 24 barangay names with `keywords` | In use |
-| Muse Spark 1.3 (`muse-spark-1.3`) | The agent LLM (default): judges each photo as structured JSON (roof damage, floodwater, debris, fallen tree, tarpaulin, house count) and extracts report facts (flood depth, houses, evacuees, crops, needs); default incident pair judge | In use |
+| Muse Spark 1.3 (`muse-spark-1.3`) | The agent LLM (default): judges each photo as structured JSON (roof damage, floodwater, debris, fallen tree, tarpaulin, house count) and extracts report facts (flood depth, houses, evacuees, crops, needs); default incident pair judge; writes the RDANA summary description (1.4), checked against the evidence | In use |
 | Muse Spark Open (`meta-models/muse-spark-open`, Baseten) | The same agent steps and incident pair judgments on open weights, photos included: set `AGENT_LLM=muse-spark-open` | In use |
 | Muse Spark Open (`accounts/fireworks/models/muse-spark-open`, Fireworks) | Agent or independent pair judge via `muse-spark-open-fireworks` | Implemented; mocked HTTP verified, no live call in this slice |
 | Muse Glimmer (`accounts/fireworks/models/muse-glimmer-30b`, Fireworks) | Pair-judge comparison via `muse-glimmer` | Implemented; serverless availability ⚠️ contradictory and unverified; explicit availability errors, no fallback |
@@ -60,6 +60,55 @@ detected; the spend cap uses estimated costs, so in-flight work can overshoot it
 and the PCIC adjuster remain the final check. A next step is verified reporters (barangay officials
 enrolled by the CDRRMO).
 
+## Officer outputs
+
+The first officer output is a draft of the **RDANA form in force**: Annex I of NDRRMC Memorandum No. 107, s. 2021
+(the 2021 RDANA SOP), "to be accomplished within the first 72 hours after a disaster". Ulat drafts one form per
+barangay at `/drafts`, in the form's official order and numbering (its own numbering typos are kept and marked
+"sic"), printable on A4. The form is defined once as data in [app/rdana_form.py](app/rdana_form.py); each field is
+fixed (region, province, city), entered by the officer (event name, persons interviewed, overall assessment,
+submitted by), filled by a deterministic rule over typed report facts, or written by the agent (the summary).
+
+| What the draft fills | From |
+|---|---|
+| 1.1.2 type and 1.1.3 date/time of event | Reported hazards; the earliest report (the officer can override both) |
+| 1.2.4–1.2.7 barangay, sitio/purok, GPS, date/time of RDANA | The incidents, their redacted place details, the mean of report pins, the draft time |
+| 1.4 summary description | The agent, plus the latest and maximum flood depth per incident as support data |
+| 2.1, 2.3, 2.4, 2.9, 2.12, 2.15 | Families affected, families and persons evacuated, missing, injured, dead (totals only) |
+| 3.3, 3.4, 4.2, 8.1, 8.2 | Damaged roads or bridges, transport or clearing needs, power (a note only), rescue requests (Water SRR only where rescue was asked for in a flood or storm-surge incident) |
+| 10.1, 10.2, 10.3, 11.5, 12.5, 15.5 (sic) | Houses totally and partially damaged; shelter, food, water and medicine needs (no item is invented) |
+| 18.1 | An evidence note on fish cages or pens and crops damaged |
+
+Everything else, such as the male/female splits, accessibility, communications, evacuation centers, relief,
+law and order and the overall assessment, is marked "— not in reports (for the RDANA team)". Missing evidence is
+never turned into "No" or "0". Every filled value links to its incidents and reports, with the reporter count,
+a "single source" chip and flagged-report chips.
+
+**Counting rule.** Reports in one incident describe the same houses and people, so their numbers are never added.
+Per incident, the latest correction replaces earlier figures; otherwise, and for figures reported after that
+correction, the highest reported value is used. Incident values are then summed across the barangay. A report not
+linked to an incident counts as its own incident; reports that are not assessed yet, or have no barangay, are
+listed but not counted. Each count shows how much of it comes from single-source incidents or flagged reports.
+
+**The agent's summary (1.4).** One agent-LLM call per draft sees only redacted, typed facts per incident and the
+computed counts: no reporter ids, raw messages, transcripts or names. The reply is accepted only if every report it
+cites was in the input, every number it writes (as digits or words) is a computed count or a value in the facts, and
+it has at most four sentences. A rejected reply is retried once with the errors; after that, or when the model fails
+or the daily spend cap is reached, a deterministic summary is used and the reason is stored on the draft and shown.
+
+**Damaged-houses table.** `/damaged-houses` (and `.csv`, UTF-8 with a byte-order mark for spreadsheets) lists
+Region / Province / City / Barangay / Total / Totally / Partially / evidence report ids, in the DSWD DROMIC
+damaged-houses columns, per barangay with a city total, using the same counting rule. An unstated count is empty,
+not zero. The officer can save the current table as a draft for approval; its CSV is then frozen.
+
+**Approval and audit.** A draft is approved or rejected once (a reason is required to reject), with an optional
+designation of the officer. Generating again creates version n+1 and marks the previous undecided version
+`superseded`; approved and rejected versions stay exactly as decided. Every generate, supersede, approve and
+reject writes an append-only `DraftEvent`, kept apart from the incident grouping audit (`AgentDecision`), which is
+per report. SQLite triggers reject edits to decided drafts and to the audit. The `/drafts` list shows when new
+evidence arrived after the latest version. **There is no login yet** (planned): anyone who can reach the web app
+can approve, so it must only listen on localhost.
+
 ## Demo
 
 - Video (3 min): _TBD_
@@ -75,7 +124,7 @@ uv sync
 cp .env.example .env   # add META_API_KEY, TELEGRAM_BOT_TOKEN, PSEUDONYM_SALT (openssl rand -hex 32); BASETEN_API_KEY for Baseten; FIREWORKS_API_KEY for Fireworks
 # AGENT_LLM=muse-spark-1.3 (default); optional independent PAIR_JUDGE_LLM
 uv run python -m app.bot                  # Telegram intake bot (long polling)
-uv run uvicorn app.main:app --reload      # web app: /health, /reports, /incidents, /incidents/<id>, /media/<id> (localhost only: no login yet)
+uv run uvicorn app.main:app --reload      # web app: /health, /reports, /incidents, /drafts, /damaged-houses (.csv), /media/<id> (localhost only: no login yet)
 uv run pytest                             # tests (all HTTP is mocked, no API calls)
 uv run ruff check . && uv run ruff format --check .
 ```
@@ -136,6 +185,10 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-29 | Spam and fake-report guards (slice 3c): per-reporter rate limits checked before download, a rolling 24 h model-spend cap that holds reports for later, an officer block list, and additive database upgrades |
 | 2026-10-29 | Trust signals: reused or near-duplicate photos across reporters (SHA-256 and difference hash), old EXIF photos, pins outside Biñan or contradicting the text, and per-incident reporter counts with a "single source" label, shown as dashboard chips |
 | 2026-10-29 | Review fixes for slice 3c: held reports keep their media for at most 72 h, blocked reporters' media follows the normal 24 h rule, late pins and partial evidence are not lost, photo hashing stays out of database writes |
+| 2026-10-29 | Slice 4: the 2021 RDANA form (NDRRMC Memo 107 s. 2021, Annex I) as data, with official numbering; per-barangay evidence counted without double counting (latest correction, else the maximum per incident, summed across incidents) with single-source and flagged shares |
+| 2026-10-29 | RDANA draft filling: deterministic evidence rules for 24 of its 108 fields with incident and report links, the "not in reports" marker for the rest, and the agent's 1.4 summary validated against cited reports and numbers, with one retry and a recorded deterministic fallback under the spend cap |
+| 2026-10-29 | Officer drafts: `/drafts` list and printable A4 form, approve or reject with a reason, versioning that supersedes undecided drafts, an append-only `DraftEvent` audit and database triggers that freeze decided drafts |
+| 2026-10-29 | Damaged-houses table per barangay in the DROMIC columns, with a city total, evidence report ids, a CSV download and approvable frozen snapshots |
 
 ### Third-party code and assets
 
@@ -186,6 +239,10 @@ app/
   facts.py, photo.py   Fact extraction; photo judgment, SAM measurement and evidence overlay
   assessment.py        Assesses a report and maps it to a barangay (python -m app.assessment)
   incidents.py         Candidates, deterministic rollups, audited grouping and rebuild CLI
+  counting.py          Per-barangay evidence and the no-double-counting rule
+  rdana_form.py        The 2021 RDANA form as data (sections, numbering, fill modes)
+  rdana.py             Evidence rules that fill the form; rdana_summary.py: the validated 1.4 summary
+  drafts.py            Versioned drafts, approve/reject, audit, damaged-houses table and CSV
   pair_judge.py        Text-only pair schema and redacted evidence prompts
   demo/                Synthetic demo: scenario, Muse Image photos, loader (python -m app.demo)
   privacy.py           HMAC pseudonymization of reporter ids
@@ -193,7 +250,7 @@ app/
   intake.py            Ingest text, photo, voice and location into reports
   retention.py         Purge raw media after the TTL
   bot.py               Telegram bot (python -m app.bot)
-  main.py, templates/  FastAPI officer pages: reports, incidents, timelines, decision audit and media
+  main.py, templates/  FastAPI officer pages: reports, incidents, timelines, decision audit, drafts and media
   evaluation.py        WER, Cohen's kappa and F1 helpers
 scripts/
   eval_transcribe.py   WER on your own recordings (outside the repo)
