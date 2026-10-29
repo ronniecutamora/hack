@@ -14,6 +14,7 @@ SQLITE_BUSY_TIMEOUT_S = 15
 
 def make_engine(settings: Settings) -> Engine:
     settings.data_dir.mkdir(parents=True, exist_ok=True)
+    settings.db_path.parent.mkdir(parents=True, exist_ok=True)
     # check_same_thread is off because FastAPI serves sync routes from a thread pool.
     engine = create_engine(
         f"sqlite:///{settings.db_path}",

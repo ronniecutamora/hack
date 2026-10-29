@@ -57,6 +57,14 @@ class Settings(BaseSettings):
     photo_hash_max_distance: int = Field(default=6, ge=0, le=64)
 
     data_dir: Path = Path("./var")
+    # The live SQLite file; default DATA_DIR/app.db. A deploy keeps it on local disk while
+    # DATA_DIR (media, model cache) sits on a network volume (see app.snapshots).
+    database_path: Path | None = None
+    # Online backups of the database (app.snapshots): off unless SNAPSHOT_DIR is set.
+    snapshot_dir: Path | None = None
+    snapshot_interval_minutes: float = Field(default=2.0, gt=0, allow_inf_nan=False)
+    snapshot_keep: int = Field(default=15, gt=0)  # the newest N, plus one per day below
+    snapshot_keep_daily: int = Field(default=7, ge=0)
     model_cache: bool = True
     raw_media_ttl_hours: int = 24
     held_media_max_hours: int = Field(default=72, gt=0)
@@ -107,7 +115,7 @@ class Settings(BaseSettings):
 
     @property
     def db_path(self) -> Path:
-        return self.data_dir / "app.db"
+        return self.database_path or self.data_dir / "app.db"
 
     @property
     def media_dir(self) -> Path:

@@ -9,6 +9,8 @@ and every state-changing request must come from the app's own pages (a same-orig
 another site open in the officer's browser cannot generate or approve drafts.
 """
 
+import asyncio
+import contextlib
 import hashlib
 import json
 import mimetypes
@@ -106,6 +108,7 @@ from app.review import (
     review_cards,
     timeline,
 )
+from app.snapshots import SnapshotStore
 from app.telegram_webhook import WEBHOOK_PREFIX, TelegramWebhook
 from app.trust import model_spend
 
@@ -399,17 +402,23 @@ def create_app(
     pair_judge: AgentLLM | None = None,
     clock: Callable[[], datetime] | None = None,
     telegram_application: Application | None = None,
+    snapshots: SnapshotStore | None = None,
 ) -> FastAPI:
     """`summary_llm` replaces the configured agent LLM for RDANA summaries and `pair_judge` the
     duplicate judge the officer's "set place" re-grouping asks (tests, offline); `clock` (naive
     UTC) replaces the real clock for filing countdowns (tests only). With TELEGRAM_MODE=webhook
     the app also runs the bot (app.telegram_webhook); `telegram_application` replaces the one
-    built from the settings (tests)."""
+    built from the settings (tests). With SNAPSHOT_DIR (or `snapshots`, which a deploy passes
+    with its volume) the database is restored at start and snapshotted (app.snapshots)."""
     settings = settings or get_settings()
     auth = OfficerAuth(settings)  # refuses to build a public app without a passcode
+    if snapshots is None and settings.snapshot_dir is not None:
+        snapshots = SnapshotStore.from_settings(settings)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        if snapshots is not None:  # before the engine: it may restore the database file
+            await asyncio.to_thread(snapshots.open)
         app.state.engine = make_engine(settings)
         init_db(app.state.engine)
         # Building a client makes no request; a missing key surfaces as a recorded fallback.
@@ -431,17 +440,24 @@ def create_app(
             secret = settings.telegram_webhook_secret.get_secret_value()
             app.state.telegram = TelegramWebhook(application, secret)
             await app.state.telegram.start()
+        snapshot_loop = asyncio.create_task(snapshots.run()) if snapshots is not None else None
         yield
         restore_signals()
         if app.state.telegram is not None:
             # First, while the database is open: it handles queued updates and assessments.
             await app.state.telegram.stop()
+        if snapshot_loop is not None:
+            snapshot_loop.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await snapshot_loop
         await app.state.live.stop()
         if summary_llm is None:
             await llm.aclose()
         if pair_judge is None:
             await judge.aclose()
         app.state.engine.dispose()
+        if snapshots is not None:  # last: every write above is in the final snapshot
+            await asyncio.to_thread(snapshots.close)
 
     app = FastAPI(title="Typhoon damage reports", lifespan=lifespan)
     app.state.auth = auth
