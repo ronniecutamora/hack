@@ -190,19 +190,23 @@ def load_command(
     if reset and data_dir.exists():
         if not assume_yes:
             answer = input(
-                f"Delete demo data in '{data_dir}' (keeps generated images) and reload? [y/N] "
+                f"Delete demo data in '{data_dir}' (keeps generated images and the model "
+                "cache) and reload? [y/N] "
             )
             if answer.strip().lower() not in ("y", "yes"):
                 print("Cancelled; demo data left alone.")
                 return 0
+        # Generated photos and cached model responses cost credits to make again; a reload
+        # with the same scenario reuses both, so only the databases, uploads and manifest go.
+        kept = {data_dir / "images", settings.cache_dir}
         for path in data_dir.iterdir():
-            if path.name == "images" and path.is_dir():
+            if path in kept and path.is_dir() and not path.is_symlink():
                 continue
             if path.is_dir() and not path.is_symlink():
                 shutil.rmtree(path)
             else:
                 path.unlink()
-        print(f"Deleted demo data in {data_dir}; kept generated images.")
+        print(f"Deleted demo data in {data_dir}; kept generated images and the model cache.")
     engine = make_engine(settings)
     init_db(engine)
     reports = load_scenario(scenario_path)
@@ -246,7 +250,9 @@ def load_command(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Load the demo scenario into a demo database.")
     parser.add_argument(
-        "--reset", action="store_true", help="delete the demo data (keeps generated images)"
+        "--reset",
+        action="store_true",
+        help="delete the demo data (keeps generated images and the model cache)",
     )
     parser.add_argument("--yes", action="store_true", help="delete without asking")
     add_anchor_argument(parser)

@@ -224,7 +224,8 @@ The fish-pen reports come late in the scenario (De La Paz on day 13 afternoon, i
 San Antonio copy on day 14 afternoon). `--anchor-now` moves every scenario time so the latest report arrives an hour
 before the load, so both Notices of Loss show a live "due in" countdown: about 47 hours for San Antonio and about 22
 hours for De La Paz, first reported the afternoon before. The command refuses to anchor on top of an existing load;
-use it with `--reset`.
+use it with `--reset`. A reset deletes the demo databases, uploads and manifest but keeps the generated images and the
+model cache (`var/demo/model_cache`), so a reload of the same scenario reuses the paid photo judgments and SAM calls.
 
 ## Getting started
 
@@ -258,7 +259,7 @@ uv run python -m scripts.eval_dedupe --judge muse-glimmer
 # Synthetic demo: a typhoon scenario in a separate database (var/demo)
 DATA_DIR=var/demo uv run python -m app.demo images   # Muse Image photos; shows the cost and asks first
 DATA_DIR=var/demo uv run python -m app.demo load     # runs every report through the real pipeline
-DATA_DIR=var/demo uv run python -m app.demo load --reset --anchor-now  # fresh load, times end an hour ago
+DATA_DIR=var/demo uv run python -m app.demo load --reset --anchor-now  # fresh load (keeps images and model cache), times end an hour ago
 DATA_DIR=var/demo uv run uvicorn app.main:app        # dashboard on the demo data
 # Evals on your own labelled data (folders OUTSIDE this repo; each prints its cost first)
 uv run python -m scripts.eval_transcribe /path/to/recordings --keywords barangays   # WER, raw and cleaned
@@ -325,6 +326,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-29 | Review fix: a Notice of Loss becomes stale when a photo of its incident is added or re-assessed (its fingerprint adds each photo's assessment id, media ids and update time); the RDANA fingerprint is unchanged |
 | 2026-10-29 | Review fix: one redaction helper (`redact_personal`) for Notice of Loss excerpts, photo notes and place details also removes emails, @handles and Facebook/Messenger account names; the phone pattern no longer swallows ISO dates or decimal coordinates |
 | 2026-10-29 | Review fix: the `/drafts` Notice of Loss summary lists the fields the agent fills and the fields left for the assured from each commodity's field definitions; the annex shows only the SAM concepts a commodity lists (fisheries: floodwater, no roof count) with a caveat that lake or pond water reads as floodwater |
+| 2026-10-29 | Demo reset keeps the model cache as well as the generated images, so a reload does not pay again for photo judgments and SAM calls; updated CLI prompt, messages, help and regression test |
 
 ### Third-party code and assets
 

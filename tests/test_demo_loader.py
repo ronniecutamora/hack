@@ -164,10 +164,15 @@ def test_loader_needs_images_first(tmp_path, capsys):
     assert len(reports(make_engine(settings))) == 0
 
 
-def test_reset_keeps_images_and_deletes_other_demo_data(tmp_path, capsys, monkeypatch, respx_mock):
+def test_reset_keeps_images_and_model_cache_and_deletes_other_demo_data(
+    tmp_path, capsys, monkeypatch, respx_mock
+):
     settings = demo_settings(tmp_path)
     write_fixture_images(settings.data_dir)
     images = {path: path.read_bytes() for path in (settings.data_dir / "images").iterdir()}
+    cached = settings.cache_dir / "ab" / "response.json"  # paid model responses
+    cached.parent.mkdir(parents=True)
+    cached.write_text('{"paid": true}')
     settings.db_path.write_text("stale database; must be deleted before loading")
     stale_files = [
         settings.data_dir / name
@@ -197,13 +202,14 @@ def test_reset_keeps_images_and_deletes_other_demo_data(tmp_path, capsys, monkey
         == 0
     )
     assert all(path.read_bytes() == data for path, data in images.items())
+    assert cached.read_text() == '{"paid": true}'
     assert all(not path.exists() for path in stale_files)
     assert not stale_upload.parent.exists()
     assert len(reports(make_engine(settings))) == 3
     manifest = json.loads((settings.data_dir / MANIFEST_NAME).read_text())
     assert set(manifest) == {report.key for report in load_scenario(FIXTURE)}
     assert (other / "keep.txt").is_file()
-    assert "kept generated images" in capsys.readouterr().out
+    assert "kept generated images and the model cache" in capsys.readouterr().out
     assert not respx_mock.calls
 
 
@@ -218,7 +224,7 @@ def test_reset_asks_first(tmp_path, capsys, monkeypatch):
     assert load_command(settings, reset=True, scenario_path=FIXTURE) == 0
 
     assert (settings.data_dir / "sentinel.txt").is_file()
-    assert "keeps generated images" in prompts[0]
+    assert "keeps generated images and the model cache" in prompts[0]
     assert "Cancelled" in capsys.readouterr().out
 
 

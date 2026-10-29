@@ -15,7 +15,9 @@ def main(argv: list[str] | None = None) -> int:
     images.add_argument("--yes", action="store_true", help="generate without asking")
     load = which.add_parser("load", help="feed the scenario through intake and assessment")
     load.add_argument(
-        "--reset", action="store_true", help="delete the demo data (keeps generated images)"
+        "--reset",
+        action="store_true",
+        help="delete the demo data (keeps generated images and the model cache)",
     )
     load.add_argument("--yes", action="store_true", help="delete without asking")
     add_anchor_argument(load)
