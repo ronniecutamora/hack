@@ -68,6 +68,31 @@
   </ul>
   </div>
 
+  <section class="card models-strip" id="live-models" data-live="spend" aria-labelledby="models-title">
+    <h2 id="models-title">Meta models at work <span class="muted">(last 24 h)</span></h2>
+    {% if not model_usage %}
+      <p class="empty">No model calls in the last 24 h. Each report's agent trace on <a href="/reports">Reports</a> shows the calls made for it.</p>
+    {% else %}
+      <div class="table-wrap">
+      <table class="stack">
+        <thead><tr><th scope="col">Model</th><th scope="col" class="num">Calls</th><th scope="col" class="num">From cache</th><th scope="col" class="num">Cost</th><th scope="col" class="num">Median time, live calls</th></tr></thead>
+        <tbody>
+        {% for u in model_usage %}
+          <tr data-key="model-{{ u.model }}">
+            <td data-label="Model">{% if u.family %}<strong>{{ u.family.name }}</strong> <span class="muted">· {{ u.family.host }}</span><div><code>{{ u.model }}</code></div>{% else %}<code>{{ u.model }}</code>{% endif %}</td>
+            <td class="num" data-label="Calls">{{ u.calls }}</td>
+            <td class="num" data-label="From cache">{{ "%.0f%%"|format(u.cache_rate * 100) }}</td>
+            <td class="num" data-label="Cost">{{ u.cost|usd }}</td>
+            <td class="num" data-label="Median time, live calls">{% if u.median_ms is not none %}{{ u.median_ms|duration }}{% else %}<span class="muted">all from cache</span>{% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      <p class="muted">Every call is logged with the report and step it served (see a report's agent trace); cache hits cost nothing. Costs are list-price estimates and add up to the spend tile. How often each model is right: <a href="/accuracy">Accuracy</a>.</p>
+    {% endif %}
+  </section>
+
   <div class="overview-grid">
     <div class="overview-col">
     <section class="card" id="live-attention" data-live="incidents reports" aria-labelledby="attention-title">

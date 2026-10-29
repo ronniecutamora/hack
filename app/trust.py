@@ -41,13 +41,16 @@ def flagging(signal: dict) -> bool:
     return signal.get("severity") in ("high", "medium")
 
 
+SPEND_WINDOW = timedelta(days=1)  # the spend cap's rolling window (not a UTC calendar day)
+
+
 def model_spend(session: Session, now: datetime | None = None) -> float:
     """Recorded estimated USD in the rolling 24 h window (not a UTC calendar day)."""
     now = now or utcnow()
     return float(
         session.exec(
             select(func.coalesce(func.sum(ModelCall.cost_estimate), 0)).where(
-                ModelCall.at > now - timedelta(days=1), ModelCall.at <= now
+                ModelCall.at > now - SPEND_WINDOW, ModelCall.at <= now
             )
         ).one()
     )

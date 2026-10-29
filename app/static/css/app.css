@@ -325,6 +325,9 @@ label.choice input { width: 1.25rem; height: 1.25rem; margin: 0; }
 .meter > span { display: block; height: 100%; background: var(--c-brand); }
 .kpi--alert .meter > span { background: var(--c-alert-line); }
 
+.models-strip { margin-bottom: var(--space-5); }
+.models-strip h2 { margin-top: 0; }
+.models-strip .table-wrap { margin-bottom: var(--space-2); }
 .overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr)); gap: var(--space-4); align-items: start; }
 .overview-grid h2 { margin-top: 0; }
 .overview-col { display: grid; gap: var(--space-4); }
