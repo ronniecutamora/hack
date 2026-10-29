@@ -350,7 +350,7 @@ cp .env.example .env   # add META_API_KEY, TELEGRAM_BOT_TOKEN, PSEUDONYM_SALT (o
 uv run python -m app.bot                  # Telegram intake bot (long polling)
 uv run python -m app.bot_profile --dry-run  # bot name, descriptions and commands: print what would change
 uv run python -m app.bot_profile --photo    # apply only what differs, and upload assets/brand/ulat-avatar.png
-uv run uvicorn app.main:app --reload      # web app: / (overview), /map, /health, /reports, /incidents, /drafts, /damaged-houses (.csv), /media/<id>, live updates at /events (localhost only: no login yet)
+uv run uvicorn app.main:app --reload      # web app: / (overview), /map, /health, /reports, /incidents, /drafts, /damaged-houses (.csv), /media/<id>, live updates at /events (no login on localhost unless OFFICER_PASSCODE is set)
 uv run pytest                             # tests (all HTTP is mocked, no API calls)
 uv run ruff check . && uv run ruff format --check .
 ```
@@ -392,6 +392,36 @@ uv run python -m app.retention
 ```
 
 Model responses are cached on disk under `DATA_DIR/model_cache` when `MODEL_CACHE=true`, so repeated development runs do not spend credits. Raw photos, voice notes and photo overlays are deleted after `RAW_MEDIA_TTL_HOURS` (default 24), or up to `HELD_MEDIA_MAX_HOURS` (default 72 from media creation) while processing is paused by the spend cap. Blocked reporters use the normal TTL. Retention runs hourly and skips active assessments until processing finishes. Reports, transcripts and assessments are kept. The bot's bilingual `/start` privacy notice states both configured retention periods. Names that reporters say when introducing themselves ("Ako po si …") are redacted before any text reaches a model.
+
+## Deploy
+
+Ulat runs on [Modal](https://modal.com) as **one always-on container** (commands and the production checklist:
+[deploy/README.md](deploy/README.md)):
+
+1. One FastAPI process serves the officer dashboard and, with `TELEGRAM_MODE=webhook`, the Telegram bot: Telegram
+   posts to a secret-checked `/telegram/webhook/…` route, and the bot, its assessor and the retention purge run in
+   the same event loop. `min_containers=1`, `max_containers=1`: one SQLite writer, no cold starts.
+2. The live database is on the container's disk; a Modal Volume holds media, the model cache and database
+   snapshots, taken with SQLite's backup API every 2 minutes and at shutdown, and restored at start.
+3. A writer lease on the volume stops a restarting container from restoring before the old one's last snapshot.
+4. Staging (`ulat-staging`, @UlatPH_dev_bot) and production (`ulat`, @UlatPH_bot) have separate apps, secrets,
+   volumes and pseudonym salts. A fresh volume seeds the synthetic demo through the real pipeline.
+5. The webhook is registered by an explicit command, never at startup, and local polling refuses to start while
+   a webhook is set, so the two never fight over the bot.
+
+- **Cost:** about $2.65 per week for the container (0.25 CPU, 512 MiB, always on, at Modal's list rates of
+  $0.0000131 per core-second and $0.00000222 per GiB-second: [modal.com/pricing](https://modal.com/pricing)), plus
+  model calls, capped at $10 a day on the public instance (`DAILY_SPEND_CAP_USD`) on top of the per-reporter
+  limits.
+- **Login:** every page and photo needs the officer passcode (report photos and texts are personal data under
+  RA 10173). Only `/health`, `/login`, the static files and the webhook are open. The passcode opens a signed, HttpOnly,
+  Secure, SameSite=Lax cookie for 12 hours; wrong passcodes are limited to 10 per 15 minutes per client address.
+  Initials typed at login prefill the review forms; with a shared passcode they are self-declared.
+- **Durability and loss window:** a stop, redeploy or preemption takes a final snapshot first, so nothing is lost
+  (tested by force-stopping the staging container 4 seconds after a report arrived). A crash that skips shutdown
+  loses at most the last 2 minutes of database writes. Snapshots: the newest 15 plus one a day for a week.
+- **Judges:** open the URL in the Demo section and sign in with the passcode given in the submission's judging
+  notes. The dashboard starts with the synthetic typhoon scenario; messages to the bot appear on it live.
 
 ## Built during the hackathon
 
@@ -466,6 +496,10 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-30 | Synthetic vision eval set: 40 Biñan-style scenes as data (`data/eval/vision_scenes.json`: roof damage levels, floods ankle- to chest-deep, debris, fallen trees, tarpaulins, fish pens, hard negatives such as wet roads and tarps on intact roofs) generated with Muse Image outside the repo ($0.40), every image checked by eye (3 labels changed, noted in `label_notes`) |
 | 2026-10-30 | First recorded eval runs on both LLMs: photo judge + SAM 3.1 on 25 real Wikimedia typhoon photos and the 40 synthetic photos, and the pair judge on the 64 synthetic pairs, for Spark 1.3 and Spark Open (Baseten); $1.93 in total from the call log; "How well it works" section with the caveats (not Biñan photos, synthetic sets, fallen trees weak, SAM masks the lake as floodwater). Glimmer was skipped: no local endpoint is running |
 | 2026-10-30 | Live demo replay (`python -m app.demo replay`): the scenario's reports arrive at real time into `var/demo-replay` with scaled, clamped gaps (about 3 minutes), through the same intake and assessment as `load`, so the live dashboard fills up on camera; the pair judge is shown story time so a take is answered from the cache with the same grouping every time; a cache-only dry run refuses uncached paid calls unless `--allow-paid`; Ctrl-C stops cleanly and a rerun resumes. Fix: a demo reset with a relative `DATA_DIR` no longer deletes the model cache it promised to keep |
+| 2026-10-30 | Officer login: a shared passcode (constant-time digest check, per-client limit of 10 wrong tries per 15 minutes) opens a signed HttpOnly, SameSite=Lax session cookie (Secure over HTTPS, 12 hours, keyed to the session secret and the passcode); every route is private unless listed as public (`/health`, `/login`, the webhook, static files), so new pages are covered by default; live updates and htmx get 401 and send the page to the login; the app refuses to start on a non-localhost host without a passcode; optional initials prefill the review and decision forms. No new dependency (stdlib HMAC) |
+| 2026-10-30 | Telegram webhook mode (`TELEGRAM_MODE=webhook`): the web app runs the bot in its own event loop; `POST /telegram/webhook/<derived path>` checks Telegram's secret header in constant time and queues the update, so updates are handled in order as with polling, and the assessor and the summary reply share the process; the dashboard stays up when Telegram is unreachable (503 until the bot starts). Polling refuses to start while the token has a webhook. Log lines mask every configured secret |
+| 2026-10-30 | Durable SQLite for a wiped-on-restart container: the database stays on local disk and is snapshotted to a volume with SQLite's backup API every 2 minutes and at shutdown (atomic rename, volume commit, unchanged databases skipped, 15 newest plus 7 daily kept), restored at start, with a restore-by-name request and a writer lease so a restart never restores before the old container's last snapshot; tested with backup, restore, backup, restore round-trips and a fake volume |
+| 2026-10-30 | Modal deploy (`deploy/modal_app.py`, `python -m app.deploy`): one always-on container per target (staging on the dev bot, production) with its own secret, volume, URL and spend cap; commands for secrets (from `.env`, never echoed), demo assets, deploying the committed HEAD, the webhook, snapshots, restore, logs and stop; a fresh volume seeds the synthetic demo through the real pipeline. Staging verified end to end: login, seeded overview, signed webhook update, a forced container restart that kept every report, no secret in the logs |
 
 ### Third-party code and assets
 
@@ -490,6 +524,7 @@ Licenses read from each installed package's metadata. The Python libraries are i
 | [Leaflet](https://github.com/Leaflet/Leaflet) 1.9.4 (vendored in `app/static/vendor/leaflet-1.9.4/` with its LICENSE and control images, from the npm package, integrity checked) | BSD-2-Clause | The officer map |
 | [htmx](https://github.com/bigskysoftware/htmx) 2.0.11 (vendored in `app/static/vendor/htmx-2.0.11/` with its LICENSE, from the npm package, integrity checked) | 0BSD | Swapping live-updated page sections in place |
 | [FFmpeg](https://ffmpeg.org) (external program, not bundled) | LGPL/GPL depending on build | Voice note conversion to WAV |
+| [Modal](https://github.com/modal-labs/modal-client) client and CLI (not a project dependency: installed separately for deploying, and provided by Modal inside the container) | Apache-2.0 | Hosting: `deploy/modal_app.py` |
 | Ulat bot avatar (`assets/brand/ulat-avatar.png`), generated for this project with OpenAI's image model through the Codex CLI ("GPT Terra") | Output owned by the user under OpenAI's [terms of use](https://openai.com/policies/terms-of-use/) | Branding only: the Telegram bot's profile photo. Not part of the report pipeline |
 
 Data:
@@ -510,6 +545,12 @@ pyproject.toml         Python project and tool config (uv)
 .env.example           Names of the environment variables (no secrets)
 app/
   config.py            Settings from env/.env
+  auth.py              Officer login: passcode, signed session cookie, deny-by-default gate, login rate limit
+  telegram_webhook.py  Webhook mode: the bot inside the web app, secret-checked update route
+  snapshots.py         Local SQLite snapshotted to a volume: restore, periodic backup, retention, writer lease
+  deploy.py            Deploy CLI (python -m app.deploy); deploy_targets.py: staging and production as data
+  seed.py              Seeds a fresh deploy with the synthetic demo through the real pipeline
+  logs.py              Logging with every configured secret masked
   cache.py             Content-hash disk cache for model responses
   meta/                Clients: transcribe.py, spark.py, sam.py, spark_open.py, fireworks.py;
                        openai_compatible.py (shared chat), llm.py (AgentLLM switch),
@@ -549,6 +590,7 @@ scripts/
   eval_vision.py       Photo judge and SAM vs hand labels, per agent LLM
   eval_facts.py        Fact extraction from voice notes vs hand labels, per agent LLM
   eval_dedupe.py       Cached pair-judge P/R/F1, review rate and per-pair misses
+deploy/                Modal app (modal_app.py) and the deploy guide (README.md)
 assets/brand/          Bot avatar (branding only)
 data/demo/scenario.json  The synthetic typhoon scenario (no real people)
 tests/                 Mocked-HTTP tests and synthetic dedupe_pairs.json (64 labelled pairs)
