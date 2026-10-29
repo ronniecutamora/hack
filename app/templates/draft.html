@@ -91,6 +91,9 @@
       {% if draft.summary_validation %}
         <ol>{% for a in draft.summary_validation %}<li>Attempt {{ a.attempt }} · <code>{{ a.model }}</code> · {% if a.errors %}<span class="error">rejected: {{ a.errors|join(" ") }}</span>{% else %}accepted{% endif %}</li>{% endfor %}</ol>
       {% endif %}
+      {% for m in model_calls %}
+        <p class="muted">Model calls: {{ m.calls }} to {% if m.family %}{{ m.family.name }} {% endif %}<code>{{ m.model }}</code> ({{ m.cached_calls }} from cache) · {{ m.model_ms|duration }} · {{ m.cost|usd }} estimated.</p>
+      {% endfor %}
       <p class="muted">The agent saw only typed, redacted facts per report and the computed counts: no reporter ids, raw messages, transcripts or names.</p>
     </section>
   {% elif nol %}

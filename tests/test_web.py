@@ -5,8 +5,9 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
 from app.assessment import AssessmentService
+from app.facts import fact_lines
 from app.intake import IntakeService
-from app.main import create_app, fact_lines
+from app.main import create_app
 from app.models import Assessment, Media
 from tests.test_assessment import FakeLLM, FakeSam, facts, jpeg
 

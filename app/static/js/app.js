@@ -158,6 +158,8 @@
   }
 
   function detailsKey(details) {
+    // An explicit key survives a summary whose text changes (the agent trace's totals).
+    if (details.dataset.detailsKey) return details.dataset.detailsKey;
     const owner = details.parentElement && details.parentElement.closest("[id]");
     const summary = details.querySelector("summary");
     return (owner ? owner.id : "") + "|" + (summary ? summary.textContent.trim() : "");

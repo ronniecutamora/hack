@@ -18,6 +18,8 @@ _TBD: one paragraph on who suffers, how much, and why now, with sourced numbers.
 4. The agent drafts each barangay's RDANA form and the city's damaged-houses table from that evidence; the officer checks every value against its linked reports, then approves or rejects the draft (see [Officer outputs](#officer-outputs)).
 5. For each incident of fish cage, fish pen or fishpond damage, the agent drafts the fisherfolk's PCIC Notice of Loss with an evidence annex for the adjuster and counts down its 2-day filing deadline; the officer approves it for filing, and the assured files it (see [Insurance: fisheries Notice of Loss](#insurance-fisheries-notice-of-loss)). Crop insurance is later work.
 
+Every report on `/reports` and on its incident timeline has an expandable **agent trace**: each pipeline step in order (transcribe, read the facts, judge each photo, SAM roofs and floodwater, find the barangay, check trust signals, group into an incident) with the Meta model that ran it, its latency, whether it came from the cache and its estimated cost, next to the one-line result it produced ("roof damage: partial", "2 roofs found", "barangay Malaban (photo GPS)", "different from incident #2, 96% → kept apart, in incident #3"). Deterministic steps are labelled "Rule, no model", officer overrides follow as "Officer" steps, and the totals give the report's model time and cost. The trace shows only derived results the dashboard already shows, never prompts, replies or the officer's notes. An RDANA draft page lists the model calls that wrote its summary. Reports assessed before 2026-10-30 say "trace not recorded".
+
 ## Meta models used
 
 | Model | What it does in this project | Status |
@@ -501,6 +503,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-30 | Durable SQLite for a wiped-on-restart container: the database stays on local disk and is snapshotted to a volume with SQLite's backup API every 2 minutes and at shutdown (atomic rename, volume commit, unchanged databases skipped, 15 newest plus 7 daily kept), restored at start, with a restore-by-name request and a writer lease so a restart never restores before the old container's last snapshot; tested with backup, restore, backup, restore round-trips and a fake volume |
 | 2026-10-30 | Modal deploy (`deploy/modal_app.py`, `python -m app.deploy`): one always-on container per target (staging on the dev bot, production) with its own secret, volume, URL and spend cap; commands for secrets (from `.env`, never echoed), demo assets, deploying the committed HEAD, the webhook, snapshots, restore, logs and stop; a fresh volume seeds the synthetic demo through the real pipeline. Staging verified end to end: login, seeded overview, signed webhook update, a forced container restart that kept every report, no secret in the logs |
 | 2026-10-30 | Agent trace plumbing: every logged model call now names the report, pipeline step (one enumerated list in `app/trace.py`: transcribe, facts, photo judge, SAM roof and floodwater, pair judge, RDANA summary, and the rule steps) and subject (the photo, the compared incident, the voice-note part) it served, set by the pipeline in a request-scoped context the call recorder reads, so no client signature changed; RDANA summary calls are linked to the draft they wrote in the draft's own insert. A test runs two assessments concurrently and checks that no call carries the other report's id; older databases get the nullable columns on startup |
+| 2026-10-30 | Agent trace view: an expandable trace on every report row and incident timeline entry (`app/agent_trace.py`, `_trace.html`) with each step's Meta model family and id, host, latency, cache hit and cost beside its one-line result, rule steps and officer decisions labelled as such, repeats from a re-assessment counted, calls with no saved output still listed, per-report totals, a "not recorded" note for older reports, and the summary's model calls on RDANA draft pages; an open trace stays open through live refreshes. Built from batched queries (five per page, not per row) |
 
 ### Third-party code and assets
 
@@ -558,6 +561,7 @@ app/
                        schema.py (output validation), base.py, factory.py
   models.py, db.py     SQLModel tables including Incident, immutable AgentDecision and OfficerAction
   trace.py             Agent trace context: the pipeline steps, the Meta model families, the call-to-report link
+  agent_trace.py       Each report's agent trace (model, rule and officer steps) and a draft's model calls
   gazetteer.py         Biñan's 24 barangays: names, aliases, matching in text, transcription keywords
   geo.py, data/        Point-in-barangay lookup on COD-AB boundaries; photo EXIF GPS
   transcript_cleanup.py  Removes repeated-word artifacts from transcripts

@@ -3,6 +3,7 @@
 {% from "_deadline.html" import clock %}
 {% from "_status.html" import incident_status %}
 {% from "_review.html" import review_card, review_actions, history_entry %}
+{% from "_trace.html" import agent_trace %}
 {% block title %}Incident #{{ incident.id }}{% endblock %}
 {% block content %}
 <div id="live-incident" data-live="incidents reports drafts">
@@ -54,6 +55,7 @@
         {% for m in item.media %}<a href="/media/{{ m.id }}"><img src="/media/{{ m.id }}" alt="Report photo evidence{% if m.kind == 'overlay' %} with measurement overlay{% endif %}" loading="lazy"></a>{% endfor %}
       </div>
       {% if item.had_photos and not item.media %}<p class="muted">Photo evidence deleted after retention; assessment kept.</p>{% endif %}
+      {{ agent_trace(item.trace, r.id) }}
       {% if r.grouping_error %}<p class="error">{{ r.grouping_error }}</p>{% endif %}
       {% if item.card %}
         {% if item.card.needs_review %}<p><a href="#review-{{ r.id }}">Waiting for officer review: {{ item.card.reasons|join(", ") }}</a></p>

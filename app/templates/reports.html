@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_trust.html" import signal_chips %}
+{% from "_trace.html" import agent_trace %}
 {% block content %}
 <div id="live-reports" data-live="reports spend">
   <header>
@@ -50,6 +51,7 @@
             {% endif %}
             {% if not r.text and not r.transcript and r.lat is none and not item.photos %}<span class="muted">(no text)</span>{% endif %}
             {{ signal_chips(a, related_incidents) }}
+            {{ agent_trace(item.trace, r.id) }}
           </td>
           <td data-label="Photo evidence">
             {% for p in item.photos %}

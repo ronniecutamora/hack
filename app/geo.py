@@ -15,6 +15,18 @@ from PIL import Image, UnidentifiedImageError
 
 from app.gazetteer import BY_PCODE, Barangay
 
+# How the barangay was found (Assessment.geo_source), as the officer reads it.
+GEO_SOURCES = {
+    "pin": "location pin",
+    "exif": "photo GPS",
+    "text": "named in text",
+    "transcript": "named in voice note",
+    "llm": "named (read by the agent)",
+    "ambiguous": "several barangays named",
+    "none": "not found",
+    "officer": "set by an officer",
+}
+
 logger = logging.getLogger(__name__)
 BOUNDARIES = Path(__file__).parent / "data" / "binan_barangays.geojson"
 

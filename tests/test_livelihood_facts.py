@@ -7,9 +7,8 @@ import pytest
 from sqlmodel import Session, select
 
 from app.db import init_db, make_engine
-from app.facts import FACTS_SCHEMA, FACTS_SYSTEM, LIVELIHOOD_DAMAGE
+from app.facts import FACTS_SCHEMA, FACTS_SYSTEM, LIVELIHOOD_DAMAGE, fact_lines
 from app.incidents import IncidentService, rollup
-from app.main import fact_lines
 from app.meta.schema import validate
 from app.models import AgentDecision, Incident, Report
 from app.pair_judge import report_context, safe_facts

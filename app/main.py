@@ -41,6 +41,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from telegram.ext import Application
 
+from app.agent_trace import TRACE_SINCE, draft_calls, report_traces
 from app.auth import (
     LOGIN_PATH,
     OfficerAuth,
@@ -73,8 +74,9 @@ from app.drafts import (
     predates_pending_bucket,
     regenerate_form,
 )
+from app.facts import fact_lines
 from app.gazetteer import BARANGAYS, BY_NAME
-from app.geo import boundaries_geojson
+from app.geo import GEO_SOURCES, boundaries_geojson
 from app.incidents import IncidentService
 from app.live import ChangeHub, close_on_shutdown_signals, event_stream
 from app.mapdata import map_features
@@ -151,7 +153,28 @@ def live_tokens(request: Request) -> str:
     return json.dumps(hub.snapshot()["tokens"] if hub else {}, separators=(",", ":"))
 
 
+def duration(ms: float | None) -> str:
+    """Model time for the officer: "850 ms", "4.2 s", "1 min 5 s"."""
+    if ms is None:
+        return "–"
+    if ms < 1000:
+        return f"{ms:.0f} ms"
+    if ms < 60_000:
+        return f"{ms / 1000:.1f} s"
+    minutes, seconds = divmod(round(ms / 1000), 60)
+    return f"{minutes} min {seconds} s"
+
+
+def usd(value: float) -> str:
+    """An estimated cost: whole cents when large, four decimals for single calls."""
+    if value == 0:
+        return "$0"
+    return f"${value:.2f}" if value >= 1 else f"${value:.4f}"
+
+
 templates.env.filters["manila_time"] = manila_time
+templates.env.filters["duration"] = duration
+templates.env.filters["usd"] = usd
 templates.env.globals["live_tokens"] = live_tokens
 templates.env.globals["render_time"] = lambda: datetime.now(MANILA).strftime("%H:%M:%S")
 templates.env.globals["NAV"] = NAV
@@ -159,71 +182,8 @@ templates.env.globals["nav_current"] = nav_current
 templates.env.globals["static_url"] = static_url
 templates.env.globals["current_officer"] = current_officer.get
 
-GEO_SOURCES = {
-    "pin": "location pin",
-    "exif": "photo GPS",
-    "text": "named in text",
-    "transcript": "named in voice note",
-    "llm": "named (read by the agent)",
-    "ambiguous": "several barangays named",
-    "none": "not found",
-    "officer": "set by an officer",
-}
-DEPTHS = {
-    "ankle": "ankle-deep",
-    "knee": "knee-deep",
-    "waist": "waist-deep",
-    "chest": "chest-deep",
-    "above_head": "above head",
-}
-
-
-def fact_lines(facts: dict[str, Any] | None) -> list[str]:
-    """The stated facts as short labels for the officer; unstated (null) fields are skipped."""
-    if not facts:
-        return []
-    lines: list[str] = []
-    if facts.get("is_correction"):
-        lines.append("CORRECTION of an earlier report")
-    if facts.get("flood_depth") in DEPTHS:
-        lines.append(f"flood {DEPTHS[facts['flood_depth']]}")
-    counts = [
-        ("houses_totally_damaged", "houses totally damaged"),
-        ("houses_partially_damaged", "houses partially damaged"),
-        ("houses_flooded", "houses flooded"),
-        ("families_affected", "families affected"),
-        ("families_evacuated", "families evacuated"),
-        ("persons_evacuated", "persons evacuated"),
-        ("dead", "dead"),
-        ("injured", "injured"),
-        ("missing", "missing"),
-        ("fish_cages_or_pens_damaged", "fish cages/pens damaged"),
-        ("livestock_lost", "animals lost"),
-    ]
-    lines += [f"{facts[key]} {label}" for key, label in counts if facts.get(key) is not None]
-    if facts.get("crop") not in (None, "none"):
-        crop = facts["crop"]
-        if facts.get("crop_area_hectares") is not None:
-            crop += f", {facts['crop_area_hectares']:g} ha"
-        if facts.get("crop_damage_percent") is not None:
-            crop += f", {facts['crop_damage_percent']:g}% damaged"
-        lines.append(crop)
-    if facts.get("fishery_area_hectares") is not None:
-        lines.append(f"{facts['fishery_area_hectares']:g} ha of fish pens, cages or ponds")
-    for key, label in (
-        ("hazards", "hazards"),
-        ("livelihood_damage", "livelihood damage"),
-        ("infrastructure", "damaged"),
-        ("needs", "needs"),
-    ):
-        if facts.get(key):
-            lines.append(f"{label}: {', '.join(v.replace('_', ' ') for v in facts[key])}")
-    if facts.get("place_detail"):
-        lines.append(f"place: {facts['place_detail']}")
-    return lines
-
-
 templates.env.globals["fact_lines"] = fact_lines
+templates.env.globals["TRACE_SINCE"] = TRACE_SINCE
 templates.env.globals["GEO_SOURCES"] = GEO_SOURCES
 templates.env.globals["BARANGAY_NAMES"] = sorted(b.name for b in BARANGAYS)
 templates.env.globals["ACTION_LABELS"] = ACTION_LABELS
@@ -373,6 +333,7 @@ def incident_context(session: Session, incident_id: int) -> dict[str, Any]:
         if item.kind in ("photo", "overlay"):
             media[item.report_id].append(item)
     cards = {card.report.id: card for card in review_cards(session, ids)}
+    traces = report_traces(session, list(reports))
     items = []
     for report in reports:
         available = [m for m in media[report.id] if m.purged_at is None]
@@ -383,6 +344,7 @@ def incident_context(session: Session, incident_id: int) -> dict[str, Any]:
                 "media": [m for m in available if m.kind == "overlay"] or available,
                 "had_photos": bool(media[report.id]),
                 "card": cards.get(report.id),
+                "trace": traces[report.id],
             }
         )
     return {
@@ -620,6 +582,7 @@ def create_app(
             ).all()
             spend = model_spend(session)
             related = related_incidents(session, assessments)
+            traces = report_traces(session, [report for report, _ in rows])
         media_by_id = {m.id: m for m in media}
         media_by_report: defaultdict[int, list[Media]] = defaultdict(list)
         for m in media:
@@ -647,6 +610,7 @@ def create_app(
                 "media": media_by_report[report.id],
                 "assessment": by_report.get(report.id),
                 "photos": photos_by_report[report.id],
+                "trace": traces[report.id],
             }
             for report, pseudonym in rows
         ]
@@ -834,8 +798,11 @@ def create_app(
     @app.get("/drafts/{draft_id:int}", response_class=HTMLResponse)
     def draft_page(request: Request, draft_id: int) -> HTMLResponse:
         draft, events, newest = request.app.state.drafts.get(draft_id)
+        with Session(request.app.state.engine) as session:
+            model_calls = draft_calls(session, draft_id)
         context = {
             "draft": draft,
+            "model_calls": model_calls,
             "stale": request.app.state.drafts.is_stale(draft),
             "predates_pending": predates_pending_bucket(draft),
             "regenerate": regenerate_form(draft),

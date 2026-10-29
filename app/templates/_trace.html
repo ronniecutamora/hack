@@ -1,0 +1,42 @@
+{# The agent trace of one report (app.agent_trace): model steps, rule steps, officer decisions. #}
+{% macro model_name(model, family) %}{% if family %}<span class="trace__family">{{ family.name }}</span> <code>{{ model }}</code> <span class="muted">· {{ family.host }}</span>{% else %}<code>{{ model }}</code>{% endif %}{% endmacro %}
+
+{% macro agent_trace(trace, report_id) %}
+  <details class="trace" data-details-key="trace-{{ report_id }}">
+    <summary>Agent trace <span class="trace__sum">· {{ trace.agent_steps }} step{{ "s" if trace.agent_steps != 1 }}{% if trace.calls %} · {{ trace.calls }} Meta model call{{ "s" if trace.calls != 1 }} · {{ trace.model_ms|duration }} · {{ trace.cost|usd }}{% endif %}</span></summary>
+    {% if not trace.recorded %}
+      <p class="muted">Trace not recorded: this report was assessed before model calls were linked to reports ({{ TRACE_SINCE }}). Its results are above.</p>
+    {% elif not trace.steps %}
+      <p class="muted">No agent steps yet.</p>
+    {% endif %}
+    {% if trace.steps %}
+    <ol class="trace__steps">
+    {% for s in trace.steps %}
+      <li class="trace__step trace__step--{{ s.actor }}">
+        <div class="trace__head">
+          <strong>{{ s.label }}</strong>
+          {% if s.actor == "model" %}<span class="chip info">Meta model</span>
+          {% elif s.actor == "rule" %}<span class="chip">Rule, no model</span>
+          {% else %}<span class="chip ok">Officer {{ s.officer }}</span>{% endif %}
+          {% if s.at %}<time class="muted">{{ s.at|manila_time }}</time>{% endif %}
+        </div>
+        {% if s.actor == "model" %}
+          <div class="trace__model">
+            {% if s.stats %}
+              {{ model_name(s.stats.model, s.family) }}
+              <span class="trace__metrics">{{ s.stats.latency_ms|duration }} · {% if s.stats.cached %}from cache{% else %}live call{% endif %} · {{ s.stats.cost|usd }}{% if s.stats.calls > 1 %} · {{ s.stats.calls }} calls, {{ s.stats.cached_calls }} from cache{% endif %}</span>
+            {% else %}
+              {{ model_name(s.model, s.family) }} <span class="muted">· call not logged</span>
+            {% endif %}
+          </div>
+        {% endif %}
+        <div class="trace__output"{% if s.detail %} title="{{ s.detail }}"{% endif %}>{{ s.output }}</div>
+      </li>
+    {% endfor %}
+    </ol>
+    {% if trace.calls %}
+      <p class="muted trace__total">Total: {{ trace.calls }} Meta model call{{ "s" if trace.calls != 1 }} ({{ trace.cached_calls }} from cache) · {{ trace.model_ms|duration }} of model time (calls for one photo run side by side) · {{ trace.cost|usd }} estimated at list prices.</p>
+    {% endif %}
+    {% endif %}
+  </details>
+{% endmacro %}

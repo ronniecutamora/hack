@@ -278,6 +278,24 @@ label.choice input { width: 1.25rem; height: 1.25rem; margin: 0; }
 .history--agent { border-left: 4px solid var(--c-info-line); }
 @media print { .review-actions, .officer-actions { display: none !important; } }
 
+/* ---------- Agent trace (app/templates/_trace.html) ---------- */
+.trace { margin-top: var(--space-2); }
+.trace > summary { cursor: pointer; font-weight: 600; min-height: 1.5rem; }
+.trace__sum { font-weight: 400; color: var(--c-muted); }
+.trace__steps { list-style: none; margin: var(--space-2) 0; padding: 0 0 0 var(--space-1); border-left: 2px solid var(--c-border); }
+.trace__step { position: relative; padding: 0 0 var(--space-2) var(--space-3); }
+.trace__step::before { content: ""; position: absolute; left: calc(-1 * var(--space-1) - 6px); top: .45rem; width: 10px; height: 10px; border-radius: 50%; background: var(--c-info-line); }
+.trace__step--rule::before { background: var(--c-surface); border: 2px solid var(--c-border-strong); width: 6px; height: 6px; }
+.trace__step--officer::before { background: var(--c-ok-line); border-radius: 2px; }
+.trace__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-2); }
+.trace__model, .trace__metrics { font-size: .875rem; }
+.trace__metrics { color: var(--c-muted); font-variant-numeric: tabular-nums; }
+.trace__family { font-weight: 600; }
+.trace__output { font-size: .9375rem; }
+.trace__output[title] { text-decoration: underline dotted var(--c-border-strong); text-underline-offset: .2em; cursor: help; }
+.trace__total { margin: 0; }
+@media print { .trace { display: none !important; } }
+
 /* ---------- Overview ---------- */
 
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr)); gap: var(--space-3); margin: 0 0 var(--space-5); padding: 0; list-style: none; }
