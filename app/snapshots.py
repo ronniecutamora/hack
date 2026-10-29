@@ -23,7 +23,11 @@ every few seconds).
 **Lease:** one writer at a time. A starting container waits (up to LEASE_WAIT_S) for a previous
 container that still holds a fresh lease to write its final snapshot and release it, so a
 restart or redeploy never restores a snapshot older than the last writes. A crashed holder's
-lease goes stale and is taken over.
+lease goes stale and is taken over. A container whose lease was taken over (it hung, then woke
+up) writes no snapshot and never touches the new holder's lease: `backup()` re-reads the lease
+first. On Modal a container sees another's lease only after a volume reload, which is unsafe
+while the app runs (the volume looks empty during it), so the periodic check reads this
+container's view and `close()`, when nothing else uses the volume, reloads before checking.
 """
 
 import asyncio
@@ -216,6 +220,19 @@ class SnapshotStore:
         stale_after = timedelta(seconds=2 * self.interval_s + 60)
         return self.clock() - lease.heartbeat < stale_after
 
+    def _lost_lease(self) -> bool:
+        """True (and logged) when another container holds the lease now: this one's database
+        is no longer the one the next start should restore."""
+        lease = self.lease()
+        if lease is None or lease.owner == self.owner:
+            return False
+        logger.error(
+            "another container (%s) took over the database lease; this one writes no more "
+            "snapshots, so its later writes are not kept",
+            lease.owner[:8],
+        )
+        return True
+
     def _acquire(self, wait_s: float) -> None:
         waited = 0.0
         while True:
@@ -287,7 +304,7 @@ class SnapshotStore:
         """One snapshot of the live database, committed to the volume, and the lease heartbeat
         refreshed. Returns its path, or None when nothing changed since the last one."""
         with self._lock:
-            if not self.db_path.exists():
+            if not self.db_path.exists() or self._lost_lease():
                 return None
             self.dir.mkdir(parents=True, exist_ok=True)
             name = snapshot_name(self.clock())
@@ -361,16 +378,25 @@ class SnapshotStore:
         return removed
 
     def close(self) -> Path | None:
-        """The final snapshot, then release the lease for the next container. Idempotent."""
+        """The final snapshot, then release the lease for the next container, unless another
+        container took it over meanwhile. Idempotent."""
         with self._lock:
             if self.closed:
                 return None
         try:
+            # Nothing else uses the volume now: commit what this container wrote, then see a
+            # takeover by another container (best effort; a busy volume refuses the reload).
+            try:
+                self.volume.commit()
+                self.volume.reload()
+            except Exception as exc:
+                logger.warning("volume reload before the final snapshot failed: %s", exc)
             return self.backup()
         finally:
             with self._lock:
                 self.closed = True
-                with contextlib.suppress(OSError):
-                    self._write_lease(released=True)
+                if not self._lost_lease():
+                    with contextlib.suppress(OSError):
+                        self._write_lease(released=True)
+                    logger.info("database lease released")
                 self.volume.commit()
-                logger.info("database lease released")

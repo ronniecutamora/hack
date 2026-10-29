@@ -320,3 +320,28 @@ async def test_requests_snapshot_soon_and_coalesce(settings, volume, clock):
         with contextlib.suppress(asyncio.CancelledError):
             await runner
     store.request()  # after run() stopped: a no-op, never an error
+
+
+async def test_a_container_whose_lease_was_taken_over_stops_writing(
+    settings, volume, clock, caplog
+):
+    """A hung container wakes up after a new one took over its stale lease: it must neither
+    write a snapshot (the next start would restore its stale database) nor touch the lease."""
+    await add_reports(settings, ["before the hang"])
+    old = store_for(settings, volume, clock, owner="old-container")
+    old.open()
+    assert old.backup() is not None
+    clock.advance(10 * 60)  # hung: no heartbeat
+    new = store_for(settings, volume, clock, owner="new-container")
+    new.open()
+    before = [p.name for p in new.snapshots()]
+
+    await add_reports(settings, ["written by the hung container"])
+    clock.advance(1)
+    assert old.backup() is None
+    assert old.close() is None
+    assert [p.name for p in new.snapshots()] == before
+    lease = new.lease()
+    assert (lease.owner, lease.released) == ("new-container", False)
+    assert "took over the database lease" in caplog.text
+    assert new.backup() is not None  # the holder carries on
