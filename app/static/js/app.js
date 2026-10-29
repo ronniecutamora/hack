@@ -141,6 +141,7 @@
   function keyOf(el) { return el.dataset.key || el.id; }
 
   function restore(region, before) {
+    if (!region.hasAttribute("tabindex")) region.setAttribute("tabindex", "-1");
     region.querySelectorAll("details").forEach((d) => { if (before.openDetails.has(detailsKey(d))) d.open = true; });
     region.querySelectorAll("input, textarea, select").forEach((f) => {
       const key = fieldKey(f);
@@ -177,7 +178,6 @@
     pending.delete(id);
     busy.add(id);
     const before = capture(region);
-    if (!region.hasAttribute("tabindex")) region.setAttribute("tabindex", "-1");
     window.htmx.ajax("GET", window.location.pathname + window.location.search, {
       target: "#" + id, select: "#" + id, swap: "outerHTML",
     }).then(() => {
