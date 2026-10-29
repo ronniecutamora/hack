@@ -139,8 +139,8 @@ def test_correction_wins_within_an_incident_and_incidents_are_summed(engine):
     assert by_incident[shared].source_report_id == corrected
     assert by_incident[single].value == 2 and by_incident[single].source_report_id == lone
     assert first.value == 6
-    # The second incident has one reporter: its 2 houses are single-source.
-    assert first.single_source_value == 2
+    # Only reporter a stated the corrected 4, and only c stated the 2: both are single-source.
+    assert first.single_source_value == 6
     assert first.flagged_value == 0
 
 
@@ -326,8 +326,8 @@ async def test_every_evidence_rule_fills_its_official_field(engine, settings):
         assert value[officer] is None
     # Counts carry their evidence; depth goes to 1.4 support data, not a numbered field.
     assert f["10.2"]["evidence"][0]["report_ids"] == [a]
-    # Two reporters in the incident: none of it is single-source.
-    assert f["10.2"]["note"] == "0 of 4 from single-source incidents; 0 of 4 from flagged reports."
+    # Two reporters in the incident, but only one of them stated the 4 houses.
+    assert f["10.2"]["note"] == "4 of 4 stated by only one reporter; 0 of 4 from flagged reports."
     assert draft.content["flood_depths"][0]["latest"] == "waist"
     assert draft.content["flood_depths"][0]["max"] == "waist"
     assert draft.content["report_ids"] == [a, b]

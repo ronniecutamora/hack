@@ -6,6 +6,9 @@ together. Per incident and per count, the latest correction replaces earlier fig
 values are then summed across the barangay's incidents. A report not linked to any incident
 counts as an incident of its own. Every count keeps the incidents and reports it came from, and
 how much of it rests on a single reporter or on reports with high/medium trust signals.
+
+A value is single-source when fewer than two different reporters stated a value at least as high
+(after the latest correction): one reporter's 40 is not corroborated by others' 2.
 """
 
 import hashlib
@@ -64,10 +67,6 @@ class IncidentEvidence:
         return len({m.reporter_id for m in self.members if m.reporter_id is not None})
 
     @property
-    def single_source(self) -> bool:
-        return self.reporter_count <= 1
-
-    @property
     def flagged_report_ids(self) -> list[int]:
         return [m.id for m in self.members if m.flagged]
 
@@ -104,6 +103,7 @@ class Contribution:
     source_report_id: int
     stating_report_ids: tuple[int, ...]
     flagged: bool  # the value rests only on reports with high/medium trust signals
+    single_source: bool  # fewer than two reporters stated this value or more
 
 
 @dataclass(frozen=True)
@@ -117,7 +117,7 @@ class Count:
 
     @property
     def single_source_value(self) -> int:
-        return sum(c.value for c in self.contributions if c.incident.single_source)
+        return sum(c.value for c in self.contributions if c.single_source)
 
     @property
     def flagged_value(self) -> int:
@@ -136,6 +136,11 @@ def incident_value(incident: IncidentEvidence, name: str) -> Contribution | None
     corrections = [i for i, m in enumerate(stated) if incident.facts(m).get("is_correction")]
     window = stated[corrections[-1] :] if corrections else stated
     value = max(incident.facts(m)[name] for m in window)
+    backers = {
+        m.reporter_id
+        for m in window
+        if incident.facts(m)[name] >= value and m.reporter_id is not None
+    }
     # A tie with an unflagged report means the value does not rest on flagged evidence alone.
     source = max(
         (m for m in window if incident.facts(m)[name] == value),
@@ -148,7 +153,13 @@ def incident_value(incident: IncidentEvidence, name: str) -> Contribution | None
     else:
         rule = "maximum since the latest correction"
     return Contribution(
-        incident, value, rule, source.id, tuple(m.id for m in stated), source.flagged
+        incident,
+        value,
+        rule,
+        source.id,
+        tuple(m.id for m in stated),
+        source.flagged,
+        len(backers) < 2,
     )
 
 

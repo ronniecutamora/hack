@@ -98,12 +98,13 @@ def count_field(count: Count | None) -> dict[str, Any] | None:
             value=c.value,
             rule=c.rule,
             source_report_id=c.source_report_id,
+            single_source=c.single_source,
         )
         for c in count.contributions
     ]
     total = count.value
     note = (
-        f"{count.single_source_value:g} of {total:g} from single-source incidents; "
+        f"{count.single_source_value:g} of {total:g} stated by only one reporter; "
         f"{count.flagged_value:g} of {total:g} from flagged reports."
     )
     return _filled(f"{total:g}", "reports", refs, note) | {

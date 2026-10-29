@@ -240,7 +240,7 @@ def test_damaged_houses_csv_has_the_exact_header_rows_and_city_total(client, eng
     ]
     html = client.get("/damaged-houses").text
     assert "City total" in html and "Poblacion" not in html
-    assert "3 of 3 from single-source incidents" in html  # Casile has one reporter
+    assert "3 of 3 stated by only one reporter" in html  # Casile has one reporter
 
 
 def test_damaged_houses_snapshot_is_a_versioned_draft_with_a_frozen_csv(client, engine):

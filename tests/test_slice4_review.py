@@ -7,7 +7,7 @@ from sqlmodel import Session
 
 from app.db import DRAFT_TRIGGERS, init_db, make_engine
 from app.models import Draft
-from tests.test_rdana import AT
+from tests.test_rdana import AT, add_incident, add_report, evidence
 
 
 @pytest.fixture
@@ -56,3 +56,24 @@ def test_init_db_replaces_older_trigger_definitions(settings, engine):
         connection.execute("UPDATE draft SET status = 'approved' WHERE id = 1")
         with pytest.raises(sqlite3.IntegrityError, match="never changes"):
             connection.execute("UPDATE draft SET decision_reason = 'edited' WHERE id = 1")
+
+
+# --- Single-source share -----------------------------------------------------------------
+
+
+def test_a_value_only_one_reporter_stated_is_single_source(engine):
+    incident = add_incident(engine)
+    add_report(engine, incident=incident, reporter="a", houses_partially_damaged=40)
+    add_report(engine, incident=incident, reporter="b", hours=1, houses_partially_damaged=2)
+    add_report(engine, incident=incident, reporter="c", hours=2, houses_partially_damaged=2)
+    count = evidence(engine).count("houses_partially_damaged")
+    assert count.value == 40 and count.single_source_value == 40
+
+    add_report(engine, incident=incident, reporter="d", hours=3, houses_partially_damaged=45)
+    add_report(engine, incident=incident, reporter="b", hours=4, houses_partially_damaged=50)
+    count = evidence(engine).count("houses_partially_damaged")
+    assert count.value == 50 and count.single_source_value == 50  # d's 45 is below 50
+
+    add_report(engine, incident=incident, reporter="c", hours=5, houses_partially_damaged=50)
+    count = evidence(engine).count("houses_partially_damaged")
+    assert count.value == 50 and count.single_source_value == 0  # b and c both say 50

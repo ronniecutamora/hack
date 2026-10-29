@@ -18,6 +18,7 @@
       {{ incident_link(ref) }}{% if ref.value is defined %}: <strong>{{ "%g"|format(ref.value) }}</strong> ({{ ref.rule }}, report {{ report_link(ref, ref.source_report_id) }}){% endif %}
       · report{{ 's' if ref.report_ids|length != 1 }} {% for r in ref.report_ids %}{{ report_link(ref, r) }}{{ ", " if not loop.last }}{% endfor %}
       {{ incident_trust(ref.trust) }}
+      {% if ref.single_source and ref.trust.reporter_count != 1 %}<span class="chip warn">value stated by one reporter</span>{% endif %}
       {% if ref.status == "needs_officer" %}<span class="chip warn">grouping needs officer review</span>{% endif %}
       {% if ref.flagged_report_ids %}<span class="chip alert">flagged: {% for r in ref.flagged_report_ids %}{{ report_link(ref, r) }}{{ ", " if not loop.last }}{% endfor %}</span>{% endif %}
     </li>
@@ -42,7 +43,7 @@
         <td class="num">{% if row.partially is not none %}{{ "%g"|format(row.partially) }}{% else %}<span class="gap" title="not in reports">—</span>{% endif %}</td>
         <td>
           {{ evidence_refs(row.evidence) }}
-          <div class="muted">{{ "%g"|format(row.single_source) }} of {{ "%g"|format(row.total) }} from single-source incidents · {{ "%g"|format(row.flagged) }} from flagged reports</div>
+          <div class="muted">{{ "%g"|format(row.single_source) }} of {{ "%g"|format(row.total) }} stated by only one reporter · {{ "%g"|format(row.flagged) }} from flagged reports</div>
         </td>
       </tr>
     {% endfor %}
@@ -51,7 +52,7 @@
         <td class="num"><strong>{% if t.total.total is not none %}{{ "%g"|format(t.total.total) }}{% endif %}</strong></td>
         <td class="num">{% if t.total.totally is not none %}{{ "%g"|format(t.total.totally) }}{% else %}<span class="gap">—</span>{% endif %}</td>
         <td class="num">{% if t.total.partially is not none %}{{ "%g"|format(t.total.partially) }}{% else %}<span class="gap">—</span>{% endif %}</td>
-        <td class="muted">{{ t.total.report_ids|length }} report{{ 's' if t.total.report_ids|length != 1 }}{% if t.total.single_source is not none %} · {{ "%g"|format(t.total.single_source) }} from single-source incidents{% endif %}</td>
+        <td class="muted">{{ t.total.report_ids|length }} report{{ 's' if t.total.report_ids|length != 1 }}{% if t.total.single_source is not none %} · {{ "%g"|format(t.total.single_source) }} stated by only one reporter{% endif %}</td>
       </tr>
     </tbody>
   </table>

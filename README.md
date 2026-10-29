@@ -88,7 +88,9 @@ a "single source" chip and flagged-report chips.
 Per incident, the latest correction replaces earlier figures; otherwise, and for figures reported after that
 correction, the highest reported value is used. Incident values are then summed across the barangay. A report not
 linked to an incident counts as its own incident; reports that are not assessed yet, or have no barangay, are
-listed but not counted. Each count shows how much of it comes from single-source incidents or flagged reports.
+listed but not counted. Each count shows how much of it rests on one reporter or on flagged reports. A value is
+single-source when fewer than two different reporters stated that value or more (after the latest correction), so
+one reporter's 40 is not corroborated by two others' 2.
 
 **The agent's summary (1.4).** One agent-LLM call per draft sees only redacted, typed facts per incident and the
 computed counts: no reporter ids, raw messages, transcripts or names. The reply is accepted only if every report it
@@ -190,6 +192,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-29 | RDANA draft filling: deterministic evidence rules for 24 of its 108 fields with incident and report links, the "not in reports" marker for the rest, and the agent's 1.4 summary validated against cited reports and numbers, with one retry and a recorded deterministic fallback under the spend cap |
 | 2026-10-29 | Officer drafts: `/drafts` list and printable A4 form, approve or reject with a reason, versioning that supersedes undecided drafts, an append-only `DraftEvent` audit and database triggers that freeze decided drafts |
 | 2026-10-29 | Damaged-houses table per barangay in the DROMIC columns, with a city total, evidence report ids, a CSV download and approvable frozen snapshots |
+| 2026-10-29 | Review fix: the single-source share is per value, not per incident: a value counts as corroborated only when two different reporters stated it or more |
 | 2026-10-29 | Review fix: startup drops and recreates every draft trigger, so changed definitions reach existing databases and a backfill can run between the two |
 
 ### Third-party code and assets
