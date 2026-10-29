@@ -39,10 +39,10 @@ from app.demo.scenario import (
     validate,
 )
 from app.intake import IntakeService
-from app.models import Report, manila_time, utcnow
+from app.models import CHANNEL_DEMO, Report, manila_time, utcnow
 
 MANIFEST_NAME = "manifest.json"
-CHANNEL = "demo"
+CHANNEL = CHANNEL_DEMO
 
 
 def _manifest_path(data_dir: Path) -> Path:

@@ -15,6 +15,10 @@ STATUS_ASSESSED = "assessed"
 STATUS_ASSESSMENT_FAILED = "assessment_failed"  # partial results are still saved
 STATUS_HELD = "held"
 
+# Report.channel of the synthetic demo scenario (app.demo): generated reports, photos and
+# reporters, no real person's data. Retention keeps its media; real channels are purged.
+CHANNEL_DEMO = "demo"
+
 
 MANILA = timezone(timedelta(hours=8))  # Philippine time, no daylight saving
 

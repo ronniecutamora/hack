@@ -6,6 +6,11 @@ Spend-cap holds keep raw files for at most HELD_MEDIA_MAX_HOURS from media creat
 blocked holds use the normal TTL. Assessments are skipped only during a one-hour grace period.
 Only the raw files go. Reports, transcripts, captions and later assessments are kept, and
 Media rows stay (with purged_at set) so the record shows what existed and when it was removed.
+
+The synthetic demo scenario's media (channel "demo") is never purged: its photos are generated
+by Muse Image and stamped as such, its reporters are invented, so it holds no personal data,
+and a deployed demo must still show its evidence the day after it was seeded. Every real
+channel is purged; the demo channel is set only by the demo loader, never by a reporter.
 """
 
 import asyncio
@@ -18,7 +23,15 @@ from sqlmodel import Session, col, select
 
 from app.config import Settings, get_settings
 from app.db import init_db, make_engine
-from app.models import STATUS_ASSESSING, STATUS_HELD, Media, Report, Reporter, utcnow
+from app.models import (
+    CHANNEL_DEMO,
+    STATUS_ASSESSING,
+    STATUS_HELD,
+    Media,
+    Report,
+    Reporter,
+    utcnow,
+)
 from app.trust import HOLD_SPEND
 
 logger = logging.getLogger(__name__)
@@ -40,6 +53,7 @@ def purge_expired(settings: Settings, engine: Engine, now: datetime | None = Non
             .join(Reporter, Reporter.id == Report.reporter_id)
             .where(
                 col(Media.purged_at).is_(None),
+                Report.channel != CHANNEL_DEMO,
                 or_(
                     Report.status != STATUS_ASSESSING,
                     col(Report.assessing_started_at).is_(None),

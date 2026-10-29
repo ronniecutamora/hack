@@ -6,7 +6,7 @@ from sqlmodel import Session, select
 
 from app.db import init_db, make_engine
 from app.intake import IntakeService
-from app.models import Media, Report, utcnow
+from app.models import CHANNEL_DEMO, Media, Report, utcnow
 from app.retention import purge_expired
 
 
@@ -105,3 +105,29 @@ async def test_purge_removes_orphaned_files_after_the_ttl(settings, engine):
     assert not old_orphan.exists()
     assert fresh_orphan.exists()  # still inside the TTL
     assert len(list((settings.data_dir / "media").glob("*/*"))) == 2  # tracked + fresh
+
+
+async def test_synthetic_demo_media_is_kept_and_every_real_channel_is_purged(settings, engine):
+    # A deployed demo must still show its generated photos the day after seeding; the demo
+    # channel holds no personal data. Real channels keep the privacy promise.
+    intake = IntakeService(settings, engine)
+    demo = await intake.ingest_photo(1, b"generated-photo", channel=CHANNEL_DEMO)
+    real = await intake.ingest_photo(2, b"resident-photo", channel="telegram")
+    other = await intake.ingest_photo(3, b"another-channel-photo", channel="sms")
+    with Session(engine) as session:
+        for media in session.exec(select(Media)).all():
+            media.created_at = utcnow() - timedelta(hours=settings.raw_media_ttl_hours + 1)
+            session.add(media)
+        session.commit()
+        paths = {m.report_id: settings.data_dir / m.path for m in session.exec(select(Media))}
+
+    assert purge_expired(settings, engine) == 2
+
+    assert paths[demo.id].exists()
+    assert not paths[real.id].exists() and not paths[other.id].exists()
+    with Session(engine) as session:
+        purged = {m.report_id: m.purged_at for m in session.exec(select(Media)).all()}
+    assert purged[demo.id] is None
+    assert purged[real.id] is not None and purged[other.id] is not None
+    assert purge_expired(settings, engine) == 0  # the demo photo stays on every later run
+    assert paths[demo.id].exists()
