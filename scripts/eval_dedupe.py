@@ -178,7 +178,7 @@ async def run(args: argparse.Namespace) -> int:
         print(
             f"{len(pairs)} pairs, judge {name}. Uncached calls spend provider credits; "
             "a length retry can add a second call per pair. Cached reruns are free. "
-            "Dollar cost is not estimated (provider pricing must be checked before use)."
+            "Costs are list-price estimates (Glimmer's price is unpublished and logs as 0)."
         )
         if name == "muse-glimmer":
             print("Glimmer serverless availability is unverified; errors never switch models.")
