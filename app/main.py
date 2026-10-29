@@ -39,6 +39,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.config import Settings, get_settings
+from app.dashboard import active_incidents, incident_trust, overview
 from app.db import init_db, make_engine, make_recorder
 from app.deadlines import deadline
 from app.drafts import (
@@ -94,6 +95,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 # The header navigation, in order: (path, label). A page is current for its own path and the
 # paths below it (/incidents/7 is under Incidents).
 NAV = (
+    ("/", "Overview"),
     ("/incidents", "Incidents"),
     ("/reports", "Reports"),
     ("/drafts", "Drafts"),
@@ -193,14 +195,6 @@ templates.env.globals["fact_lines"] = fact_lines
 templates.env.globals["GEO_SOURCES"] = GEO_SOURCES
 templates.env.globals["output_label"] = output_label
 templates.env.globals["deadline_table"] = deadline_table
-
-
-def incident_trust(incident: Incident) -> dict[str, int | None]:
-    """The rollup owns trust counts; legacy incidents show unknown until refreshed."""
-    return {
-        "reporter_count": incident.latest_facts.get("reporter_count"),
-        "flagged_report_count": incident.latest_facts.get("flagged_report_count", 0),
-    }
 
 
 def related_incidents(session: Session, assessments: list[Assessment]) -> dict[int, int | None]:
@@ -376,6 +370,14 @@ def create_app(
             request.app.state.live.snapshot(), headers={"Cache-Control": "no-store"}
         )
 
+    @app.get("/", response_class=HTMLResponse)
+    def overview_page(request: Request) -> HTMLResponse:
+        drafts: DraftService = request.app.state.drafts
+        with Session(request.app.state.engine) as session:
+            context = overview(session, drafts, drafts.clock())
+        context["spend_cap"] = settings.daily_spend_cap_usd
+        return templates.TemplateResponse(request, "overview.html", context)
+
     @app.get("/reports", response_class=HTMLResponse)
     def reports(request: Request, around: int | None = None) -> HTMLResponse:
         with Session(request.app.state.engine) as session:
@@ -434,11 +436,7 @@ def create_app(
     @app.get("/incidents", response_class=HTMLResponse)
     def incidents(request: Request) -> HTMLResponse:
         with Session(request.app.state.engine) as session:
-            items = session.exec(
-                select(Incident)
-                .where(Incident.active == True)  # noqa: E712
-                .order_by(col(Incident.last_seen).desc(), col(Incident.id).desc())
-            ).all()
+            items = active_incidents(session)
             trust = {incident.id: incident_trust(incident) for incident in items}
         return templates.TemplateResponse(
             request, "incidents.html", {"items": items, "trust": trust}

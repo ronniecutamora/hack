@@ -254,6 +254,37 @@ button[type=button]:hover, .button.secondary:hover { background: var(--c-info-bg
 .decision-forms > form { flex: 1 1 20rem; }
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
 
+/* ---------- Overview ---------- */
+
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: var(--space-3); margin: 0 0 var(--space-5); padding: 0; list-style: none; }
+.kpi {
+  display: flex; flex-direction: column; gap: var(--space-1); height: 100%; padding: var(--space-4);
+  background: var(--c-surface); border: 1px solid var(--c-border); border-top: 4px solid var(--c-info-line);
+  border-radius: var(--radius); box-shadow: var(--shadow); color: inherit; text-decoration: none;
+}
+.kpi:hover { border-color: var(--c-border-strong); border-top-color: var(--c-brand); }
+.kpi--warn { border-top-color: var(--c-warn-line); }
+.kpi--alert { border-top-color: var(--c-alert-line); }
+.kpi__label { font-size: .875rem; font-weight: 700; color: var(--c-muted); }
+.kpi__value { font-size: 2.25rem; font-weight: 800; line-height: 1.1; }
+.kpi__value--text { font-size: 1.25rem; align-self: flex-start; }
+.kpi__value.chip { font-size: 1.125rem; padding: .125rem .75rem; }
+.kpi__sub { font-size: .875rem; color: var(--c-muted); }
+.kpi:hover .kpi__label { text-decoration: underline; }
+.meter { display: block; height: .4rem; margin-top: auto; border-radius: .2rem; background: var(--c-chip-bg); overflow: hidden; }
+.meter > span { display: block; height: 100%; background: var(--c-brand); }
+.kpi--alert .meter > span { background: var(--c-alert-line); }
+
+.overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr)); gap: var(--space-4); align-items: start; }
+.overview-grid h2 { margin-top: 0; }
+.feed { list-style: none; margin: 0 0 var(--space-3); padding: 0; }
+.feed > li { padding: var(--space-3) 0; border-bottom: 1px solid var(--c-border); }
+.feed > li:last-child { border-bottom: 0; }
+.feed > li:first-child { padding-top: 0; }
+.feed__head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: var(--space-1) var(--space-3); }
+.feed__meta { font-size: .9375rem; color: var(--c-muted); margin-top: var(--space-1); }
+.feed__meta .chip { margin-left: var(--space-1); }
+
 /* ---------- Print: A4 forms without the dashboard chrome ---------- */
 
 @page { size: A4; margin: 12mm; }

@@ -114,7 +114,7 @@
       <form method="post" action="/drafts/damaged-houses"><button type="submit">Save the current table as a draft for approval</button></form>
     {% else %}<p class="muted">No report states a number of damaged houses yet.</p>{% endif %}
   </section>
-  <h2>All drafts</h2>
+  <h2 id="all-drafts">All drafts</h2>
   {% if not history %}<p class="empty">No drafts generated yet.</p>{% else %}
   <div class="table-wrap">
   <table>

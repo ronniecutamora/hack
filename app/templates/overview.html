@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% from "_trust.html" import incident_trust %}
+{% from "_status.html" import incident_status %}
+{% from "_links.html" import report_href %}
+{% block title %}Overview{% endblock %}
+{% block content %}
+<div id="live-overview" data-live="reports incidents drafts spend">
+  <header>
+    <h1>Overview</h1>
+    <p class="muted">Biñan City · Philippine time (GMT+8) · reported figures for the officer to verify</p>
+  </header>
+
+  <ul class="kpis" aria-label="Key figures">
+    <li>
+      <a class="kpi" href="/incidents">
+        <span class="kpi__label">Open incidents</span>
+        <span class="kpi__value" data-kpi="incidents_open">{{ incidents_open }}</span>
+        <span class="kpi__sub">groupings of reports about one situation</span>
+      </a>
+    </li>
+    <li>
+      <a class="kpi{% if incidents_review %} kpi--warn{% endif %}" href="/incidents">
+        <span class="kpi__label">Needs officer review</span>
+        <span class="kpi__value" data-kpi="incidents_review">{{ incidents_review }}</span>
+        <span class="kpi__sub">{% if incidents_review %}grouping uncertain: check before counting{% else %}no grouping waits for you{% endif %}</span>
+      </a>
+    </li>
+    <li>
+      <a class="kpi{% if reports_held %} kpi--warn{% endif %}" href="/reports">
+        <span class="kpi__label">Reports, last 24 h</span>
+        <span class="kpi__value" data-kpi="reports_recent">{{ reports_recent }}</span>
+        <span class="kpi__sub"><span data-kpi="reports_total">{{ reports_total }}</span> in total · <span data-kpi="reports_held">{{ reports_held }}</span> held</span>
+      </a>
+    </li>
+    <li>
+      <a class="kpi{% if drafts_open %} kpi--warn{% endif %}" href="/drafts#all-drafts">
+        <span class="kpi__label">Drafts awaiting approval</span>
+        <span class="kpi__value" data-kpi="drafts_open">{{ drafts_open }}</span>
+        <span class="kpi__sub">RDANA, damaged houses and Notices of Loss</span>
+      </a>
+    </li>
+    <li>
+      {% set d = next_deadline %}
+      <a class="kpi{% if d.overdue %} kpi--alert{% elif d.countdown %} kpi--warn{% endif %}" href="/drafts{% if d.anchor %}#{{ d.anchor }}{% endif %}">
+        <span class="kpi__label">Next filing deadline</span>
+        {% if d.countdown %}
+          <span class="kpi__value kpi__value--text chip warn"><strong data-due="{{ d.countdown.due_iso }}" data-kpi="next_deadline">{{ d.countdown.text }}</strong></span>
+          <span class="kpi__sub">{{ d.label }} · incident #{{ d.incident_id }} · due {{ d.countdown.due_local }}{% if d.overdue %} · <strong>{{ d.overdue }} overdue</strong>{% endif %}</span>
+        {% elif d.overdue %}
+          <span class="kpi__value kpi__value--text" data-kpi="next_deadline">{{ d.overdue }} overdue</span>
+          <span class="kpi__sub">no filing deadline still ahead</span>
+        {% else %}
+          <span class="kpi__value kpi__value--text" data-kpi="next_deadline">None</span>
+          <span class="kpi__sub">no Notice of Loss clock running</span>
+        {% endif %}
+      </a>
+    </li>
+    <li>
+      <a class="kpi{% if model_spend >= spend_cap %} kpi--alert{% endif %}" href="/reports">
+        <span class="kpi__label">Model spend, last 24 h</span>
+        <span class="kpi__value" data-kpi="model_spend">${{ "%.2f"|format(model_spend) }}</span>
+        <span class="kpi__sub">of ${{ "%.2f"|format(spend_cap) }} cap{% if model_spend >= spend_cap %} · <strong>cap reached: new reports are held</strong>{% endif %}</span>
+        <span class="meter" aria-hidden="true"><span style="width: {{ [100, (model_spend / spend_cap * 100)|round(1)]|min }}%"></span></span>
+      </a>
+    </li>
+  </ul>
+
+  <div class="overview-grid">
+    <section class="card" aria-labelledby="attention-title">
+      <h2 id="attention-title">Needs attention <span class="muted">({{ attention_total }})</span></h2>
+      {% if not attention %}
+        <p class="empty">No incident waits for review and none has flagged reports.</p>
+      {% else %}
+        <ul class="feed">
+        {% for i in attention %}
+          <li id="incident-{{ i.id }}">
+            <div class="feed__head">
+              <a href="/incidents/{{ i.id }}"><strong>{{ i.title }}</strong></a>
+              {{ incident_status(i.status) }}
+            </div>
+            <div class="feed__meta">{{ i.latest_facts.get("report_count", 0) }} report{{ 's' if i.latest_facts.get("report_count", 0) != 1 }} · last {{ i.last_seen|manila_time }} · {{ incident_trust(trust[i.id]) }}</div>
+          </li>
+        {% endfor %}
+        </ul>
+        {% if attention_total > attention|length %}<p><a href="/incidents">All {{ attention_total }} on Incidents</a></p>{% endif %}
+      {% endif %}
+    </section>
+
+    <section class="card" aria-labelledby="latest-title">
+      <h2 id="latest-title">Latest reports</h2>
+      {% if not latest %}
+        <p class="empty">No reports yet. Reports sent to the Telegram bot appear here as they arrive.</p>
+      {% else %}
+        <ul class="feed">
+        {% for r, a in latest %}
+          <li id="report-{{ r.id }}">
+            <div class="feed__head">
+              <a href="{{ report_href(r.id, r.incident_id) }}"><time>{{ r.received_at|manila_time }}</time> · <strong>{{ r.barangay or "Place not found yet" }}</strong></a>
+              <span class="status-{{ r.status }}">{{ r.status|replace("_", " ") }}</span>
+            </div>
+            <div class="feed__meta">
+              {% if a and a.facts and a.facts.summary_en %}{{ a.facts.summary_en|truncate(160) }}
+              {% elif r.text %}{{ r.text|truncate(160) }}
+              {% elif r.transcript %}Voice: {{ r.transcript|truncate(150) }}
+              {% else %}<span class="muted">Photo, voice note or location without text</span>{% endif %}
+              {% if r.channel == "demo" %}<span class="chip warn">Synthetic demo</span>{% endif %}
+            </div>
+          </li>
+        {% endfor %}
+        </ul>
+        <p><a href="/reports">All reports</a></p>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

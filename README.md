@@ -214,7 +214,11 @@ data_version`, so it sees the bot's writes from its separate process) and tells 
 events which topics changed (reports, incidents, drafts, model spend), never report text. Each marked section
 re-fetches only itself, keeps the scroll position, highlights new rows briefly and never replaces a section the
 officer is typing in: it shows "New updates. Refresh section" there instead, and a requested refresh keeps the typed
-values. The header shows Live, Reconnecting or Offline with the time of the last update in Philippine time; when the
+values. The home page `/` is an overview: open incidents, incidents waiting for officer review, reports in the last
+24 hours (and held ones), drafts awaiting approval, the next filing deadline with its live countdown and model spend
+against the cap, each tile linking to its page and counted with the same helpers as that page
+([app/dashboard.py](app/dashboard.py)), beside the incidents needing attention and the latest reports. The header
+shows Live, Reconnecting or Offline with the time of the last update in Philippine time; when the
 stream keeps failing, the page checks `/events/token` every 20 seconds instead.
 
 ## Demo
@@ -249,7 +253,7 @@ cp .env.example .env   # add META_API_KEY, TELEGRAM_BOT_TOKEN, PSEUDONYM_SALT (o
 uv run python -m app.bot                  # Telegram intake bot (long polling)
 uv run python -m app.bot_profile --dry-run  # bot name, descriptions and commands: print what would change
 uv run python -m app.bot_profile --photo    # apply only what differs, and upload assets/brand/ulat-avatar.png
-uv run uvicorn app.main:app --reload      # web app: /health, /reports, /incidents, /drafts, /damaged-houses (.csv), /media/<id>, live updates at /events (localhost only: no login yet)
+uv run uvicorn app.main:app --reload      # web app: / (overview), /health, /reports, /incidents, /drafts, /damaged-houses (.csv), /media/<id>, live updates at /events (localhost only: no login yet)
 uv run pytest                             # tests (all HTTP is mocked, no API calls)
 uv run ruff check . && uv run ruff format --check .
 ```
@@ -345,6 +349,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-29 | Late captions (fix from the live bot test): a text sent within 2 minutes of the same reporter's caption-less photo or image file, with no other report in between, becomes the photo's caption instead of a caption-only report; the bot confirms it, the photo is re-assessed (cached photo calls, new facts and barangay from the caption) and re-grouped, and the joined text is exempt from the rate limit. An assessment whose text or pin changed while it ran no longer ends "assessed" with stale facts: the report stays new for the queued re-run, also across a spend-cap hold |
 | 2026-10-29 | Bot profile as data (`app/bot_profile.py`): the name, short description, description and command list for @UlatPH_bot in Taglish and English (what to send, Biñan typhoon and flood damage, reports go to the City DRRM Office, not an emergency line: call 911, the same privacy line as `/start`), with Telegram's length limits enforced by a test; an idempotent CLI compares the live values and sets only what differs (`--dry-run` prints the changes), and `--photo` uploads the avatar as a square JPEG; `/help` repeats `/start` |
 | 2026-10-29 | Live dashboard: one database watcher per web process (`PRAGMA data_version` on a dedicated read-only connection, then per-topic tokens in one read transaction) fanned out over server-sent events (`/events`, typed topics, heartbeat, retry, no report text) with a polling fallback (`/events/token`); marked page sections refresh in place without wiping typed input, keep scroll position and highlight new rows; Live / Reconnecting / Offline indicator; streams close on Ctrl+C or reload so uvicorn never hangs |
+| 2026-10-29 | Overview home page (`/`): key-figure tiles (open incidents, officer review, reports in 24 h and held, drafts awaiting approval, next filing deadline with a live countdown, model spend against the cap) that link to their pages and reuse those pages' queries and services (`app/dashboard.py`), the incidents needing attention and the latest reports; it updates live; a test checks every figure against the linked page |
 
 ### Third-party code and assets
 
@@ -413,6 +418,7 @@ app/
   bot_profile.py       The bot's public profile (name, descriptions, commands) as data; idempotent CLI that applies it
   main.py, templates/  FastAPI officer pages: reports, incidents, timelines, decision audit, drafts and media
   live.py              Live updates: one database watcher per process and the server-sent event streams
+  dashboard.py         Read models shared by the officer pages (overview figures, active incidents)
   static/              Dashboard stylesheet (css/app.css, design tokens), script (js/app.js), favicon and
                        vendor/ (pinned browser libraries with their licenses)
   evaluation.py        WER, Cohen's kappa and F1 helpers
