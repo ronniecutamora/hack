@@ -193,6 +193,24 @@ def test_phone_numbers_and_names_in_photo_notes_are_removed(client, engine):
     assert notes["judgment"]["notes"] == "Pen of [redacted], call [number]."
 
 
+def test_a_photo_change_makes_the_notice_of_loss_stale_but_not_the_rdana(client, engine):
+    incident, first, _ = fisherfolk_incident(engine)
+    add_photo(engine, first)
+    nol = generate(client, incident)
+    made = client.post("/drafts", data={"barangay": "De La Paz"}, follow_redirects=False)
+    rdana = int(made.headers["location"].rsplit("/", 1)[1])
+    with Session(engine) as session:  # a re-run of the photo judgment, nothing else
+        row = session.exec(select(PhotoAssessment)).one()
+        row.updated_at = row.updated_at + timedelta(minutes=5)
+        session.add(row)
+        session.commit()
+    assert "NEW EVIDENCE SINCE THIS VERSION" in client.get(f"/drafts/{nol}").text
+    assert "NEW EVIDENCE SINCE THIS VERSION" not in client.get(f"/drafts/{rdana}").text
+    current = generate(client, incident)
+    add_photo(engine, first)  # a second photo for the same report
+    assert "NEW EVIDENCE SINCE THIS VERSION" in client.get(f"/drafts/{current}").text
+
+
 def test_a_long_excerpt_is_cut_after_redaction(client, engine):
     incident, *_ = fisherfolk_incident(engine)
     add_report(

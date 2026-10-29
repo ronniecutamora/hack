@@ -37,7 +37,15 @@ from app.models import (
     manila_time,
     utcnow,
 )
-from app.nol import annex, countdowns, deadline_rows, eligible_incidents, fill_nol, occurred_at
+from app.nol import (
+    annex,
+    countdowns,
+    deadline_rows,
+    eligible_incidents,
+    fill_nol,
+    occurred_at,
+)
+from app.nol import fingerprint as nol_fingerprint
 from app.nol_form import COMMODITIES, Commodity, commodity_for_kind
 from app.rdana import EventInput, count_field, fill_rdana, summary_counts
 from app.rdana_form import CITY, PROVINCE, REGION
@@ -107,9 +115,9 @@ def current_fingerprint(city: CityEvidence, draft: Draft) -> str | None:
     """The fingerprint a draft of this output would get now; None when no evidence is left."""
     if draft.kind == KIND_DAMAGED_HOUSES:
         return city_fingerprint(city)
-    if draft.incident_id is not None:
+    if draft.incident_id is not None:  # a Notice of Loss: its incident plus that incident's photos
         incident = city.incident(draft.incident_id)
-        return incident.fingerprint() if incident else None
+        return nol_fingerprint(incident) if incident else None
     evidence = city.barangays.get(draft.barangay or "")
     return evidence.fingerprint() if evidence else None
 
@@ -402,7 +410,7 @@ class DraftService:
             incident_id=incident_id,
             version=0,
             content=fill_nol(commodity, incident, entries, drafted_at),
-            evidence_fingerprint=incident.fingerprint(),
+            evidence_fingerprint=nol_fingerprint(incident),
             created_at=drafted_at,
         )
         detail = {"reports": len(incident.report_ids), "commodity": commodity.key}

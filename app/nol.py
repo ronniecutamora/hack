@@ -17,7 +17,7 @@ from typing import Any
 
 from sqlmodel import Session, col, select
 
-from app.counting import CityEvidence, IncidentEvidence, count
+from app.counting import CityEvidence, IncidentEvidence, count, digest
 from app.deadlines import DEADLINES, Countdown, countdown
 from app.models import Assessment, Media, PhotoAssessment, Report, manila_time
 from app.nol_form import ASSURED, Commodity, NolField
@@ -72,6 +72,20 @@ def eligible(commodity: Commodity, incident: IncidentEvidence) -> bool:
 def eligible_incidents(commodity: Commodity, city: CityEvidence) -> list[IncidentEvidence]:
     """Grouped incidents a Notice of Loss can be drafted for, oldest first."""
     return [i for i in city.incidents() if i.incident_id is not None and eligible(commodity, i)]
+
+
+def fingerprint(incident: IncidentEvidence) -> str:
+    """The incident's evidence plus its photos, since the annex shows each photo's assessment.
+
+    A re-assessed or added photo makes the Notice of Loss stale; the RDANA fingerprint
+    (IncidentEvidence.fingerprint_data) leaves photos out and is unchanged.
+    """
+    return digest(
+        {
+            "incident": incident.fingerprint_data(),
+            "photos": [[m.id, [list(p) for p in m.photos]] for m in incident.members],
+        }
+    )
 
 
 def occurred_at(incident: IncidentEvidence) -> datetime:

@@ -81,6 +81,9 @@ class Observation:
     context: dict[str, Any]
     reporter_id: int | None = None
     flagged: bool = False
+    # (photo assessment id, media id, overlay media id, updated_at) per photo, for staleness of
+    # outputs that show the photos (the Notice of Loss annex); grouping and counting ignore it.
+    photos: tuple[tuple[int | None, int, int | None, str], ...] = ()
 
 
 def distance_m(a: tuple[float, float], b: tuple[float, float]) -> float:
@@ -206,6 +209,10 @@ def observations(session: Session) -> dict[int, Observation]:
             any(
                 s.get("severity") in ("high", "medium")
                 for s in (assessments[report.id].signals or [])
+            ),
+            tuple(
+                (p.id, p.media_id, p.overlay_media_id, p.updated_at.isoformat())
+                for p in photos[report.id]
             ),
         )
     return result

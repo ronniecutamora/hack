@@ -51,7 +51,7 @@ COUNTING_RULE = (
 )
 
 
-def _digest(data: Any) -> str:
+def digest(data: Any) -> str:
     return hashlib.sha256(json.dumps(data, sort_keys=True, default=str).encode()).hexdigest()
 
 
@@ -128,7 +128,7 @@ class IncidentEvidence:
         }
 
     def fingerprint(self) -> str:
-        return _digest(self.fingerprint_data())
+        return digest(self.fingerprint_data())
 
 
 @dataclass(frozen=True)
@@ -262,7 +262,7 @@ class BarangayEvidence:
 
     def fingerprint(self) -> str:
         """Changes whenever the counted evidence changes, so stale drafts can be flagged."""
-        return _digest([incident.fingerprint_data() for incident in self.incidents])
+        return digest([incident.fingerprint_data() for incident in self.incidents])
 
 
 @dataclass
