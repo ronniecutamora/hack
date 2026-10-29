@@ -6,7 +6,7 @@ import json
 import pytest
 
 from app import eval_results
-from app.evaluation import BinaryScores
+from app.evaluation import REPO_ROOT, BinaryScores
 
 SCORES = eval_results.scores_dict(BinaryScores(tp=3, fp=1, fn=1, tn=5))
 
@@ -123,3 +123,24 @@ def test_markdown_has_one_row_per_entry_with_n_provenance_and_date(path):
 def test_git_commit_names_the_checkout():
     commit = eval_results.git_commit()
     assert commit == "unknown" or len(commit.removesuffix("-dirty")) == 12
+
+
+# --- the recorded runs ----------------------------------------------------------------------
+
+
+def test_the_readme_tables_are_generated_from_the_results_file():
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    assert eval_results.readme_block(readme) == eval_results.render_markdown(eval_results.load()), (
+        "README eval tables are stale: paste the output of `uv run python -m app.eval_results`"
+    )
+
+
+@pytest.mark.parametrize("model", ["muse-spark-1.3", "muse-spark-open"])
+def test_both_llms_are_measured_on_every_set(model):
+    results = eval_results.load()
+    for dataset in ("kill-test-25", "synthetic-40"):
+        entry = results.find("photo_judge", dataset, model)
+        assert entry is not None and entry.sam == "sam-3.1"
+        assert (entry.n, entry.errors) == (entry.dataset.n, 0)
+    pairs = results.find("pair_judge", "dedupe-pairs-64", model)
+    assert pairs is not None and pairs.n == 64
