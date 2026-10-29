@@ -5,7 +5,10 @@ default), so a page or media URL added later is protected without anyone remembe
 photos and texts are personal data under RA 10173.
 
 - The passcode is compared as SHA-256 digests in constant time. Failed attempts are limited per
-  client address (LoginLimiter); behind Modal's proxy the address comes from X-Forwarded-For.
+  client address (LoginLimiter); behind Modal's proxy the address is the last X-Forwarded-For
+  hop, the one the proxy adds. Checked on staging (2026-10-30): 12 wrong passcodes, each with a
+  different forged X-Forwarded-For, got 401 ten times and then 429, while a second network was
+  still answered 401, so a client can neither dodge its limit nor lock out other officers.
 - The cookie holds the expiry and the optional officer initials typed at login, signed with
   HMAC-SHA256 under a key derived from SESSION_SECRET and the passcode, so changing either one
   signs everyone out. Nothing is stored server-side.

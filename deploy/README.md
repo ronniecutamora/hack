@@ -121,4 +121,7 @@ Only after Ronnie's go. Staging must have passed the same steps first.
   invented reporters, no personal data; see [app/retention.py](../app/retention.py)), so a deployed demo keeps its
   evidence. Every real report's raw photos and voice notes are still deleted `RAW_MEDIA_TTL_HOURS` (24) after
   arrival.
+- The login limit (10 wrong passcodes per 15 minutes) is per client address: the last `X-Forwarded-For` hop, which
+  Modal's proxy adds. Forged entries before it are ignored (checked on staging 2026-10-30, see
+  [app/auth.py](../app/auth.py)).
 - `--strategy recreate` matters: a rolling deploy would start the new container while the old one still writes.
