@@ -41,6 +41,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from telegram.ext import Application
 
+from app.accuracy import WEAK_BELOW, accuracy_page
 from app.agent_trace import TRACE_SINCE, draft_calls, report_traces
 from app.auth import (
     LOGIN_PATH,
@@ -74,6 +75,7 @@ from app.drafts import (
     predates_pending_bucket,
     regenerate_form,
 )
+from app.eval_results import RESULTS_PATH
 from app.facts import fact_lines
 from app.gazetteer import BARANGAYS, BY_NAME
 from app.geo import GEO_SOURCES, boundaries_geojson
@@ -132,6 +134,7 @@ NAV = (
     ("/map", "Map"),
     ("/drafts", "Drafts"),
     ("/damaged-houses", "Damaged houses"),
+    ("/accuracy", "Accuracy"),
 )
 
 
@@ -423,6 +426,7 @@ def create_app(
 
     app = FastAPI(title="Typhoon damage reports", lifespan=lifespan)
     app.state.auth = auth
+    app.state.results_path = RESULTS_PATH  # the recorded accuracy results; tests point elsewhere
     # Middleware runs last-added first: host check, then same-origin, then the login gate.
     install_login_gate(app, auth)
 
@@ -542,6 +546,12 @@ def create_app(
             context = overview(session, drafts, drafts.clock())
         context["spend_cap"] = settings.daily_spend_cap_usd
         return templates.TemplateResponse(request, "overview.html", context)
+
+    @app.get("/accuracy", response_class=HTMLResponse)
+    def accuracy(request: Request) -> HTMLResponse:
+        """The agent's measured accuracy, from the recorded eval results (app.accuracy)."""
+        context = {"page": accuracy_page(request.app.state.results_path), "weak_below": WEAK_BELOW}
+        return templates.TemplateResponse(request, "accuracy.html", context)
 
     @app.get("/map", response_class=HTMLResponse)
     def map_page(request: Request) -> HTMLResponse:
