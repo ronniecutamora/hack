@@ -187,7 +187,18 @@ def image_document(mime, size=1000, data=b"\xff\xd8jpeg"):
     return document
 
 
-async def test_every_report_is_queued_for_assessment_after_the_reply(settings, engine):
+async def test_a_report_is_assessed_even_when_the_received_reply_fails(settings, engine):
+    """A reporter who blocked the bot (or a dead network) must not leave the report unassessed."""
+    context, assessor = context_with_assessor(settings, engine)
+    update = make_update(text="baha sa Casile")
+    update.effective_message.reply_text = AsyncMock(side_effect=BadRequest("Chat not found"))
+    with pytest.raises(BadRequest):
+        await bot.on_text(update, context)
+    (report,) = reports(engine)
+    assert assessor.assessed == [f"assess-{report.id}"]
+
+
+async def test_every_report_is_queued_for_assessment(settings, engine):
     context, assessor = context_with_assessor(settings, engine)
     await bot.on_text(make_update(text="baha sa Casile"), context)
     await bot.on_photo(make_update(photo=[Downloadable(b"jpg")], caption=None), context)

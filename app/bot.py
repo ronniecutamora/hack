@@ -253,6 +253,17 @@ async def _assess_and_acknowledge(
     acks.remember(sent, report_id)
 
 
+async def _stored(
+    context: ContextTypes.DEFAULT_TYPE, report: Report, message: object, reply: str | None
+) -> None:
+    """A message is stored in `report`: queue its assessment, then send `reply`. The assessment
+    is queued first so it never depends on the reply reaching the reporter (a reporter who
+    blocked the bot, or a network failure, would otherwise leave the report unassessed)."""
+    _assess_later(context, report, message)
+    if reply is not None:
+        await _reply(message, reply)
+
+
 def reporter_summary(engine: object, report_id: int) -> str | None:
     """The bilingual summary of a report as stored now (app.reporter_summary)."""
     with Session(engine) as session:
@@ -312,16 +323,17 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Photo first, words second: a text right after a caption-less photo is its caption.
     report = await intake.attach_caption(update.effective_user.id, message.text)
     if report is not None:
-        await _reply(message, CAPTION_ADDED)
-    else:
-        # A reply to one of our summaries corrects that report ("Mali? I-reply…").
-        acks: Acknowledgements | None = context.application.bot_data.get("acks")
-        corrects = acks.replied_to(message) if acks else None
-        report = await intake.ingest_text(
-            update.effective_user.id, message.text, corrects_report_id=corrects
-        )
-        await _reply(message, CORRECTION_RECEIVED if report.corrects_report_id else RECEIVED)
-    _assess_later(context, report, message)  # re-assesses a photo that got its caption
+        await _stored(context, report, message, CAPTION_ADDED)  # re-assesses the photo
+        return
+    # A reply to one of our summaries corrects that report ("Mali? I-reply…").
+    acks: Acknowledgements | None = context.application.bot_data.get("acks")
+    corrects = acks.replied_to(message) if acks else None
+    report = await intake.ingest_text(
+        update.effective_user.id, message.text, corrects_report_id=corrects
+    )
+    await _stored(
+        context, report, message, CORRECTION_RECEIVED if report.corrects_report_id else RECEIVED
+    )
 
 
 def _joins_album(intake: IntakeService, user_ref: int, message: object) -> bool:
@@ -339,9 +351,7 @@ async def _ingest_photo(
     report = await intake.ingest_photo(
         update.effective_user.id, data, caption=message.caption, ext=ext, album=_album(message)
     )
-    if not joins:
-        await _reply(message, RECEIVED)
-    _assess_later(context, report, message)
+    await _stored(context, report, message, None if joins else RECEIVED)
 
 
 @_admitted(attaches=_joins_album)
@@ -369,11 +379,8 @@ async def on_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     data = await _download(message.voice)
     report = await _intake(context).ingest_voice(update.effective_user.id, data, ext="ogg")
-    await _reply(
-        message,
-        RECEIVED if report.transcript or report.status == STATUS_HELD else VOICE_NOT_TRANSCRIBED,
-    )
-    _assess_later(context, report, message)
+    heard = report.transcript or report.status == STATUS_HELD
+    await _stored(context, report, message, RECEIVED if heard else VOICE_NOT_TRANSCRIBED)
 
 
 @_admitted(attaches=lambda intake, user_ref, _message: intake.can_attach_location(user_ref))
@@ -382,8 +389,8 @@ async def on_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     report = await _intake(context).ingest_location(
         update.effective_user.id, message.location.latitude, message.location.longitude
     )
-    await _reply(message, LOCATION_RECEIVED)
-    _assess_later(context, report, message)  # re-maps a report assessed before the pin came
+    # Re-maps a report assessed before the pin came.
+    await _stored(context, report, message, LOCATION_RECEIVED)
 
 
 async def _after_update(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:

@@ -513,6 +513,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-30 | Review fix: "Keep separate" now undoes a wrong merge: when the report's incident has other reports it is split into a new incident in the same barangay, pinned there, both incidents' rollups are recomputed (drafts go stale), and the audit records an `officer_split` from the old incident; the incident page labels the action "Split into its own incident". The accuracy page's merge note now says figures in one incident are counted once |
 | 2026-10-30 | Review fix: the database lease is enforced, not advisory: a container whose stale lease another one took over writes no more snapshots and never overwrites or releases the new holder's lease (the final snapshot reloads the volume first to see a takeover) |
 | 2026-10-30 | Review fix: incident titles use the facts as the officer adjusted them (a ruled-out fallen tree leaves the title, a confirmed one joins the hazards), and a fallen-tree verdict refreshes its incident |
+| 2026-10-30 | Fix found in the staging restart check: a stored report is queued for assessment before the bot replies "received", so a reporter who blocked the bot (or a failed reply) no longer leaves it unassessed until the next restart |
 
 ### Third-party code and assets
 
