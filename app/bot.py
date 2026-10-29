@@ -70,6 +70,7 @@ RATE_LIMITED = (
     "You've sent many reports recently. Please try again later. For emergencies, call 911."
 )
 LOCATION_RECEIVED = "Natanggap ang location. / Location received."
+CAPTION_ADDED = "Idinugtong sa iyong larawan. / Added to your photo."
 VOICE_NOT_TRANSCRIBED = (
     "Natanggap ang voice note pero hindi pa ito na-transcribe. Subukan ulit o mag-text. / "
     "Voice note received but not transcribed yet. Please try again or send text."
@@ -124,8 +125,12 @@ def _assess_later(context: ContextTypes.DEFAULT_TYPE, report: Report) -> None:
         context.application.create_task(assessor.assess(report.id), name=f"assess-{report.id}")
 
 
-def _admitted(*, location_pin: bool = False):
-    """One admission per report message, before download; attached pins are exempt."""
+def _admitted(*, attaches: Callable[[IntakeService, int], bool] | None = None):
+    """One admission per report message, before download.
+
+    A message that `attaches` to the sender's existing report (a late pin, a late caption)
+    creates no report, so it is exempt from the rate limit.
+    """
 
     def decorate(handler):
         @wraps(handler)
@@ -134,8 +139,8 @@ def _admitted(*, location_pin: bool = False):
             user_ref = update.effective_user.id
             async with intake.admission_lock(user_ref):
                 admission = intake.admit(user_ref)
-                attached_pin = location_pin and intake.can_attach_location(user_ref)
-                if admission == Admission.RATE_LIMITED and not attached_pin:
+                attached = attaches is not None and attaches(intake, user_ref)
+                if admission == Admission.RATE_LIMITED and not attached:
                     await _reply(update.effective_message, RATE_LIMITED)
                     return
                 return await handler(update, context)
@@ -153,12 +158,18 @@ async def on_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 
-@_admitted()
+@_admitted(attaches=IntakeService.can_attach_caption)
 async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
-    report = await _intake(context).ingest_text(update.effective_user.id, message.text)
-    await _reply(message, RECEIVED)
-    _assess_later(context, report)
+    intake = _intake(context)
+    # Photo first, words second: a text right after a caption-less photo is its caption.
+    report = await intake.attach_caption(update.effective_user.id, message.text)
+    if report is not None:
+        await _reply(message, CAPTION_ADDED)
+    else:
+        report = await intake.ingest_text(update.effective_user.id, message.text)
+        await _reply(message, RECEIVED)
+    _assess_later(context, report)  # re-assesses and re-groups a photo that got its caption
 
 
 @_admitted()
@@ -204,7 +215,7 @@ async def on_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     _assess_later(context, report)
 
 
-@_admitted(location_pin=True)
+@_admitted(attaches=IntakeService.can_attach_location)
 async def on_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     report = await _intake(context).ingest_location(

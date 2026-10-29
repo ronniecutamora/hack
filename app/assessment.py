@@ -299,7 +299,8 @@ class AssessmentService:
             errors.append("raw media expired while held")
         if untranscribed_voice:  # part of the report is missing: not "assessed"
             errors.insert(0, "voice note not transcribed")
-        return self._save(report_id, transcript, facts, geo, outcomes, errors)
+        inputs = (report.text, report.lat, report.lon)
+        return self._save(report_id, transcript, facts, geo, outcomes, errors, inputs)
 
     async def _facts(self, text: str) -> tuple[dict[str, Any] | None, str | None]:
         try:
@@ -335,7 +336,11 @@ class AssessmentService:
         geo: GeoResult,
         outcomes: list[_PhotoOutcome],
         errors: list[str],
+        inputs: tuple[str | None, float | None, float | None],
     ) -> Report:
+        """Store the results. `inputs` are the report's text and pin this pass read: if a late
+        caption or pin changed them meanwhile, the report stays "new" (not grouped) and the
+        re-assessment queued with that change finishes it."""
         # Legacy hashing reads files/decodes images, so finish it before any SQLite write.
         hashes = pending_photo_hashes(self.engine, self.settings)
         with self._session() as session:
@@ -365,7 +370,10 @@ class AssessmentService:
             )
             session.add(assessment)
             report.barangay = geo.barangay.name if geo.barangay else None
-            report.status = STATUS_ASSESSMENT_FAILED if errors else STATUS_ASSESSED
+            if (report.text, report.lat, report.lon) != inputs:
+                report.status = STATUS_NEW
+            else:
+                report.status = STATUS_ASSESSMENT_FAILED if errors else STATUS_ASSESSED
             session.add(report)
             session.flush()
             # Trust changes do not change grouping inputs or justify another pair-judge call.

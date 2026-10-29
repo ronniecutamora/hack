@@ -418,7 +418,7 @@ async def test_lazy_hash_reads_and_decodes_before_save_write(settings, engine, m
     monkeypatch.setattr(Path, "read_bytes", checked_read)
     monkeypatch.setattr(trust, "photo_hash", checked_hash)
     service = AssessmentService(settings, engine, FakeLLM(), FakeSam())
-    service._save(report.id, None, None, GeoResult(None, "none"), [], [])
+    service._save(report.id, None, None, GeoResult(None, "none"), [], [], (None, None, None))
     assert len(reads) == len(hashes) == 1
     assert rows(engine, Media)[0].phash is not None
 
@@ -444,10 +444,10 @@ async def test_unhashable_legacy_photo_is_not_retried(settings, engine, monkeypa
 
     monkeypatch.setattr(Path, "read_bytes", counted)
     service = AssessmentService(settings, engine, FakeLLM(), FakeSam())
-    service._save(report.id, None, None, GeoResult(None, "none"), [], [])
+    service._save(report.id, None, None, GeoResult(None, "none"), [], [], (None, None, None))
     assert rows(engine, Media)[0].phash is not None
     reads.clear()
-    service._save(report.id, None, None, GeoResult(None, "none"), [], [])
+    service._save(report.id, None, None, GeoResult(None, "none"), [], [], (None, None, None))
     assert not reads
 
 

@@ -12,7 +12,7 @@ _TBD: one paragraph on who suffers, how much, and why now, with sourced numbers.
 
 ## What it does
 
-1. Residents send photos, voice notes, texts and location pins; the agent extracts damage facts and maps the report to a barangay.
+1. Residents send photos, voice notes, texts and location pins; the agent extracts damage facts and maps the report to a barangay. Reporters often send a photo and then type its words: a text within 2 minutes of the same reporter's caption-less photo, with nothing in between, becomes that photo's caption (the bot answers "Idinugtong sa iyong larawan. / Added to your photo."), and the photo is re-assessed and re-grouped with it, like a late location pin.
 2. Deterministic place/time/GPS filters find candidate incidents. A text-only Meta pair judge decides whether reports describe the same situation; uncertainty stays separate for officer review. Every candidate is judged, not just the first, so a correction ("mali po… dalawang bahay lang, hindi tatlo") lands in the incident that holds the figure it corrects.
 3. Officers read incident timelines, depth changes and the stored reasons for grouping. Reported totals explicitly warn about double-counting, including corrections.
 4. The agent drafts each barangay's RDANA form and the city's damaged-houses table from that evidence; the officer checks every value against its linked reports, then approves or rejects the draft (see [Officer outputs](#officer-outputs)).
@@ -45,7 +45,7 @@ model calls:
 
 | Layer | What happens | Default |
 |---|---|---|
-| Rate limit | Each pseudonymous reporter is checked *before* a file is downloaded. Over the limit, the bot replies (Tagalog / English) to try later and to call 911 for emergencies | 20 reports per hour, 60 per 24 h (`REPORTS_PER_HOUR`, `REPORTS_PER_DAY`) |
+| Rate limit | Each pseudonymous reporter is checked *before* a file is downloaded. Over the limit, the bot replies (Tagalog / English) to try later and to call 911 for emergencies. A late pin or caption that joins the sender's last report is not a new report and is not limited | 20 reports per hour, 60 per 24 h (`REPORTS_PER_HOUR`, `REPORTS_PER_DAY`) |
 | Spend cap | Model costs logged in the last 24 h are checked before every assessment. Over the cap, new reports are stored as `held` and assessed later by `python -m app.assessment --pending` | $10 (`DAILY_SPEND_CAP_USD`) |
 | Block list | `python -m app.trust block <pseudonym-prefix>` (and `unblock`). Messages are still stored as `held` for the officer but never reach a model | — |
 | Trust signals | Rule-based flags on each report, shown as red / amber / grey chips: **photo reused** by another reporter (SHA-256 or a 64-bit difference hash, so resized or recompressed copies match), **old photo** (EXIF capture time), **pin outside Biñan**, **pin and text name different barangays** | Photo older than 3 days (`PHOTO_MAX_AGE_DAYS`) |
@@ -329,6 +329,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-29 | Demo reset keeps the model cache as well as the generated images, so a reload does not pay again for photo judgments and SAM calls; updated CLI prompt, messages, help and regression test |
 | 2026-10-29 | Officer dashboard design system: one stylesheet with colour, spacing and type tokens (16 px body text, AA contrast, visible focus rings, 40 px controls), an "Ulat" header bar with the active page marked (`aria-current`), status badges that always carry text, sticky table headers, tables that scroll inside a wrapper on narrow screens and become stacked cards under 640 px, and A4 print rules that drop the dashboard chrome |
 | 2026-10-29 | Correction routing (fix from the live bot test): the pair judge now compares a report with every candidate incident up to `MAX_JUDGED_CANDIDATES` instead of stopping at the first match, and the best accepted match wins: an incident not waiting for review, then for a correction the incident stating the corrected figure, then confidence. A Casile "2 houses, not 3" correction had merged into an unconfirmed old-photo incident; re-grouping moves such a report, and the stored reason names why the incident won |
+| 2026-10-29 | Late captions (fix from the live bot test): a text sent within 2 minutes of the same reporter's caption-less photo or image file, with no other report in between, becomes the photo's caption instead of a caption-only report; the bot confirms it, the photo is re-assessed (cached photo calls, new facts and barangay from the caption) and re-grouped, and the joined text is exempt from the rate limit. An assessment whose text or pin changed while it ran no longer ends "assessed" with stale facts: the report stays new for the queued re-run, also across a spend-cap hold |
 
 ### Third-party code and assets
 

@@ -43,6 +43,9 @@ logger = logging.getLogger(__name__)
 LANGUAGE_BIAS = ["Tagalog", "English"]
 # A location pin sent shortly after a report is attached to that report.
 LOCATION_JOIN_WINDOW = timedelta(minutes=15)
+# Reporters send a photo, then type its words as a separate message (live test 2026-10-29: 1 s
+# and 14 s gaps). A text this soon after a caption-less photo becomes the photo's caption.
+CAPTION_JOIN_WINDOW = timedelta(minutes=2)
 
 ConvertFn = Callable[[Path, Path], Awaitable[list[Path]]]
 
@@ -136,15 +139,46 @@ class IntakeService:
             .order_by(col(Report.received_at).desc(), col(Report.id).desc())
         ).first()
 
-    def can_attach_location(self, user_ref: int | str) -> bool:
+    def _caption_target(self, session: Session, reporter_id: int) -> Report | None:
+        """The reporter's latest report if it is a recent photo without words.
+
+        Taking the latest report means no other report came in between. A voice note's
+        transcript is not a caption, and a report that has text is never overwritten.
+        """
+        latest = session.exec(
+            select(Report)
+            .where(
+                Report.reporter_id == reporter_id,
+                Report.received_at >= utcnow() - CAPTION_JOIN_WINDOW,
+            )
+            .order_by(col(Report.received_at).desc(), col(Report.id).desc())
+        ).first()
+        if latest is None or latest.text or latest.transcript:
+            return None
+        photo = session.exec(
+            select(Media.id).where(Media.report_id == latest.id, Media.kind == "photo")
+        ).first()
+        return latest if photo is not None else None
+
+    def _can_attach(
+        self, user_ref: int | str, find: Callable[[Session, int], Report | None]
+    ) -> bool:
         pseudonym = pseudonymize(self.settings.pseudonym_salt.get_secret_value(), user_ref)
         with self._session() as session:
             reporter = session.exec(select(Reporter).where(Reporter.pseudonym == pseudonym)).first()
             return (
                 reporter is not None
                 and not reporter.blocked
-                and self._location_target(session, reporter.id) is not None
+                and find(session, reporter.id) is not None
             )
+
+    def can_attach_location(self, user_ref: int | str) -> bool:
+        """A pin would join an existing report (so it is not a new report for the rate limit)."""
+        return self._can_attach(user_ref, self._location_target)
+
+    def can_attach_caption(self, user_ref: int | str) -> bool:
+        """A text would become a photo's caption (so it is not a new report for the rate limit)."""
+        return self._can_attach(user_ref, self._caption_target)
 
     def _session(self) -> Session:
         return Session(self.engine, expire_on_commit=False)
@@ -204,6 +238,32 @@ class IntakeService:
             raise ValueError("text report is empty")
         with self._session() as session:
             report = self._new_report(session, user_ref, channel, text=text)
+            session.commit()
+            return report
+
+    async def attach_caption(self, user_ref: int | str, text: str) -> Report | None:
+        """Make a text the caption of the reporter's caption-less photo sent just before it.
+
+        Returns the photo report, or None when the text is a report of its own. Like a late
+        pin, an assessed report goes back to "new" so it is re-assessed (facts and place from
+        the caption) and re-grouped; one being assessed right now is re-run by the assessor.
+        A blocked reporter's text never joins an earlier report.
+        """
+        text = text.strip()
+        if not text:
+            return None
+        pseudonym = pseudonymize(self.settings.pseudonym_salt.get_secret_value(), user_ref)
+        with self._session() as session:
+            reporter = session.exec(select(Reporter).where(Reporter.pseudonym == pseudonym)).first()
+            if reporter is None or reporter.blocked:
+                return None
+            report = self._caption_target(session, reporter.id)
+            if report is None:
+                return None
+            report.text = text
+            if report.status == STATUS_ASSESSED:
+                report.status = STATUS_NEW
+            session.add(report)
             session.commit()
             return report
 
