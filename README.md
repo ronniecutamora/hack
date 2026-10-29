@@ -36,6 +36,22 @@ Incident candidates share a barangay and activity within `INCIDENT_WINDOW_DAYS` 
 
 Grouping runs after successful assessment under the same per-report lock, without a database transaction across a model call. A changed late pin re-links the report; an empty old group is retired from the list while its audit remains readable. Unchanged grouping is a no-op. `AgentDecision` stores the actual judge model, compared incident/report, confidence and reason; pages do not regenerate explanations. Judge failures stay visible for officer review and can be retried explicitly. Existing slice-2 SQLite files receive grouping columns on startup without losing reports.
 
+### The reporter's side (Telegram bot)
+
+Ulat is a hackathon prototype that Biñan's disaster office has not adopted, and the bot says so. Its public profile
+(`app/bot_profile.py`, applied with `python -m app.bot_profile`) reads, verbatim:
+
+- **Name:** Ulat · Bagyo at Baha (prototype)
+- **Short description:** Prototype: mag-report ng pinsala ng bagyo at baha. / Prototype damage reports, not official.
+  Emergency? Call 911.
+- **Description:** Prototype para sa Biñan, hindi pa opisyal o binabantayan ng LGU: magpadala ng larawan, voice note,
+  text o location ng pinsala. / A prototype for Biñan's disaster office, not yet official or monitored by the city:
+  send photos, voice notes, text or location of the damage. — Hindi ito emergency hotline. Para sa rescue, tumawag sa
+  911. / Not an emergency line. For rescue, call 911. — (the `/start` privacy line)
+
+`/start` and `/help` carry the same prototype notice. A test keeps every public text free of claims that reports
+reach the City DRRM Office.
+
 ## Spam and fake reports
 
 Ulat never sends aid or files a claim by itself: every output is a draft an officer approves, and PCIC
@@ -356,6 +372,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-29 | Live dashboard: one database watcher per web process (`PRAGMA data_version` on a dedicated read-only connection, then per-topic tokens in one read transaction) fanned out over server-sent events (`/events`, typed topics, heartbeat, retry, no report text) with a polling fallback (`/events/token`); marked page sections refresh in place without wiping typed input, keep scroll position and highlight new rows; Live / Reconnecting / Offline indicator; streams close on Ctrl+C or reload so uvicorn never hangs |
 | 2026-10-29 | Overview home page (`/`): key-figure tiles (open incidents, officer review, reports in 24 h and held, drafts awaiting approval, next filing deadline with a live countdown, model spend against the cap) that link to their pages and reuse those pages' queries and services (`app/dashboard.py`), the incidents needing attention and the latest reports; it updates live; a test checks every figure against the linked page |
 | 2026-10-29 | Officer map (`/map`, Leaflet 1.9.4 vendored): barangay boundaries served from the COD-AB file (`/map/barangays.geojson`, cached with an ETag) and shaded where incidents are active; one marker per active incident at its reports' mean GPS point inside Biñan, else an "approximate" marker at the barangay centre (`app/geo.py` `centroid`); status by shape, number and a text legend; flagged pins outside Biñan only, never auto-panned to; a list of every position for keyboard, screen-reader and no-JavaScript use; live updates; a compact map on the overview; offline-safe when OSM tiles fail |
+| 2026-10-30 | Honest bot copy: the public profile and `/start` say Ulat is a prototype being prepared for Biñan's disaster office, not yet an official city service and not monitored by the city; the name drops "Biñan" so it does not read as an LGU account ("Ulat · Bagyo at Baha (prototype)"); a test rejects any claim that reports reach the City DRRM Office. Not applied to the live bot yet |
 
 ### Third-party code and assets
 

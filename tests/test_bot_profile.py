@@ -78,13 +78,45 @@ def test_profile_fits_telegram_limits():
         assert 0 < len(description) <= BotCommandLimit.MAX_DESCRIPTION
 
 
-def test_profile_says_what_to_send_where_it_goes_and_that_it_is_not_a_hotline():
+def test_profile_says_what_to_send_and_that_it_is_not_a_hotline():
     text = PROFILE.description
-    for words in ("larawan", "voice note", "location", "photos", "Biñan", "DRRM", "911"):
+    for words in ("larawan", "voice note", "location", "photos", "Biñan", "911"):
         assert words in text
-    assert "Not an emergency line" in text
+    assert bot.NOT_A_HOTLINE in text and bot.NOT_A_HOTLINE in bot.start_text(24, 72)
     assert bot.NO_NAMES_STORED in text and bot.NO_NAMES_STORED in bot.start_text(24, 72)
     assert "911" in PROFILE.short_description
+
+
+# Ulat is a prototype the city has not adopted: the public copy must not read as an LGU service.
+OFFICIAL_CLAIMS = (
+    "Napupunta ito",
+    "go to the City",
+    "reach the City",
+    "DRRM Office",
+    "CDRRMO",
+    "for the LGU damage assessment",
+    "damage assessment ng LGU",
+)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [PROFILE.name, PROFILE.short_description, PROFILE.description, bot.start_text(24, 72)],
+    ids=["name", "short", "description", "start"],
+)
+def test_public_copy_is_honest_that_ulat_is_a_prototype(text):
+    assert "prototype" in text.lower()
+    for claim in OFFICIAL_CLAIMS:
+        assert claim not in text
+
+
+def test_profile_and_start_say_the_city_does_not_monitor_reports_yet():
+    for text in (PROFILE.description, bot.start_text(24, 72)):
+        assert "not yet official" in text or "not yet an official city service" in text
+        assert "hindi pa opisyal o binabantayan ng LGU" in text
+    assert "monitored by the city" in PROFILE.description
+    assert bot.PROTOTYPE_NOTICE in bot.start_text(24, 72)
+    assert "Biñan" not in PROFILE.name  # an LGU-sounding account name is avoided
 
 
 def test_every_listed_command_has_a_handler(settings):

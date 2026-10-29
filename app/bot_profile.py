@@ -21,7 +21,12 @@ from typing import Any
 from PIL import Image, ImageOps
 from telegram import Bot, BotCommand, InputFile, InputProfilePhotoStatic
 
-from app.bot import MISSING_TOKEN_MESSAGE, NO_NAMES_STORED, _with_retries
+from app.bot import (
+    MISSING_TOKEN_MESSAGE,
+    NO_NAMES_STORED,
+    NOT_A_HOTLINE,
+    _with_retries,
+)
 from app.config import get_settings
 
 # The chosen avatar (branding only; see the README's third-party assets).
@@ -39,20 +44,22 @@ class BotProfile:
 
 
 # Taglish first, then English, like /start. Not an emergency line: rescue goes to 911 (no local
-# number is printed without an official source).
+# number is printed without an official source). Honest about what Ulat is: a prototype being
+# prepared for Biñan's disaster office, not an official LGU account, so the name carries
+# "prototype" and no LGU office, and nothing claims that reports reach the city.
 PROFILE = BotProfile(
-    name="Ulat Biñan · Bagyo at Baha",
+    name="Ulat · Bagyo at Baha (prototype)",
     short_description=(
-        "Mag-report ng pinsala ng bagyo at baha sa Biñan. / "
-        "Report typhoon and flood damage in Biñan. Emergency? Call 911."
+        "Prototype: mag-report ng pinsala ng bagyo at baha. / "
+        "Prototype damage reports, not official. Emergency? Call 911."
     ),
     description=(
-        "Mag-report ng pinsala ng bagyo at baha sa Biñan, Laguna: magpadala ng larawan, voice "
-        "note, text o location. Napupunta ito sa City DRRM Office.\n"
-        "Report typhoon and flood damage in Biñan: send photos, voice notes, text or location. "
-        "Reports go to the City DRRM Office.\n\n"
-        "Hindi ito emergency hotline. Para sa rescue, tumawag sa 911. / "
-        "Not an emergency line. For rescue, call 911.\n\n"
+        # /start's PROTOTYPE_NOTICE, condensed to fit Telegram's 512 characters.
+        "Prototype para sa Biñan, hindi pa opisyal o binabantayan ng LGU: magpadala ng larawan, "
+        "voice note, text o location ng pinsala. / "
+        "A prototype for Biñan's disaster office, not yet official or monitored by the city: "
+        "send photos, voice notes, text or location of the damage.\n\n"
+        f"{NOT_A_HOTLINE}\n\n"
         f"{NO_NAMES_STORED}"
     ),
     commands=(

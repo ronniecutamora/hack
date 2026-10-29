@@ -48,6 +48,17 @@ NO_NAMES_STORED = (
     "Hindi namin iniimbak ang pangalan o numero mo, pseudonymous ID lang. / "
     "We store no names or phone numbers, only a pseudonymous ID."
 )
+# Ulat is a hackathon prototype the city has not adopted: nothing may say or imply that a report
+# reaches City Hall or that anyone at the LGU watches these chats.
+PROTOTYPE_NOTICE = (
+    "Prototype para sa disaster office ng Biñan; hindi pa opisyal o binabantayan ng LGU. / "
+    "A prototype for Biñan's disaster office: not yet an official city service, and not "
+    "monitored by the city yet."
+)
+NOT_A_HOTLINE = (
+    "Hindi ito emergency hotline. Para sa rescue, tumawag sa 911. / "
+    "Not an emergency line. For rescue, call 911."
+)
 
 
 def start_text(ttl_hours: int, held_max_hours: int) -> str:
@@ -55,6 +66,7 @@ def start_text(ttl_hours: int, held_max_hours: int) -> str:
         "Kumusta! Ito ang bot para sa pag-report ng pinsala ng bagyo. Magpadala ng larawan, "
         "voice note, text, o location ng pinsala.\n"
         "Hello! Send photos, voice notes, text or your location to report typhoon damage.\n\n"
+        f"{PROTOTYPE_NOTICE}\n{NOT_A_HOTLINE}\n\n"
         "Privacy:\n"
         f"- {NO_NAMES_STORED}\n"
         f"- Binubura ang orihinal na larawan at audio pagkatapos ng {ttl_hours} oras, "
@@ -63,8 +75,8 @@ def start_text(ttl_hours: int, held_max_hours: int) -> str:
         f"Original photos and audio are deleted after {ttl_hours} hours, "
         f"or up to {held_max_hours} hours if processing is paused; only text and "
         "assessments are kept.\n"
-        "- Ipoproseso ng AI models ng Meta ang mga ito para sa damage assessment ng LGU. / "
-        "Meta AI models process them for the LGU damage assessment.\n"
+        "- Ipoproseso ng AI models ng Meta ang mga ito para sa damage-assessment prototype. / "
+        "Meta AI models process them for the damage-assessment prototype.\n"
         "- Huwag magpadala ng mukha ng tao o ID. / Please do not send faces or ID documents."
     )
 
