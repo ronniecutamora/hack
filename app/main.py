@@ -362,6 +362,8 @@ def create_app(settings: Settings | None = None, *, summary_llm: AgentLLM | None
         draft, events, newest = request.app.state.drafts.get(draft_id)
         context = {
             "draft": draft,
+            "stale": request.app.state.drafts.is_stale(draft),
+            "event_at_local": draft.event_at and manila_time(draft.event_at).replace(" ", "T"),
             "c": draft.content,
             "events": events,
             "newest": newest,
@@ -384,7 +386,11 @@ def create_app(settings: Settings | None = None, *, summary_llm: AgentLLM | None
     async def decide_draft(request: Request, draft_id: int, action: str) -> RedirectResponse:
         form = await form_fields(request)
         request.app.state.drafts.decide(
-            draft_id, action, reason=form.get("reason"), decided_by=form.get("decided_by")
+            draft_id,
+            action,
+            reason=form.get("reason"),
+            decided_by=form.get("decided_by"),
+            confirm_stale=form.get("confirm_stale") == "1",
         )
         return RedirectResponse(f"/drafts/{draft_id}", status_code=303)
 

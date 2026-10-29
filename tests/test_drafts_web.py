@@ -253,7 +253,8 @@ def test_damaged_houses_snapshot_is_a_versioned_draft_with_a_frozen_csv(client, 
     add_report(engine, barangay="San Antonio", houses_totally_damaged=9)
     assert client.get(f"/drafts/{draft_id}.csv").text == frozen
     assert "San Antonio" in client.get("/damaged-houses.csv").text
-    client.post(f"/drafts/{draft_id}/approve", data={"decided_by": "CSWDO"})
+    stale = {"decided_by": "CSWDO", "confirm_stale": "1"}  # San Antonio came in since
+    client.post(f"/drafts/{draft_id}/approve", data=stale)
     assert "APPROVED" in client.get(f"/drafts/{draft_id}").text
     rdana = generate(client)
     assert client.get(f"/drafts/{rdana}.csv").status_code == 404

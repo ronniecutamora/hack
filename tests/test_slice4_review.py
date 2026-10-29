@@ -187,7 +187,7 @@ def test_pending_figures_show_on_the_form_csv_and_banner_and_approval_needs_a_re
     assert response.status_code == 303 and stored(client, draft_id).status == "approved"
     (event,) = decision_events(client, draft_id)
     assert event.reason == "Same street; counted once by the CDRRMO"
-    assert event.detail == {"pending_report_ids": ids}
+    assert event.detail == {"stale": False, "pending_report_ids": ids}
 
 
 def test_drafts_list_shows_the_pending_chip(client):
@@ -337,3 +337,53 @@ def test_the_rule_summary_passes_the_allowlist_with_every_count(engine):
     text = fallback_summary(found, counts)
     assert "Block 5 Lot 12" in text and "persons in evacuation centers: 21" in text
     assert check(summary_input(found, counts), text) == []
+
+
+# --- Staleness at decision time ----------------------------------------------------------
+
+
+def test_approving_a_stale_draft_needs_confirmation_and_is_recorded(client):
+    engine = client.app.state.engine
+    incident = add_incident(engine)
+    add_report(engine, incident=incident, houses_partially_damaged=4)
+    draft_id = generate(client, event_name="Typhoon demo", event_at="2026-10-28T08:00")
+    assert "NEW EVIDENCE SINCE THIS VERSION" not in client.get(f"/drafts/{draft_id}").text
+
+    add_report(engine, incident=incident, reporter="b", hours=1, houses_partially_damaged=6)
+    page = client.get(f"/drafts/{draft_id}").text
+    assert "NEW EVIDENCE SINCE THIS VERSION" in page and 'name="confirm_stale"' in page
+    # The regenerate button keeps the officer's event details.
+    assert '<input type="hidden" name="event_name" value="Typhoon demo">' in page
+    assert '<input type="hidden" name="event_at" value="2026-10-28T08:00">' in page
+
+    refused = client.post(f"/drafts/{draft_id}/approve", data={"decided_by": "CDRRMO"})
+    assert refused.status_code == 409
+    assert "The evidence changed after version 1 was generated" in refused.text
+    assert stored(client, draft_id).status == "draft" and decision_events(client, draft_id) == []
+
+    response = client.post(
+        f"/drafts/{draft_id}/approve",
+        data={"decided_by": "CDRRMO", "confirm_stale": "1"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303 and stored(client, draft_id).status == "approved"
+    (event,) = decision_events(client, draft_id)
+    assert event.detail == {"stale": True}
+    assert "stays as approved" in client.get(f"/drafts/{draft_id}").text
+
+
+def test_a_current_draft_is_approved_without_confirmation_and_rejection_never_needs_it(client):
+    engine = client.app.state.engine
+    incident = add_incident(engine)
+    add_report(engine, incident=incident, houses_partially_damaged=4)
+    current = generate(client)
+    assert client.post(f"/drafts/{current}/approve", data={}).status_code == 200
+    assert decision_events(client, current)[0].detail == {"stale": False}
+
+    houses = client.post("/drafts/damaged-houses", follow_redirects=False)
+    houses_id = int(houses.headers["location"].rsplit("/", 1)[1])
+    add_report(engine, incident=incident, reporter="b", hours=1, houses_partially_damaged=6)
+    assert client.post(f"/drafts/{houses_id}/approve", data={}).status_code == 409
+    rejected = client.post(f"/drafts/{houses_id}/reject", data={"reason": "Counts changed"})
+    assert rejected.status_code == 200 and stored(client, houses_id).status == "rejected"
+    assert decision_events(client, houses_id)[0].detail == {"stale": True}

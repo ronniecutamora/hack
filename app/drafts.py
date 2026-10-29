@@ -87,6 +87,18 @@ def city_fingerprint(city: CityEvidence) -> str:
     return hashlib.sha256(joined.encode()).hexdigest()
 
 
+def current_fingerprint(city: CityEvidence, kind: str, barangay: str | None) -> str | None:
+    """The fingerprint a draft of this output would get now; None when no evidence is left."""
+    if kind == KIND_DAMAGED_HOUSES:
+        return city_fingerprint(city)
+    evidence = city.barangays.get(barangay or "")
+    return evidence.fingerprint() if evidence else None
+
+
+def is_stale(draft: Draft, city: CityEvidence) -> bool:
+    return draft.evidence_fingerprint != current_fingerprint(city, draft.kind, draft.barangay)
+
+
 HOUSE_COLUMNS = {"totally": "houses_totally_damaged", "partially": "houses_partially_damaged"}
 
 
@@ -185,18 +197,16 @@ class BarangayStatus:
     latest: Draft | None
     approved: Draft | None
 
-    @property
-    def stale(self) -> bool:
-        """The counted evidence changed after the latest draft was generated."""
-        if self.latest is None:
-            return False
-        current = self.evidence.fingerprint() if self.evidence else None
-        return self.latest.evidence_fingerprint != current
+    stale: bool  # the counted evidence changed after the latest draft was generated
 
 
 class DraftService:
     def __init__(self, settings: Settings, engine: Engine, llm: AgentLLM | None) -> None:
         self.settings, self.engine, self.llm = settings, engine, llm
+
+    def is_stale(self, draft: Draft) -> bool:
+        """The counted evidence changed after this draft was generated."""
+        return is_stale(draft, self.evidence())
 
     def evidence(self) -> CityEvidence:
         with Session(self.engine) as session:
@@ -296,8 +306,19 @@ class DraftService:
             return draft
 
     def decide(
-        self, draft_id: int, action: str, *, reason: str | None, decided_by: str | None
+        self,
+        draft_id: int,
+        action: str,
+        *,
+        reason: str | None,
+        decided_by: str | None,
+        confirm_stale: bool = False,
     ) -> Draft:
+        """Approve or reject an open draft once.
+
+        Staleness is checked again here, inside the write transaction: approving a draft whose
+        evidence changed since it was generated needs `confirm_stale`, and the audit records it.
+        """
         if action not in DECISIONS:
             raise DraftNotFound(f"Unknown decision {action!r}.")
         status = DECISIONS[action]
@@ -317,6 +338,12 @@ class DraftService:
                 raise DraftConflict(
                     f"Draft {draft_id} is {draft.status}; only a draft can be decided."
                 )
+            stale = is_stale(draft, collect(session))
+            if status == DRAFT_APPROVED and stale and not confirm_stale:
+                raise DraftConflict(
+                    f"The evidence changed after version {draft.version} was generated. "
+                    "Generate a new version, or confirm that you approve this version as it is."
+                )
             pending = pending_report_ids(draft)
             if status == DRAFT_APPROVED and pending and len(reason or "") < REASON_MIN:
                 raise DraftError(
@@ -333,7 +360,7 @@ class DraftService:
                     action=status,
                     reason=reason,
                     actor=decided_by,
-                    detail={"pending_report_ids": pending} if pending else None,
+                    detail={"stale": stale, **({"pending_report_ids": pending} if pending else {})},
                     created_at=draft.decided_at,
                 )
             )
@@ -374,16 +401,18 @@ class DraftService:
         names = set(city.barangays) | {d.barangay for d in drafts if d.kind == KIND_RDANA}
         for name in sorted(n for n in names if n):
             mine = [d for d in drafts if d.kind == KIND_RDANA and d.barangay == name]
+            latest = max(mine, key=lambda d: d.version, default=None)
             statuses.append(
                 BarangayStatus(
                     name,
                     city.barangays.get(name),
-                    max(mine, key=lambda d: d.version, default=None),
+                    latest,
                     max(
                         (d for d in mine if d.status == DRAFT_APPROVED),
                         key=lambda d: d.version,
                         default=None,
                     ),
+                    latest is not None and is_stale(latest, city),
                 )
             )
         return city, statuses, drafts
