@@ -8,7 +8,9 @@ from sqlalchemy import create_engine, inspect
 from sqlmodel import Session, select
 
 from app.assessment import AssessmentService
+from app.counting import COUNT_FIELDS, collect
 from app.db import init_db, make_engine, make_recorder
+from app.facts import FACT_COUNT_FIELDS
 from app.incidents import (
     GPS_DISTANCE_CAP_M,
     IncidentService,
@@ -438,11 +440,14 @@ async def test_gps_only_member_keeps_known_incident_barangay(settings, engine):
 
 
 async def test_moving_uncertain_member_clears_old_review_status(settings, engine):
-    judge = FakeJudge({"decision": "unsure", "confidence": 0.5, "reason": "Place unclear."})
+    judge = FakeJudge(
+        {"decision": "unsure", "confidence": 0.5, "reason": "Place unclear."}, DIFFERENT, SAME
+    )
     service = IncidentService(settings, engine, judge)
     await service.group(add_report(engine))
     uncertain = await service.group(add_report(engine, at=AT + timedelta(hours=1)))
-    # A later confident match may join a group that still contains unresolved evidence.
+    # A later confident match may join a group that still contains unresolved evidence (the
+    # open incident is judged first and is different).
     joined = await service.group(add_report(engine, at=AT + timedelta(hours=2)))
     assert joined.incident_id == uncertain.incident_id
     assert rows(engine, Incident)[1].status == "needs_officer"
@@ -530,3 +535,130 @@ async def test_unassessed_report_is_skipped_and_has_no_incident(settings, engine
     assert service.report_ids() == []
     assert await service.group(999) is None
     assert not rows(engine, AgentDecision)
+
+
+UNSURE = {"decision": "unsure", "confidence": 0.7, "reason": "Place cannot be established."}
+
+
+def same(confidence):
+    return {"decision": "same", "confidence": confidence, "reason": "Same synthetic situation."}
+
+
+async def test_correction_goes_to_the_incident_stating_the_corrected_figure(settings, engine):
+    """The 2026-10-29 live case: Casile 3 houses, an unconfirmed old photo, then "2, not 3"."""
+    judge = FakeJudge(UNSURE, same(0.85), same(0.85))
+    service = IncidentService(settings, engine, judge)
+    voice = await service.group(add_report(engine, barangay="Casile", houses_partially_damaged=3))
+    photo = await service.group(add_report(engine, barangay="Casile", at=AT + timedelta(hours=1)))
+    assert photo.incident_id != voice.incident_id and photo.grouping_needs_officer
+    correction = await service.group(
+        add_report(
+            engine,
+            barangay="Casile",
+            at=AT + timedelta(hours=2),
+            is_correction=True,
+            houses_partially_damaged=2,
+        )
+    )
+    assert correction.incident_id == voice.incident_id
+    assert correction.grouping_needs_officer is False
+    decisions = [d for d in rows(engine, AgentDecision) if d.report_id == correction.id]
+    assert [(d.kind, d.compared_incident_id) for d in decisions] == [
+        ("merged", voice.incident_id),
+        ("kept_separate", photo.incident_id),
+    ]
+    assert (
+        f"corrects the houses partially damaged figure stated in incident {voice.incident_id}"
+        in decisions[0].reason
+    )
+    assert f"incident {photo.incident_id} waits for officer review" in decisions[0].reason
+    with Session(engine) as session:
+        houses = collect(session).barangays["Casile"].count("houses_partially_damaged")
+    assert houses.value == 2
+    assert houses.contributions[0].rule == "latest correction"
+    assert houses.pending_value is None
+
+
+async def test_wrongly_merged_correction_moves_when_regrouped(settings, engine):
+    """A correction merged by the old first-match rule moves once its grouping is re-run."""
+    service = IncidentService(settings, engine, FakeJudge(UNSURE))
+    voice = await service.group(add_report(engine, barangay="Casile", houses_partially_damaged=3))
+    photo = await service.group(add_report(engine, barangay="Casile", at=AT + timedelta(hours=1)))
+    correction_id = add_report(
+        engine,
+        barangay="Casile",
+        at=AT + timedelta(hours=2),
+        is_correction=True,
+        houses_partially_damaged=2,
+    )
+    with Session(engine) as session:  # the live state: merged into the photo's incident
+        report = session.get(Report, correction_id)
+        report.incident_id, report.grouping_fingerprint = photo.incident_id, "old-rule"
+        session.add(report)
+        session.commit()
+    service.judge.replies = [same(0.9), same(0.9)]
+    moved = await service.group(correction_id)
+    assert moved.incident_id == voice.incident_id
+    relinks = [d for d in rows(engine, AgentDecision) if d.kind == "re-linked"]
+    assert [(d.compared_incident_id, d.incident_id) for d in relinks] == [
+        (photo.incident_id, voice.incident_id)
+    ]
+    statuses = {i.id: i.status for i in rows(engine, Incident)}
+    assert statuses == {voice.incident_id: "open", photo.incident_id: "needs_officer"}
+
+
+async def test_unsure_on_one_candidate_does_not_stop_a_match_on_another(settings, engine):
+    judge = FakeJudge(DIFFERENT, UNSURE, SAME)
+    service = IncidentService(settings, engine, judge)
+    older = await service.group(add_report(engine))
+    newer = await service.group(add_report(engine, at=AT + timedelta(hours=1)))
+    third = await service.group(add_report(engine, at=AT + timedelta(hours=2)))
+    assert third.incident_id == older.incident_id != newer.incident_id
+    assert third.grouping_needs_officer is False
+    assert all(i.status == "open" for i in rows(engine, Incident))
+    compared = [d for d in rows(engine, AgentDecision) if d.report_id == third.id]
+    assert [(d.kind, d.compared_incident_id) for d in compared] == [
+        ("kept_separate", newer.incident_id),
+        ("merged", older.incident_id),
+    ]
+
+
+async def test_best_accepted_match_wins_by_confidence_then_candidate_order(settings, engine):
+    judge = FakeJudge(DIFFERENT, same(0.9), same(0.97))
+    service = IncidentService(settings, engine, judge)
+    older = await service.group(add_report(engine))
+    await service.group(add_report(engine, at=AT + timedelta(hours=1)))
+    third = await service.group(add_report(engine, at=AT + timedelta(hours=2)))
+    assert third.incident_id == older.incident_id
+    merged = next(d for d in rows(engine, AgentDecision) if d.kind == "merged")
+    assert "higher confidence (0.97 vs 0.90)" in merged.reason
+
+
+async def test_judge_calls_are_capped_per_grouping(settings, engine):
+    settings.max_judged_candidates = 2
+    judge = FakeJudge(*[DIFFERENT] * 20)
+    service = IncidentService(settings, engine, judge)
+    for hour in range(5):
+        await service.group(add_report(engine, at=AT + timedelta(hours=hour)))
+    assert len(rows(engine, Incident)) == 5
+    # 0 + 1 + 2 + 2 + 2 calls: the fourth and fifth reports had 3 and 4 candidates.
+    assert len(judge.calls) == 7
+
+
+async def test_judge_failure_stops_judging_and_never_merges(settings, engine):
+    judge = FakeJudge(DIFFERENT)
+    service = IncidentService(settings, engine, judge)
+    await service.group(add_report(engine))
+    await service.group(add_report(engine, at=AT + timedelta(hours=1)))
+    judge.replies = [ModelApiError("Meta", "unavailable", status=503), SAME]
+    failed = await service.group(add_report(engine, at=AT + timedelta(hours=2)))
+    assert "unavailable" in failed.grouping_error
+    assert failed.grouping_needs_officer is True
+    assert len(rows(engine, Incident)) == 3
+    assert len([d for d in rows(engine, AgentDecision) if d.report_id == failed.id]) == 2
+
+
+def test_correction_fields_reuse_the_facts_schema():
+    assert set(COUNT_FIELDS) <= set(FACT_COUNT_FIELDS)
+    assert "houses_partially_damaged" in FACT_COUNT_FIELDS
+    assert "is_correction" not in FACT_COUNT_FIELDS

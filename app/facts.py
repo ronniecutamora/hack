@@ -84,6 +84,13 @@ FACTS_SCHEMA: dict[str, Any] = {
     "additionalProperties": False,
 }
 FACTS_SCHEMA["required"] = list(FACTS_SCHEMA["properties"])
+# Every count field. A correction's stated counts name the figures it corrects (incident routing);
+# counting.COUNT_FIELDS picks the subset the officer outputs total.
+FACT_COUNT_FIELDS = tuple(
+    name
+    for name, spec in FACTS_SCHEMA["properties"].items()
+    if spec.get("type") == ["integer", "null"]
+)
 
 FACTS_SYSTEM = (
     "You read one damage report sent to a Philippine city disaster office after a typhoon or "

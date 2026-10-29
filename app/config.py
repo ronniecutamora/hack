@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     pair_judge_llm: AgentLLMName | None = None
     incident_window_days: int = Field(default=14, gt=0)
     pair_merge_threshold: float = Field(default=0.85, ge=0, le=1)
+    # Pair-judge calls per grouping: every candidate up to this many is judged, then the best
+    # accepted match wins. Same-barangay candidates beyond it are rare within the window.
+    max_judged_candidates: int = Field(default=4, gt=0)
 
     reports_per_hour: int = Field(default=20, gt=0)
     reports_per_day: int = Field(default=60, gt=0)

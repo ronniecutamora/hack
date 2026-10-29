@@ -19,12 +19,12 @@ from datetime import datetime, timedelta
 from typing import Any
 from weakref import WeakKeyDictionary
 
-from sqlalchemy import Engine, func
-from sqlmodel import Session, select
+from sqlalchemy import Engine, func, or_
+from sqlmodel import Session, col, select
 
 from app.config import Settings, get_settings
 from app.db import init_db, make_engine, make_recorder
-from app.facts import LIVELIHOOD_DAMAGE
+from app.facts import FACT_COUNT_FIELDS, LIVELIHOOD_DAMAGE
 from app.meta.factory import LLM_BACKENDS, make_pair_judge
 from app.meta.llm import AgentLLM
 from app.models import (
@@ -131,6 +131,91 @@ def candidate_incidents(
     return [item[2] for item in sorted(candidates)]
 
 
+def review_report_ids(session: Session) -> set[int]:
+    """Reports whose grouping waits for the officer (an uncertain or failed pair judgment)."""
+    return set(
+        session.exec(
+            select(Report.id).where(
+                or_(
+                    Report.grouping_needs_officer == True,  # noqa: E712
+                    col(Report.grouping_error).is_not(None),
+                )
+            )
+        ).all()
+    )
+
+
+@dataclass(frozen=True)
+class CandidateFit:
+    """What makes one candidate a better home than another when the judge accepts both."""
+
+    incident_id: int
+    pending: bool  # another member's grouping waits for the officer
+    corrected: tuple[str, ...] = ()  # count fields a correction restates that members state
+
+
+def candidate_fit(
+    new: Observation, incident_id: int, members: list[Observation], review: set[int]
+) -> CandidateFit:
+    others = [m for m in members if m.id != new.id]
+    corrected: tuple[str, ...] = ()
+    if new.facts.get("is_correction"):
+        stated = {n for m in others for n in FACT_COUNT_FIELDS if m.facts.get(n) is not None}
+        corrected = tuple(
+            n for n in FACT_COUNT_FIELDS if new.facts.get(n) is not None and n in stated
+        )
+    return CandidateFit(incident_id, any(m.id in review for m in others), corrected)
+
+
+def choose(
+    accepted: list[tuple[CandidateFit, dict[str, Any]]], *, current: int | None
+) -> tuple[int, str | None]:
+    """Pick the best accepted match and say why it beat the runner-up (None if unopposed).
+
+    Preference: an incident not waiting for review; for a correction, the incident whose
+    members state the corrected figures; higher confidence; the report's current incident
+    (no churn on re-grouping); then the candidate order (nearest, then newest).
+    """
+    ranked = sorted(
+        enumerate(accepted),
+        key=lambda item: (
+            item[1][0].pending,
+            -len(item[1][0].corrected),
+            -item[1][1]["confidence"],
+            item[1][0].incident_id != current,
+            item[0],
+        ),
+    )
+    best, best_judgment = ranked[0][1]
+    if len(ranked) == 1:
+        return best.incident_id, None
+    runner, runner_judgment = ranked[1][1]
+    reasons = []
+    if len(best.corrected) > len(runner.corrected):
+        fields = ", ".join(n.replace("_", " ") for n in best.corrected)
+        plural = "s" if len(best.corrected) > 1 else ""
+        reasons.append(
+            f"it corrects the {fields} figure{plural} stated in incident {best.incident_id}"
+        )
+    if runner.pending and not best.pending:
+        reasons.append(f"incident {runner.incident_id} waits for officer review")
+    if not reasons:
+        if best_judgment["confidence"] > runner_judgment["confidence"]:
+            reasons.append(
+                f"higher confidence ({best_judgment['confidence']:.2f} "
+                f"vs {runner_judgment['confidence']:.2f})"
+            )
+        elif best.incident_id == current:
+            reasons.append("the report was already grouped there")
+        else:
+            reasons.append("nearest place, then most recent activity")
+    others = ", ".join(str(fit.incident_id) for _, (fit, _) in ranked[1:])
+    plural = "s" if len(ranked) > 2 else ""
+    return best.incident_id, (
+        f"Chosen over incident{plural} {others}, also judged the same: {'; '.join(reasons)}."
+    )
+
+
 def rollup(members: list[Observation]) -> dict[str, Any]:
     """Depth maxima are ordinal, latest depth may be unknown; totals are explicitly unverified."""
     ordered = sorted(members, key=lambda m: (m.at, m.id))
@@ -229,12 +314,14 @@ class IncidentService:
 
     def fingerprint(self, observation: Observation) -> str:
         data = {
-            "version": 1,
+            # 2: every candidate up to the cap is judged and the best accepted match wins.
+            "version": 2,
             "context": observation.context,
             "point": observation.point,
             "judge": self.judge.model,
             "window_days": self.settings.incident_window_days,
             "threshold": self.settings.pair_merge_threshold,
+            "max_judged": self.settings.max_judged_candidates,
         }
         return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
 
@@ -264,16 +351,21 @@ class IncidentService:
                     for member in all_members.values():
                         if member.incident_id is not None:
                             groups[member.incident_id].append(member)
+                    review = review_report_ids(session)
                     candidates = candidate_incidents(
                         new, groups, window_days=self.settings.incident_window_days
                     )
-                # Every session is closed before asking the judge.
+                fits = [candidate_fit(new, i, groups[i], review) for i in candidates]
+                # Stable sort: within equal fit the nearest, newest order stays.
+                fits.sort(key=lambda f: (f.pending, -len(f.corrected)))
+                fits = fits[: self.settings.max_judged_candidates]
+                # Every session is closed before asking the judge. Every candidate up to the cap
+                # is judged; first-match-wins once merged a correction into the wrong incident.
                 comparisons = []
-                chosen = None
-                needs_officer = not new.barangay and new.point is None
+                accepted = []
                 error = None
-                for incident_id in candidates:
-                    recent = [m for m in groups[incident_id] if m.id != report_id][
+                for fit in fits:
+                    recent = [m for m in groups[fit.incident_id] if m.id != report_id][
                         -RECENT_REPORT_LIMIT:
                     ]
                     try:
@@ -288,24 +380,42 @@ class IncidentService:
                             "confidence": None,
                             "reason": f"Pair judge unavailable: {error}",
                         }
-                    comparisons.append((incident_id, recent[-1].id, judgment))
-                    if judgment["decision"] == "same" and (
-                        judgment["confidence"] >= self.settings.pair_merge_threshold
-                    ):
-                        chosen = incident_id
+                    comparisons.append((fit.incident_id, recent[-1].id, judgment))
+                    if error:
+                        # The provider is down, and a missing comparison may hide the best
+                        # match: nothing merges; the officer sees it and can retry.
+                        accepted = []
                         break
-                    if judgment["decision"] == "unsure" or (
-                        judgment["decision"] == "same"
-                        and judgment["confidence"] < self.settings.pair_merge_threshold
-                    ):
-                        needs_officer = True
-                        break
+                    if self._accepted(judgment):
+                        accepted.append((fit, judgment))
+                chosen = None
+                if accepted:
+                    chosen, why = choose(accepted, current=new.incident_id)
+                    if why:
+                        comparisons = [
+                            (i, r, {**j, "reason": f"{j['reason']} {why}"} if i == chosen else j)
+                            for i, r, j in comparisons
+                        ]
+                needs_officer = (not new.barangay and new.point is None) or (
+                    chosen is None and any(self._uncertain(j) for _, _, j in comparisons)
+                )
                 out = self._apply(
                     new, fingerprint, epoch, chosen, needs_officer, comparisons, error
                 )
                 if out is not None:
                     return out
             raise RuntimeError("Incident inputs changed repeatedly; rerun grouping.")
+
+    def _accepted(self, judgment: dict[str, Any]) -> bool:
+        return (
+            judgment["decision"] == "same"
+            and judgment["confidence"] >= self.settings.pair_merge_threshold
+        )
+
+    def _uncertain(self, judgment: dict[str, Any]) -> bool:
+        return judgment["decision"] == "unsure" or (
+            judgment["decision"] == "same" and not self._accepted(judgment)
+        )
 
     def _apply(self, new, fingerprint, epoch, chosen, needs_officer, comparisons, error):
         with Session(self.engine, expire_on_commit=False) as session:
@@ -346,17 +456,13 @@ class IncidentService:
             session.add(report)
             session.flush()
             for compared_id, compared_report, judgment in comparisons:
-                merged = chosen == compared_id
-                uncertain = judgment["decision"] == "unsure" or (
-                    judgment["decision"] == "same"
-                    and judgment["confidence"] < self.settings.pair_merge_threshold
-                )
+                # An uncertain comparison needs the officer only when nothing else matched.
                 session.add(
                     AgentDecision(
                         kind="merged"
-                        if merged
+                        if chosen == compared_id
                         else "needs_officer"
-                        if uncertain
+                        if chosen is None and self._uncertain(judgment)
                         else "kept_separate",
                         report_id=new.id,
                         incident_id=target.id,
