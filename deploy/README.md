@@ -78,8 +78,10 @@ database is kept on the container as `app.db.before-restore` until the next rest
 - **Shutdown** is bounded to fit Modal's 30 s (constants in [app/bot.py](../app/bot.py)): new webhook calls get
   503 (Telegram re-sends them to the next container); the updates already answered with 200 are handled (up to
   8 s) and snapshotted at once; in-flight assessments get 8 s, and the summary reply skips its 15 s quiet
-  period; the bot stops (up to 4 s); then the final snapshot. An assessment cut off there resumes at the next
-  start.
+  period; the bot stops (up to 4 s); then the final snapshot. An assessment or grouping cut off there resumes at
+  the next start. Measured on staging (2026-10-30): an update posted 2.5 s before `modal app stop` was in a
+  snapshot 0.6 s after it was handled; a stop with an assessment in flight took about 18 s from the stop
+  command to the lease release; after the restart both test reports were there and were assessed and grouped.
 - **Loss window:** a graceful stop, redeploy or preemption loses nothing the bot acknowledged. A crash that skips
   shutdown loses at most about 5 seconds of acknowledged reports (plus a webhook update still in the queue: answered
   200 but not yet handled, usually under a second) and at most the last 2 minutes of other database writes
