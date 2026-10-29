@@ -7,7 +7,7 @@
   {% set values = form["values"] if mine else {} %}
   {% if mine %}<p class="error" role="alert" id="review-error-{{ card.report.id }}-{{ action }}">{{ form.error }}</p>{% endif %}
   <input type="hidden" name="next" value="{{ back }}">
-  <label>Your initials <input type="text" name="officer" required maxlength="{{ REVIEW_LIMITS.officer }}" autocomplete="off" value="{{ values.get('officer', '') }}" placeholder="e.g. JDC, CDRRMO"{% if mine %} aria-invalid="true" aria-describedby="review-error-{{ card.report.id }}-{{ action }}"{% endif %}></label>
+  <label>Your initials <input type="text" name="officer" required maxlength="{{ REVIEW_LIMITS.officer }}" autocomplete="off" value="{{ values.get('officer') or current_officer() }}" placeholder="e.g. JDC, CDRRMO"{% if mine %} aria-invalid="true" aria-describedby="review-error-{{ card.report.id }}-{{ action }}"{% endif %}></label>
   <label>{{ note_label }} <textarea name="note" rows="2" maxlength="{{ REVIEW_LIMITS.note }}"{% if note_required %} required minlength="{{ REVIEW_LIMITS.place_reason }}"{% endif %}>{{ values.get('note', '') }}</textarea></label>
 {% endmacro %}
 

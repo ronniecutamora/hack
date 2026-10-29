@@ -6,6 +6,7 @@ from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 from sqlmodel import Session, select
 
 from app.config import Settings
@@ -531,7 +532,14 @@ def test_allowed_hosts_setting_reads_a_comma_separated_list(monkeypatch, setting
     assert Settings(_env_file=None).allowed_hosts == ["localhost", "127.0.0.1"]
     monkeypatch.setenv("ALLOWED_HOSTS", "localhost, ulat.example.ph ,")
     assert Settings(_env_file=None).allowed_hosts == ["localhost", "ulat.example.ph"]
-    deployed = settings.model_copy(update={"allowed_hosts": ["ulat.example.ph"]})
+    # A deployed host needs the officer login (app.auth); /health stays public.
+    deployed = settings.model_copy(
+        update={
+            "allowed_hosts": ["ulat.example.ph"],
+            "officer_passcode": SecretStr("correct-horse-battery"),
+            "session_secret": SecretStr("s" * 40),
+        }
+    )
     with TestClient(create_app(deployed), base_url="http://ulat.example.ph") as other:
         assert other.get("/health").status_code == 200
         assert other.get("/health", headers={"Host": "localhost"}).status_code == 400

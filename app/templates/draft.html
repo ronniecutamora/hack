@@ -104,11 +104,11 @@
   {% if draft.status == 'draft' %}
     <section class="no-print">
       <h2>Officer decision</h2>
-      <p class="muted">No login yet: write your designation so the audit shows who decided.</p>
+      <p class="muted">Write your designation so the audit shows who decided (the sign-in passcode is shared, so it cannot tell officers apart).</p>
       <div class="decision-forms">
         <form method="post" action="/drafts/{{ draft.id }}/approve">
           <fieldset><legend>Approve</legend>
-            <label>Decided by (designation) <input type="text" name="decided_by" maxlength="{{ decided_by_max }}" placeholder="e.g. CDRRMO Head"></label>
+            <label>Decided by (designation) <input type="text" name="decided_by" maxlength="{{ decided_by_max }}" value="{{ current_officer() }}" placeholder="e.g. CDRRMO Head"></label>
             {% if pending %}<label>Reason (required: figures wait for grouping review) <textarea name="reason" required minlength="{{ reason_min }}" maxlength="{{ reason_max }}" rows="2"></textarea></label>
             {% else %}<label>Note (optional) <textarea name="reason" maxlength="{{ reason_max }}" rows="2"></textarea></label>{% endif %}
             {% if stale %}<label><input type="checkbox" name="confirm_stale" value="1" required> Approve this version as it is, although new evidence arrived</label>{% endif %}
@@ -117,7 +117,7 @@
         </form>
         <form method="post" action="/drafts/{{ draft.id }}/reject">
           <fieldset><legend>Reject</legend>
-            <label>Decided by (designation) <input type="text" name="decided_by" maxlength="{{ decided_by_max }}"></label>
+            <label>Decided by (designation) <input type="text" name="decided_by" maxlength="{{ decided_by_max }}" value="{{ current_officer() }}"></label>
             <label>Reason (required) <textarea name="reason" required minlength="{{ reason_min }}" maxlength="{{ reason_max }}" rows="2"></textarea></label>
             <button type="submit">Reject</button>
           </fieldset>

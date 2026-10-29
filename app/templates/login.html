@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Officer sign-in{% endblock %}
+{% block nav %}{% endblock %}
+{% block content %}
+  <section class="login card">
+    <h1>Officer sign-in</h1>
+    <p class="muted">The dashboard shows residents' reports and photos, so it is for disaster office staff only.</p>
+    {% if error %}<p class="banner alert" role="alert" id="login-error">{{ error }}</p>{% endif %}
+    <form method="post" action="/login">
+      <input type="hidden" name="next" value="{{ next }}">
+      <label>Passcode <input type="password" name="passcode" required autocomplete="current-password" autofocus{% if error %} aria-invalid="true" aria-describedby="login-error"{% endif %}></label>
+      <label>Your initials (optional) <input type="text" name="officer" maxlength="{{ officer_max }}" autocomplete="off" value="{{ officer }}" placeholder="e.g. JDC, CDRRMO"></label>
+      <p class="muted">Initials fill in the review and approval forms for you; with a shared passcode they are what you say, not proof of who you are.</p>
+      <button type="submit">Sign in</button>
+    </form>
+  </section>
+{% endblock %}

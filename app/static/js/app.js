@@ -265,12 +265,19 @@
     if (polls % SSE_RETRY_EVERY === 0) { stopPolling(); failures = 0; connect(); return; }
     try {
       const response = await fetch("/events/token", { cache: "no-store", headers: { Accept: "application/json" } });
+      if (response.status === 401) { signIn(); return; }
       if (!response.ok) throw new Error(String(response.status));
       applySnapshot(await response.json());
       setState("polling", "Live, checking every 20 s");
     } catch (e) {
       setState("offline", "Offline");
     }
+  }
+
+  // The session expired: go to the sign-in page, which brings the officer back here after.
+  function signIn() {
+    stopPolling();
+    window.location.assign("/login?next=" + encodeURIComponent(window.location.pathname + window.location.search));
   }
 
   function startPolling() {

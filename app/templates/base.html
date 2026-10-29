@@ -16,6 +16,7 @@
         <span class="brand__mark" aria-hidden="true">U</span>
         <span class="brand__text"><span class="brand__name">Ulat</span><span class="brand__sub">Biñan City DRRM · typhoon and flood reports</span></span>
       </a>
+      {% block nav %}
       <nav class="site-nav" aria-label="Officer dashboard">
         <ul>
         {% for href, label in NAV %}
@@ -23,11 +24,18 @@
         {% endfor %}
         </ul>
       </nav>
+      {% endblock %}
       <p class="live" data-live-status data-state="connecting" hidden>
         <span class="live__dot" aria-hidden="true"></span>
         <span data-live-label role="status">Connecting</span>
         <span class="live__updated">· updated <time data-live-updated>{{ render_time() }}</time></span>
       </p>
+      {% if request.state.officer_session %}
+      <form class="signout" method="post" action="/logout">
+        {% if request.state.officer_session.officer %}<span>Signed in as {{ request.state.officer_session.officer }}</span>{% endif %}
+        <button type="submit">Sign out</button>
+      </form>
+      {% endif %}
     </div>
   </header>
   <main id="main" class="page" tabindex="-1">

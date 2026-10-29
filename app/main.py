@@ -3,11 +3,10 @@ Notices of Loss) and evidence media.
 
 Run with: uv run uvicorn app.main:app --reload
 
-There is no login yet, so the app must only listen on localhost (uvicorn's default). Add
-authentication before exposing it anywhere: the pages show reports and photos. Until then, it
-answers only to ALLOWED_HOSTS (against DNS rebinding) and every state-changing request must come
-from the app's own pages (a same-origin check), so another site open in the officer's browser
-cannot generate or approve drafts.
+Every page and media URL needs an officer login (app.auth), except on a localhost-only dev
+server without OFFICER_PASSCODE. The app answers only to ALLOWED_HOSTS (against DNS rebinding),
+and every state-changing request must come from the app's own pages (a same-origin check), so
+another site open in the officer's browser cannot generate or approve drafts.
 """
 
 import hashlib
@@ -39,6 +38,13 @@ from sqlmodel import Session, col, select
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from app.auth import (
+    LOGIN_PATH,
+    OfficerAuth,
+    current_officer,
+    install_login_gate,
+    safe_next,
+)
 from app.config import Settings, get_settings
 from app.dashboard import active_incidents, incident_trust, overview
 from app.db import init_db, make_engine, make_recorder
@@ -145,6 +151,7 @@ templates.env.globals["render_time"] = lambda: datetime.now(MANILA).strftime("%H
 templates.env.globals["NAV"] = NAV
 templates.env.globals["nav_current"] = nav_current
 templates.env.globals["static_url"] = static_url
+templates.env.globals["current_officer"] = current_officer.get
 
 GEO_SOURCES = {
     "pin": "location pin",
@@ -393,6 +400,7 @@ def create_app(
     duplicate judge the officer's "set place" re-grouping asks (tests, offline); `clock` (naive
     UTC) replaces the real clock for filing countdowns (tests only)."""
     settings = settings or get_settings()
+    auth = OfficerAuth(settings)  # refuses to build a public app without a passcode
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -419,6 +427,9 @@ def create_app(
         app.state.engine.dispose()
 
     app = FastAPI(title="Typhoon damage reports", lifespan=lifespan)
+    app.state.auth = auth
+    # Middleware runs last-added first: host check, then same-origin, then the login gate.
+    install_login_gate(app, auth)
 
     @app.middleware("http")
     async def same_origin_only(request: Request, call_next):
@@ -442,6 +453,65 @@ def create_app(
     @app.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    def login_page(
+        request: Request,
+        next_path: str | None,
+        *,
+        error: str | None = None,
+        officer: str = "",
+        status_code: int = 200,
+    ) -> HTMLResponse:
+        context = {
+            "next": safe_next(next_path),
+            "error": error,
+            "officer": officer,
+            "officer_max": OFFICER_MAX,
+        }
+        headers = {"Cache-Control": "no-store"}
+        if status_code == 429:
+            headers["Retry-After"] = str(auth.limiter.retry_after(auth.client_address(request)))
+        return templates.TemplateResponse(
+            request, "login.html", context, status_code=status_code, headers=headers
+        )
+
+    @app.get(LOGIN_PATH, response_model=None)
+    def login_form(request: Request) -> HTMLResponse | RedirectResponse:
+        if not auth.enabled or auth.session(request) is not None:
+            return RedirectResponse(safe_next(request.query_params.get("next")), status_code=303)
+        return login_page(request, request.query_params.get("next"))
+
+    @app.post(LOGIN_PATH, response_model=None)
+    async def login(request: Request) -> HTMLResponse | RedirectResponse:
+        if not auth.enabled:
+            return RedirectResponse("/", status_code=303)
+        form = await form_fields(request)
+        client = auth.client_address(request)
+        if wait := auth.limiter.retry_after(client):
+            minutes = -(-wait // 60)
+            return login_page(
+                request,
+                form.get("next"),
+                error=f"Too many wrong passcodes. Try again in {minutes} minute"
+                + ("s." if minutes != 1 else "."),
+                status_code=429,
+            )
+        officer = " ".join(form.get("officer", "").split())[:OFFICER_MAX]
+        if not auth.check_passcode(form.get("passcode", "")):
+            auth.failed_login(client)
+            return login_page(
+                request, form.get("next"), error="Wrong passcode.", officer=officer, status_code=401
+            )
+        auth.limiter.succeeded(client)
+        response = RedirectResponse(safe_next(form.get("next")), status_code=303)
+        auth.sign_in(response, request, officer)
+        return response
+
+    @app.post("/logout")
+    def logout(request: Request) -> RedirectResponse:
+        response = RedirectResponse(LOGIN_PATH if auth.enabled else "/", status_code=303)
+        auth.sign_out(response, request)
+        return response
 
     @app.get("/events")
     async def events(request: Request) -> StreamingResponse:

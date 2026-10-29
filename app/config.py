@@ -18,6 +18,16 @@ class Settings(BaseSettings):
     fireworks_api_key: SecretStr = SecretStr("")
     telegram_bot_token: SecretStr = SecretStr("")
     pseudonym_salt: SecretStr = SecretStr("")
+    # Officer login (app.auth). Unset on a localhost-only dev server, required anywhere else.
+    officer_passcode: SecretStr = SecretStr("")
+    session_secret: SecretStr = SecretStr("")
+    session_ttl_hours: int = Field(default=12, gt=0, le=24 * 30)
+    # Failed passcodes per client address in a rolling window, then 429 until the window passes.
+    login_failures_per_window: int = Field(default=10, gt=0)
+    login_window_minutes: int = Field(default=15, gt=0)
+    # Behind a TLS-terminating proxy (Modal): take the client address from X-Forwarded-For (the
+    # hop the proxy appended) and mark the session cookie Secure. Off when clients connect directly.
+    proxy_headers: bool = False
 
     # Agent and pair judge share a backend vocabulary; None inherits AGENT_LLM.
     agent_llm: AgentLLMName = "muse-spark-1.3"
