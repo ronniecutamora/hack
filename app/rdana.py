@@ -88,7 +88,29 @@ def _listing(evidence: BarangayEvidence, list_field: str, values: tuple[str, ...
     return refs, list(dict.fromkeys(v for v in values if v in found))
 
 
+def pending_text(count: Count, unit: str = "") -> str:
+    """The pending bucket in words, e.g. "pending grouping review: 5 (reports 4, 7)"."""
+    ids = count.pending_report_ids
+    return (
+        f"pending grouping review: {count.pending_value:g}{unit} "
+        f"(report{'s' if len(ids) != 1 else ''} {', '.join(map(str, ids))})"
+    )
+
+
+def figure_text(count: Count, unit: str = "") -> str:
+    """A count for prose: the confirmed figure and, beside it, never added, the pending one."""
+    if not count.pending:
+        return f"{count.value:g}{unit}"
+    if not count.confirmed:
+        return pending_text(count, unit)
+    return f"{count.value:g}{unit}; {pending_text(count, unit)}"
+
+
 def count_field(count: Count | None) -> dict[str, Any] | None:
+    """A count field: the confirmed figure, its evidence and the pending bucket beside it.
+
+    With only pending evidence the value stays empty: 0 would read as "no damage".
+    """
     if count is None:
         return None
     refs = [
@@ -99,19 +121,28 @@ def count_field(count: Count | None) -> dict[str, Any] | None:
             rule=c.rule,
             source_report_id=c.source_report_id,
             single_source=c.single_source,
+            pending=pending,
         )
-        for c in count.contributions
+        for pending, contributions in ((False, count.contributions), (True, count.pending))
+        for c in contributions
     ]
     total = count.value
-    note = (
-        f"{count.single_source_value:g} of {total:g} stated by only one reporter; "
-        f"{count.flagged_value:g} of {total:g} from flagged reports."
-    )
-    return _filled(f"{total:g}", "reports", refs, note) | {
+    notes = []
+    if count.confirmed:
+        notes.append(
+            f"{count.single_source_value:g} of {total:g} stated by only one reporter; "
+            f"{count.flagged_value:g} of {total:g} from flagged reports."
+        )
+    if count.pending:
+        notes.append(f"Not added: {pending_text(count)}.")
+    value = f"{total:g}" if count.confirmed else None
+    return _filled(value, "reports" if count.confirmed else None, refs, " ".join(notes)) | {
         "count": {
-            "value": total,
+            "value": total if count.confirmed else None,
             "single_source": count.single_source_value,
             "flagged": count.flagged_value,
+            "pending": count.pending_value,
+            "pending_report_ids": count.pending_report_ids,
         }
     }
 
@@ -248,7 +279,7 @@ def _livelihood(ctx: RuleContext):
     parts, refs = [], []
     pens = ctx.evidence.count("fish_cages_or_pens_damaged")
     if pens is not None:
-        parts.append(f"fish cages or pens damaged: {pens.value:g}")
+        parts.append(f"fish cages or pens damaged: {figure_text(pens)}")
         refs += count_field(pens)["evidence"]
     crops: dict[str, list[int]] = {}
     for incident in ctx.evidence.incidents:
@@ -264,7 +295,11 @@ def _livelihood(ctx: RuleContext):
     if crops:
         crop_text = "crops damaged: " + ", ".join(crops)
         if hectares is not None:
-            crop_text += f" ({hectares.value:g} ha reported)"
+            crop_text += (
+                f" ({hectares.value:g} ha reported)"
+                if not hectares.pending
+                else f"; area: {figure_text(hectares, ' ha')}"
+            )
         parts.append(crop_text)
     if not parts:
         return None
@@ -356,6 +391,7 @@ def fill_rdana(
         "report_ids": evidence.report_ids,
         "incident_count": len(evidence.incidents),
         "unassessed_report_ids": evidence.unassessed_report_ids,
+        "pending_report_ids": evidence.pending_report_ids(),
         "filled_count": sum(f["value"] is not None for f in fields),
         "field_count": len(fields),
         "summary": {
@@ -368,5 +404,5 @@ def fill_rdana(
 
 
 def summary_counts(evidence: BarangayEvidence) -> dict[str, int | float]:
-    """The computed counts given to the summary agent (only the ones the reports state)."""
-    return {name: c.value for name in COUNT_FIELDS if (c := evidence.count(name)) is not None}
+    """The confirmed counts given to the summary agent; pending figures are never totals."""
+    return {name: c.value for name in COUNT_FIELDS if (c := evidence.count(name)) and c.confirmed}

@@ -228,14 +228,15 @@ def test_damaged_houses_csv_has_the_exact_header_rows_and_city_total(client, eng
     assert response.content.startswith(CSV_BOM.encode())  # Excel reads UTF-8 "Biñan"
     lines = response.text.removeprefix(CSV_BOM).split("\r\n")
     assert lines[0] == (
-        "Region,Province,City/Municipality,Barangay,Total,Totally,Partially,Evidence report ids"
+        "Region,Province,City/Municipality,Barangay,Total,Totally,Partially,Evidence report ids,"
+        "Pending grouping review,Pending report ids"
     )
     assert lines[0] == ",".join(CSV_HEADER)
     place = "Region IV-A (CALABARZON),Laguna,City of Biñan"
     assert lines[1:] == [
-        f"{place},Casile,3,2,1,{c}",
-        f"{place},Malaban,3,,3,{a};{b}",
-        f"{place},City total,6,2,4,{a};{b};{c}",
+        f"{place},Casile,3,2,1,{c},,",
+        f"{place},Malaban,3,,3,{a};{b},,",
+        f"{place},City total,6,2,4,{a};{b};{c},,",
         "",
     ]
     html = client.get("/damaged-houses").text
@@ -262,7 +263,7 @@ def test_empty_damaged_houses_table_cannot_be_snapshotted(client):
     assert "No report states a number of damaged houses yet." in client.get("/damaged-houses").text
     assert client.post("/drafts/damaged-houses").status_code == 422
     lines = client.get("/damaged-houses.csv").text.removeprefix(CSV_BOM).split("\r\n")
-    assert lines[1] == "Region IV-A (CALABARZON),Laguna,City of Biñan,City total,,,,"
+    assert lines[1] == "Region IV-A (CALABARZON),Laguna,City of Biñan,City total,,,,,,"
 
 
 async def test_service_numbers_versions_inside_one_write_transaction(settings):

@@ -86,11 +86,19 @@ a "single source" chip and flagged-report chips.
 
 **Counting rule.** Reports in one incident describe the same houses and people, so their numbers are never added.
 Per incident, the latest correction replaces earlier figures; otherwise, and for figures reported after that
-correction, the highest reported value is used. Incident values are then summed across the barangay. A report not
-linked to an incident counts as its own incident; reports that are not assessed yet, or have no barangay, are
-listed but not counted. Each count shows how much of it rests on one reporter or on flagged reports. A value is
-single-source when fewer than two different reporters stated that value or more (after the latest correction), so
-one reporter's 40 is not corroborated by two others' 2.
+correction, the highest reported value is used. Incident values are then summed across the barangay. Reports that
+are not assessed yet, or have no barangay, are listed but not counted. Each count shows how much of it rests on one
+reporter or on flagged reports. A value is single-source when fewer than two different reporters stated that value
+or more (after the latest correction), so one reporter's 40 is not corroborated by two others' 2.
+
+**Pending grouping review.** A report whose grouping waits for the officer (its incident is `needs_officer` after an
+uncertain or failed duplicate check, it has a grouping error, or it was never grouped) may describe the same houses
+as another report. Its figures are never added to a total: they form a separate bucket, counted as if all pending
+reports were one incident, and are shown beside the confirmed figure ("pending grouping review: 5 (reports 4, 7,
+9)"), in the CSV's pending columns and in a banner on the draft. So 5 houses reported three times while the pair
+judge is down read as 0 confirmed and 5 pending, never 15. With only pending evidence a field shows "no confirmed
+figure", not 0. Approving such a draft is allowed, but needs a written reason, and the audit records the pending
+reports.
 
 **The agent's summary (1.4).** One agent-LLM call per draft sees only redacted, typed facts per incident and the
 computed counts: no reporter ids, raw messages, transcripts or names. The reply is accepted only if every report it
@@ -100,17 +108,18 @@ or the daily spend cap is reached, a deterministic summary is used and the reaso
 
 **Damaged-houses table.** `/damaged-houses` (and `.csv`, UTF-8 with a byte-order mark for spreadsheets) lists
 Region / Province / City / Barangay / Total / Totally / Partially / evidence report ids, in the DSWD DROMIC
-damaged-houses columns, per barangay with a city total, using the same counting rule. An unstated count is empty,
-not zero. The officer can save the current table as a draft for approval; its CSV is then frozen.
+damaged-houses columns, then the pending grouping-review figure and its report ids, per barangay with a city total,
+using the same counting rule. An unstated count is empty, not zero. The officer can save the current table as a
+draft for approval; its CSV is then frozen.
 
 **Approval and audit.** A draft is approved or rejected once (a reason is required to reject), with an optional
 designation of the officer. Generating again creates version n+1 and marks the previous undecided version
 `superseded`; approved and rejected versions stay exactly as decided. Every generate, supersede, approve and
 reject writes an append-only `DraftEvent`, kept apart from the incident grouping audit (`AgentDecision`), which is
 per report. SQLite triggers reject edits to decided drafts and to the audit; startup drops and recreates them, so a
-changed definition reaches an existing database (a backfill that must update decided drafts runs in between). The `/drafts` list shows when new
-evidence arrived after the latest version. **There is no login yet** (planned): anyone who can reach the web app
-can approve, so it must only listen on localhost.
+changed definition reaches an existing database (a backfill that must update decided drafts runs in between). The
+`/drafts` list shows when new evidence arrived after the latest version. **There is no login yet** (planned):
+anyone who can reach the web app can approve, so it must only listen on localhost.
 
 ## Demo
 
@@ -194,6 +203,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-29 | Damaged-houses table per barangay in the DROMIC columns, with a city total, evidence report ids, a CSV download and approvable frozen snapshots |
 | 2026-10-29 | Review fix: the single-source share is per value, not per incident: a value counts as corroborated only when two different reporters stated it or more |
 | 2026-10-29 | Review fix: startup drops and recreates every draft trigger, so changed definitions reach existing databases and a backfill can run between the two |
+| 2026-10-29 | Review fix: figures from reports waiting for grouping review (`needs_officer`, grouping errors, never grouped) form a pending bucket beside each count and CSV row instead of being summed, with a draft banner and a required reason to approve |
 
 ### Third-party code and assets
 

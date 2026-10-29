@@ -20,6 +20,8 @@
             {% if s.evidence %}
               {{ s.evidence.report_ids|length }} report{{ 's' if s.evidence.report_ids|length != 1 }} in {{ s.evidence.incidents|length }} incident{{ 's' if s.evidence.incidents|length != 1 }}
               <div class="muted">{% for i in s.evidence.incidents %}{% if i.incident_id %}<a href="/incidents/{{ i.incident_id }}">#{{ i.incident_id }}</a>{% else %}ungrouped report #{{ i.report_ids[0] }}{% endif %}{{ ", " if not loop.last }}{% endfor %}</div>
+              {% set waiting = s.evidence.pending_report_ids() %}
+              {% if waiting %}<div class="chip warn">{{ waiting|length }} report{{ 's' if waiting|length != 1 }} with figures pending grouping review, not added</div>{% endif %}
               {% if s.evidence.unassessed_report_ids %}<div class="chip warn">{{ s.evidence.unassessed_report_ids|length }} report{{ 's' if s.evidence.unassessed_report_ids|length != 1 }} not assessed yet, not counted</div>{% endif %}
             {% else %}<span class="muted">No assessed reports placed here now.</span>{% endif %}
           </td>

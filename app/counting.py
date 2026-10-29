@@ -3,9 +3,15 @@
 Reports in one incident describe the same houses and people, so their numbers are never added
 together. Per incident and per count, the latest correction replaces earlier figures; otherwise
 (and for figures reported after that correction) the maximum stated value is used. Incident
-values are then summed across the barangay's incidents. A report not linked to any incident
-counts as an incident of its own. Every count keeps the incidents and reports it came from, and
-how much of it rests on a single reporter or on reports with high/medium trust signals.
+values are then summed across the barangay's incidents. Every count keeps the incidents and
+reports it came from, and how much of it rests on a single reporter or on flagged reports (high
+or medium trust signals).
+
+Reports whose grouping waits for officer review (an incident marked `needs_officer` after an
+uncertain or failed pair judgment, a report with a grouping error, or a report never grouped)
+may describe the same houses as each other or as a confirmed incident. Their values are never
+added to a figure: they form a separate pending bucket, counted as if all of them were one
+incident, and shown beside the confirmed figure.
 
 A value is single-source when fewer than two different reporters stated a value at least as high
 (after the latest correction): one reporter's 40 is not corroborated by others' 2.
@@ -33,13 +39,15 @@ COUNT_FIELDS = (
     "missing",
     "fish_cages_or_pens_damaged",
 )
+PENDING_STATUSES = ("needs_officer", "ungrouped")
 COUNTING_RULE = (
     "Counting rule: reports in one incident describe the same houses and people, so they are "
     "never added together. Per incident, the latest correction replaces earlier figures; "
     "otherwise, and for figures reported after that correction, the highest reported value is "
-    "used. Incident values are then summed across the barangay's incidents. A report not "
-    "linked to an incident counts as its own incident. Counts are reported figures for the "
-    "RDANA team to verify, not verified damage."
+    "used. Incident values are then summed across the barangay's incidents. Reports waiting "
+    "for grouping review (an uncertain or failed duplicate check, or not grouped yet) are "
+    "never added: they are shown beside the figure as pending, counted as if they were one "
+    "incident. Counts are reported figures for the RDANA team to verify, not verified damage."
 )
 
 
@@ -49,8 +57,14 @@ class IncidentEvidence:
 
     incident_id: int | None
     barangay: str
-    status: str
+    status: str  # open | needs_officer | ungrouped
     members: tuple[Observation, ...]
+    grouping_error_report_ids: tuple[int, ...] = ()
+
+    @property
+    def pending(self) -> bool:
+        """Grouping waits for the officer, so its reports may duplicate other incidents."""
+        return self.status in PENDING_STATUSES or bool(self.grouping_error_report_ids)
 
     @property
     def key(self) -> str:
@@ -108,8 +122,16 @@ class Contribution:
 
 @dataclass(frozen=True)
 class Count:
+    """A confirmed figure (summed over confirmed incidents) and the pending bucket beside it."""
+
     field: str
-    contributions: tuple[Contribution, ...]
+    contributions: tuple[Contribution, ...]  # confirmed incidents only
+    pending: tuple[Contribution, ...] = ()  # per incident waiting for grouping review
+    pending_value: int | None = None  # the counting rule over all pending reports as one
+
+    @property
+    def confirmed(self) -> bool:
+        return bool(self.contributions)
 
     @property
     def value(self) -> int:
@@ -126,6 +148,10 @@ class Count:
     @property
     def report_ids(self) -> list[int]:
         return sorted({r for c in self.contributions for r in c.stating_report_ids})
+
+    @property
+    def pending_report_ids(self) -> list[int]:
+        return sorted({r for c in self.pending for r in c.stating_report_ids})
 
 
 def incident_value(incident: IncidentEvidence, name: str) -> Contribution | None:
@@ -164,10 +190,20 @@ def incident_value(incident: IncidentEvidence, name: str) -> Contribution | None
 
 
 def count(incidents: list[IncidentEvidence], name: str) -> Count | None:
-    contributions = tuple(
-        c for incident in incidents if (c := incident_value(incident, name)) is not None
+    """None when no report states the value; pending incidents never add to the figure."""
+    confirmed = tuple(
+        c for i in incidents if not i.pending and (c := incident_value(i, name)) is not None
     )
-    return Count(name, contributions) if contributions else None
+    waiting = [i for i in incidents if i.pending]
+    pending = tuple(c for i in waiting if (c := incident_value(i, name)) is not None)
+    if not confirmed and not pending:
+        return None
+    pooled = None
+    if pending:
+        members = sorted((m for i in waiting for m in i.members), key=lambda m: (m.at, m.id))
+        pool = IncidentEvidence(None, waiting[0].barangay, "pending", tuple(members))
+        pooled = incident_value(pool, name)
+    return Count(name, confirmed, pending, pooled.value if pooled else None)
 
 
 @dataclass
@@ -187,8 +223,18 @@ class BarangayEvidence:
             key=lambda m: (m.at, m.id),
         )
 
+    @property
+    def reporter_count(self) -> int:
+        return len({m.reporter_id for m in self.members if m.reporter_id is not None})
+
     def count(self, name: str) -> Count | None:
         return count(self.incidents, name)
+
+    def pending_report_ids(self) -> list[int]:
+        """Reports whose stated counts wait for grouping review, over every count."""
+        return sorted(
+            {r for name in COUNT_FIELDS if (c := self.count(name)) for r in c.pending_report_ids}
+        )
 
     def fingerprint(self) -> str:
         """Changes whenever the counted evidence changes, so stale drafts can be flagged."""
@@ -201,6 +247,12 @@ class BarangayEvidence:
                     [m.id, m.at.isoformat(), m.point, m.flagged, incident.facts(m)]
                     for m in incident.members
                 ],
+                # Only when present, so fingerprints of drafts made before this key still match.
+                **(
+                    {"grouping_errors": list(incident.grouping_error_report_ids)}
+                    if incident.grouping_error_report_ids
+                    else {}
+                ),
             }
             for incident in self.incidents
         ]
@@ -216,6 +268,9 @@ class CityEvidence:
 def collect(session: Session) -> CityEvidence:
     """Group every assessed report by incident and barangay in one pass over the database."""
     assessed = set(session.exec(select(Report.id).where(Report.status == STATUS_ASSESSED)).all())
+    errors = set(
+        session.exec(select(Report.id).where(col(Report.grouping_error).is_not(None))).all()
+    )
     members: defaultdict[tuple[str, int], list[Observation]] = defaultdict(list)
     for observation in observations(session).values():
         if observation.id not in assessed:
@@ -233,11 +288,13 @@ def collect(session: Session) -> CityEvidence:
     unplaced = []
     for (kind, ident), rows in members.items():
         rows.sort(key=lambda m: (m.at, m.id))
+        failed = tuple(m.id for m in rows if m.id in errors)
         if kind == "incident" and ident in incidents:
             row = incidents[ident]
-            evidence = IncidentEvidence(ident, row.barangay or "", row.status, tuple(rows))
+            evidence = IncidentEvidence(ident, row.barangay or "", row.status, tuple(rows), failed)
         else:
-            evidence = IncidentEvidence(None, rows[0].barangay or "", "ungrouped", tuple(rows))
+            barangay = rows[0].barangay or ""
+            evidence = IncidentEvidence(None, barangay, "ungrouped", tuple(rows), failed)
         if evidence.barangay:
             by_barangay[evidence.barangay].append(evidence)
         else:

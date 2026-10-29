@@ -34,6 +34,7 @@ from app.drafts import (
     damaged_houses,
     damaged_houses_csv,
     parse_event_at,
+    pending_report_ids,
 )
 from app.gazetteer import BY_NAME
 from app.meta.factory import make_agent_llm
@@ -364,6 +365,7 @@ def create_app(settings: Settings | None = None, *, summary_llm: AgentLLM | None
             "c": draft.content,
             "events": events,
             "newest": newest,
+            "pending": pending_report_ids(draft),
             "reason_min": REASON_MIN,
             "reason_max": REASON_MAX,
             "decided_by_max": DECIDED_BY_MAX,

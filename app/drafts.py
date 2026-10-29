@@ -51,6 +51,8 @@ CSV_HEADER = (
     "Totally",
     "Partially",
     "Evidence report ids",
+    "Pending grouping review",
+    "Pending report ids",
 )
 CITY_TOTAL = "City total"
 CSV_BOM = "\ufeff"  # spreadsheets then read the file as UTF-8 ("Biñan")
@@ -85,30 +87,35 @@ def city_fingerprint(city: CityEvidence) -> str:
     return hashlib.sha256(joined.encode()).hexdigest()
 
 
+HOUSE_COLUMNS = {"totally": "houses_totally_damaged", "partially": "houses_partially_damaged"}
+
+
 def damaged_houses(city: CityEvidence) -> dict[str, Any]:
     """DROMIC damaged-houses rows per barangay (counting rule applied) and the city total.
 
     Only barangays whose reports state a house-damage count are listed; an unstated count is
-    empty, never 0. Total is the sum of the stated counts.
+    empty, never 0. Total is the sum of the confirmed counts. Figures waiting for grouping
+    review are never in Total: the Pending column shows them beside it.
     """
     rows = []
     for evidence in city.barangays.values():
-        totally = count_field(evidence.count("houses_totally_damaged"))
-        partially = count_field(evidence.count("houses_partially_damaged"))
-        if totally is None and partially is None:
+        counts = {k: evidence.count(name) for k, name in HOUSE_COLUMNS.items()}
+        stated = [c for c in counts.values() if c is not None]
+        if not stated:
             continue
-        parts = [p for p in (totally, partially) if p is not None]
-        report_ids = sorted({r for p in parts for e in p["evidence"] for r in e["report_ids"]})
+        confirmed = [c for c in stated if c.confirmed]
+        pending = [c for c in stated if c.pending]
         rows.append(
             {
                 "barangay": evidence.barangay,
-                "total": sum(p["count"]["value"] for p in parts),
-                "totally": totally and totally["count"]["value"],
-                "partially": partially and partially["count"]["value"],
-                "single_source": sum(p["count"]["single_source"] for p in parts),
-                "flagged": sum(p["count"]["flagged"] for p in parts),
-                "report_ids": report_ids,
-                "evidence": [e for p in parts for e in p["evidence"]],
+                "total": sum(c.value for c in confirmed) if confirmed else None,
+                **{k: c.value if c and c.confirmed else None for k, c in counts.items()},
+                "single_source": sum(c.single_source_value for c in confirmed),
+                "flagged": sum(c.flagged_value for c in confirmed),
+                "pending": sum(c.pending_value for c in pending) if pending else None,
+                "pending_report_ids": sorted({r for c in pending for r in c.pending_report_ids}),
+                "report_ids": sorted({r for c in confirmed for r in c.report_ids}),
+                "evidence": [e for c in stated for e in count_field(c)["evidence"]],
             }
         )
 
@@ -116,18 +123,21 @@ def damaged_houses(city: CityEvidence) -> dict[str, Any]:
         values = [r[name] for r in rows if r[name] is not None]
         return sum(values) if values else None
 
+    def ids(name: str) -> list[int]:
+        return sorted({r for row in rows for r in row[name]})
+
     return {
         "region": REGION,
         "province": PROVINCE,
         "city": CITY,
         "rows": rows,
         "total": {
-            "total": column("total"),
-            "totally": column("totally"),
-            "partially": column("partially"),
-            "single_source": column("single_source"),
-            "flagged": column("flagged"),
-            "report_ids": sorted({r for row in rows for r in row["report_ids"]}),
+            **{
+                name: column(name)
+                for name in ("total", *HOUSE_COLUMNS, "single_source", "flagged", "pending")
+            },
+            "report_ids": ids("report_ids"),
+            "pending_report_ids": ids("pending_report_ids"),
         },
         "counting_rule": COUNTING_RULE,
         "unplaced_incidents": len(city.unplaced),
@@ -154,9 +164,18 @@ def damaged_houses_csv(table: dict[str, Any]) -> str:
                 cell(row["totally"]),
                 cell(row["partially"]),
                 ";".join(str(r) for r in row["report_ids"]),
+                cell(row.get("pending")),  # absent in snapshots made before the bucket
+                ";".join(str(r) for r in row.get("pending_report_ids", [])),
             ]
         )
     return CSV_BOM + out.getvalue()
+
+
+def pending_report_ids(draft: Draft) -> list[int]:
+    """Reports whose figures waited for grouping review when the draft was generated."""
+    if draft.kind == KIND_RDANA:
+        return draft.content.get("pending_report_ids", [])
+    return draft.content.get("total", {}).get("pending_report_ids", [])
 
 
 @dataclass
@@ -298,6 +317,13 @@ class DraftService:
                 raise DraftConflict(
                     f"Draft {draft_id} is {draft.status}; only a draft can be decided."
                 )
+            pending = pending_report_ids(draft)
+            if status == DRAFT_APPROVED and pending and len(reason or "") < REASON_MIN:
+                raise DraftError(
+                    f"Figures from reports {', '.join(map(str, pending))} wait for grouping "
+                    "review and are not in the totals. Write why you approve this version "
+                    f"anyway (at least {REASON_MIN} characters)."
+                )
             draft.status, draft.decided_at = status, utcnow()
             draft.decision_reason, draft.decided_by = reason, decided_by
             session.add(draft)
@@ -307,6 +333,7 @@ class DraftService:
                     action=status,
                     reason=reason,
                     actor=decided_by,
+                    detail={"pending_report_ids": pending} if pending else None,
                     created_at=draft.decided_at,
                 )
             )

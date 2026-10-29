@@ -19,7 +19,8 @@
       · report{{ 's' if ref.report_ids|length != 1 }} {% for r in ref.report_ids %}{{ report_link(ref, r) }}{{ ", " if not loop.last }}{% endfor %}
       {{ incident_trust(ref.trust) }}
       {% if ref.single_source and ref.trust.reporter_count != 1 %}<span class="chip warn">value stated by one reporter</span>{% endif %}
-      {% if ref.status == "needs_officer" %}<span class="chip warn">grouping needs officer review</span>{% endif %}
+      {% if ref.status == "needs_officer" %}<span class="chip warn">grouping needs officer review</span>{% elif ref.status == "ungrouped" %}<span class="chip warn">not grouped yet</span>{% endif %}
+      {% if ref.pending %}<span class="chip warn">pending, not added</span>{% endif %}
       {% if ref.flagged_report_ids %}<span class="chip alert">flagged: {% for r in ref.flagged_report_ids %}{{ report_link(ref, r) }}{{ ", " if not loop.last }}{% endfor %}</span>{% endif %}
     </li>
   {% endfor %}
@@ -31,19 +32,20 @@
 {% macro houses_table(t) %}
   <table>
     <thead>
-      <tr><th rowspan="2">Region</th><th rowspan="2">Province</th><th rowspan="2">City/Municipality</th><th rowspan="2">Barangay</th><th colspan="3">No. of damaged houses</th><th rowspan="2">Evidence</th></tr>
+      <tr><th rowspan="2">Region</th><th rowspan="2">Province</th><th rowspan="2">City/Municipality</th><th rowspan="2">Barangay</th><th colspan="3">No. of damaged houses</th><th rowspan="2" class="num">Pending grouping review (not added)</th><th rowspan="2">Evidence</th></tr>
       <tr><th class="num">Total</th><th class="num">Totally</th><th class="num">Partially</th></tr>
     </thead>
     <tbody>
     {% for row in t.rows %}
       <tr>
         <td>{{ t.region }}</td><td>{{ t.province }}</td><td>{{ t.city }}</td><td><strong>{{ row.barangay }}</strong></td>
-        <td class="num">{{ "%g"|format(row.total) }}</td>
+        <td class="num">{% if row.total is not none %}{{ "%g"|format(row.total) }}{% else %}<span class="gap" title="no confirmed figure">—</span>{% endif %}</td>
         <td class="num">{% if row.totally is not none %}{{ "%g"|format(row.totally) }}{% else %}<span class="gap" title="not in reports">—</span>{% endif %}</td>
         <td class="num">{% if row.partially is not none %}{{ "%g"|format(row.partially) }}{% else %}<span class="gap" title="not in reports">—</span>{% endif %}</td>
+        <td class="num">{% if row.pending is defined and row.pending is not none %}<span class="chip warn">{{ "%g"|format(row.pending) }}</span><div class="muted">report{{ 's' if row.pending_report_ids|length != 1 }} {{ row.pending_report_ids|join(", ") }}</div>{% endif %}</td>
         <td>
           {{ evidence_refs(row.evidence) }}
-          <div class="muted">{{ "%g"|format(row.single_source) }} of {{ "%g"|format(row.total) }} stated by only one reporter · {{ "%g"|format(row.flagged) }} from flagged reports</div>
+          {% if row.total is not none %}<div class="muted">{{ "%g"|format(row.single_source) }} of {{ "%g"|format(row.total) }} stated by only one reporter · {{ "%g"|format(row.flagged) }} from flagged reports</div>{% endif %}
         </td>
       </tr>
     {% endfor %}
@@ -52,9 +54,10 @@
         <td class="num"><strong>{% if t.total.total is not none %}{{ "%g"|format(t.total.total) }}{% endif %}</strong></td>
         <td class="num">{% if t.total.totally is not none %}{{ "%g"|format(t.total.totally) }}{% else %}<span class="gap">—</span>{% endif %}</td>
         <td class="num">{% if t.total.partially is not none %}{{ "%g"|format(t.total.partially) }}{% else %}<span class="gap">—</span>{% endif %}</td>
+        <td class="num">{% if t.total.pending is defined and t.total.pending is not none %}<strong>{{ "%g"|format(t.total.pending) }}</strong>{% endif %}</td>
         <td class="muted">{{ t.total.report_ids|length }} report{{ 's' if t.total.report_ids|length != 1 }}{% if t.total.single_source is not none %} · {{ "%g"|format(t.total.single_source) }} stated by only one reporter{% endif %}</td>
       </tr>
     </tbody>
   </table>
-  <p class="muted">{{ t.counting_rule }} An empty cell means no report states that number; it is not zero. Barangays whose reports state no house-damage number are not listed.{% if t.unplaced_incidents %} {{ t.unplaced_incidents }} incident{{ 's' if t.unplaced_incidents != 1 }} without a barangay {{ 'are' if t.unplaced_incidents != 1 else 'is' }} not counted until the officer places {{ 'them' if t.unplaced_incidents != 1 else 'it' }}.{% endif %}</p>
+  <p class="muted">{{ t.counting_rule }} An empty cell means no confirmed report states that number; it is not zero. Pending figures may duplicate other reports and are never added to Total. Barangays whose reports state no house-damage number are not listed.{% if t.unplaced_incidents %} {{ t.unplaced_incidents }} incident{{ 's' if t.unplaced_incidents != 1 }} without a barangay {{ 'are' if t.unplaced_incidents != 1 else 'is' }} not counted until the officer places {{ 'them' if t.unplaced_incidents != 1 else 'it' }}.{% endif %}</p>
 {% endmacro %}

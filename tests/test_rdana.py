@@ -179,7 +179,7 @@ def test_without_a_correction_the_maximum_is_used_never_the_sum(engine):
     assert evidence(engine).count("persons_evacuated") is None  # never stated: no count
 
 
-def test_ungrouped_reports_count_alone_and_unplaced_or_unassessed_reports_are_kept_apart(engine):
+def test_ungrouped_reports_are_pending_and_unplaced_or_unassessed_reports_are_kept_apart(engine):
     incident = add_incident(engine)
     add_report(engine, incident=incident, houses_partially_damaged=4)
     loose = add_report(engine, reporter="b", hours=1, houses_partially_damaged=1)
@@ -190,7 +190,9 @@ def test_ungrouped_reports_count_alone_and_unplaced_or_unassessed_reports_are_ke
     with Session(engine) as session:
         city = collect(session)
     malaban = city.barangays["Malaban"]
-    assert malaban.count("houses_partially_damaged").value == 5
+    count = malaban.count("houses_partially_damaged")
+    assert count.value == 4  # the ungrouped report may repeat the incident: never added
+    assert (count.pending_value, count.pending_report_ids) == (1, [loose])
     assert [i.key for i in malaban.incidents] == [f"incident {incident}", f"report {loose}"]
     assert malaban.unassessed_report_ids == [pending]
     assert [i.incident_id for i in city.unplaced] == [nowhere]
