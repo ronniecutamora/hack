@@ -3,9 +3,10 @@
 Run with: uv run uvicorn app.main:app --reload
 
 There is no login yet, so the app must only listen on localhost (uvicorn's default). Add
-authentication before exposing it anywhere: the pages show reports and photos. Until then, every
-state-changing request must come from the app's own pages (a same-origin check), so another site
-open in the officer's browser cannot generate or approve drafts.
+authentication before exposing it anywhere: the pages show reports and photos. Until then, it
+answers only to ALLOWED_HOSTS (against DNS rebinding) and every state-changing request must come
+from the app's own pages (a same-origin check), so another site open in the officer's browser
+cannot generate or approve drafts.
 """
 
 import mimetypes
@@ -20,6 +21,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, col, select
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.config import Settings, get_settings
 from app.db import init_db, make_engine, make_recorder
@@ -245,6 +247,9 @@ def create_app(settings: Settings | None = None, *, summary_llm: AgentLLM | None
                 request, "error.html", {"message": message}, status_code=403
             )
         return await call_next(request)
+
+    # Added last, so it runs first: a request for another host name never reaches a route.
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
 
     @app.exception_handler(DraftError)
     async def draft_error(request: Request, exc: DraftError) -> HTMLResponse:

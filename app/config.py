@@ -2,10 +2,10 @@
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Self
+from typing import Annotated, Self
 
-from pydantic import Field, SecretStr, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, SecretStr, field_validator, model_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from app.meta.llm import AgentLLMName
 
@@ -36,6 +36,18 @@ class Settings(BaseSettings):
     model_cache: bool = True
     raw_media_ttl_hours: int = 24
     held_media_max_hours: int = Field(default=72, gt=0)
+    # Host names the web app answers to (Host header, any port); anything else gets 400. This
+    # stops DNS rebinding, where another site's name resolves to this machine. Comma-separated.
+    allowed_hosts: Annotated[list[str], NoDecode] = Field(
+        default=["localhost", "127.0.0.1"], min_length=1
+    )
+
+    @field_validator("allowed_hosts", mode="before")
+    @classmethod
+    def split_hosts(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [host.strip() for host in value.split(",") if host.strip()]
+        return value
 
     @model_validator(mode="after")
     def validate_retention_periods(self) -> Self:

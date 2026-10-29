@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
+from app.config import Settings
 from app.db import DRAFT_TRIGGERS, init_db, make_engine
 from app.drafts import CSV_BOM, DraftService, damaged_houses_csv
 from app.main import REPORT_LIMIT, create_app
@@ -27,7 +28,9 @@ def engine(settings):
 
 @pytest.fixture
 def client(settings):
-    with TestClient(create_app(settings, summary_llm=SummaryLLM(*[cite_all] * 20))) as client:
+    with TestClient(
+        create_app(settings, summary_llm=SummaryLLM(*[cite_all] * 20)), base_url="http://localhost"
+    ) as client:
         yield client
 
 
@@ -489,10 +492,10 @@ def test_a_draft_made_before_the_pending_bucket_counts_as_stale(client, kind):
     [
         ({"Origin": "http://evil.example"}, 403),
         ({"Origin": "null"}, 403),
-        ({"Origin": "http://testserver.evil.example"}, 403),
+        ({"Origin": "http://localhost.evil.example"}, 403),
         ({"Referer": "http://evil.example/drafts"}, 403),
-        ({"Origin": "http://testserver"}, 303),
-        ({"Referer": "http://testserver/drafts/1"}, 303),
+        ({"Origin": "http://localhost"}, 303),
+        ({"Referer": "http://localhost/drafts/1"}, 303),
         ({}, 303),
     ],
 )
@@ -511,6 +514,27 @@ def test_state_changing_posts_must_be_same_origin(client, headers, status):
         "/drafts", data={"barangay": "Malaban"}, headers=headers, follow_redirects=False
     )
     assert generated.status_code == status
+
+
+# --- Host allowlist (DNS rebinding) -----------------------------------------------------
+
+
+def test_only_allowed_host_names_are_served(client):
+    assert client.get("/health").status_code == 200  # tests run as http://localhost
+    assert client.get("/health", headers={"Host": "127.0.0.1:8001"}).status_code == 200
+    for host in ("evil.example", "localhost.evil.example", "192.168.1.5"):
+        assert client.get("/drafts", headers={"Host": host}).status_code == 400
+        assert client.post("/drafts", data={}, headers={"Host": host}).status_code == 400
+
+
+def test_allowed_hosts_setting_reads_a_comma_separated_list(monkeypatch, settings):
+    assert Settings(_env_file=None).allowed_hosts == ["localhost", "127.0.0.1"]
+    monkeypatch.setenv("ALLOWED_HOSTS", "localhost, ulat.example.ph ,")
+    assert Settings(_env_file=None).allowed_hosts == ["localhost", "ulat.example.ph"]
+    deployed = settings.model_copy(update={"allowed_hosts": ["ulat.example.ph"]})
+    with TestClient(create_app(deployed), base_url="http://ulat.example.ph") as other:
+        assert other.get("/health").status_code == 200
+        assert other.get("/health", headers={"Host": "localhost"}).status_code == 400
 
 
 # --- CSV status and columns --------------------------------------------------------------

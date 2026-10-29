@@ -147,8 +147,9 @@ draft generated before the pending grouping-review bucket existed always counts 
 include pending figures. **There is no login yet** (planned):
 anyone who can reach the web app can approve, so it must only listen on localhost. Every state-changing request
 (generate, approve, reject) must be same-origin: when the browser sends an `Origin` or `Referer` header it must name
-this host, or the app answers 403, so another site open in the officer's browser cannot post to it. This is a
-cross-site guard, not authentication.
+this host, or the app answers 403, so another site open in the officer's browser cannot post to it. The app also
+answers only to the host names in `ALLOWED_HOSTS` (default `localhost,127.0.0.1`; other names get 400), so a DNS
+rebinding site cannot pose as this host. These are cross-site guards, not authentication.
 
 ## Demo
 
@@ -242,6 +243,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-29 | Review fix (round 2): schema setup, including the trigger rebuild, runs in one BEGIN IMMEDIATE transaction, so the bot and the web app starting together cannot both drop the triggers |
 | 2026-10-29 | Review fix (round 2): every number in the 1.4 summary needs a label naming exactly one computed count; unlabelled numbers, people with no qualifier and "one of" followed by a count word are rejected |
 | 2026-10-29 | Review fix (round 2): open drafts generated before the pending grouping-review bucket count as stale, so approving one needs the confirmation and the page says why |
+| 2026-10-29 | Review fix (round 2): a host allowlist (ALLOWED_HOSTS, default localhost and 127.0.0.1, enforced by Starlette TrustedHostMiddleware) stops DNS rebinding around the same-origin check |
 
 ### Third-party code and assets
 

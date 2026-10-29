@@ -12,7 +12,7 @@ from app.models import Assessment, Incident, ModelCall, Report, Reporter, utcnow
 
 @pytest.fixture
 def client(settings):
-    with TestClient(create_app(settings)) as client:
+    with TestClient(create_app(settings), base_url="http://localhost") as client:
         yield client
 
 

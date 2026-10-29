@@ -13,7 +13,7 @@ from tests.test_assessment import FakeLLM, FakeSam, facts, jpeg
 
 @pytest.fixture
 def client(settings):
-    with TestClient(create_app(settings)) as client:
+    with TestClient(create_app(settings), base_url="http://localhost") as client:
         yield client
 
 

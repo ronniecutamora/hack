@@ -24,7 +24,7 @@ def llm():
 
 @pytest.fixture
 def client(settings, llm):
-    with TestClient(create_app(settings, summary_llm=llm)) as client:
+    with TestClient(create_app(settings, summary_llm=llm), base_url="http://localhost") as client:
         yield client
 
 
@@ -327,7 +327,9 @@ async def test_unfilled_fields_render_the_marker_and_filled_ones_link_evidence(s
     report = add_report(engine, incident=incident, houses_partially_damaged=4)
     draft = await DraftService(settings, engine, SummaryLLM(cite_all)).generate_rdana("Malaban")
     engine.dispose()
-    with TestClient(create_app(settings, summary_llm=SummaryLLM())) as client:
+    with TestClient(
+        create_app(settings, summary_llm=SummaryLLM()), base_url="http://localhost"
+    ) as client:
         html = client.get(f"/drafts/{draft.id}").text
     fields = {f["key"]: f for s in draft.content["sections"] for f in s["fields"]}
     empty = [k for k, f in fields.items() if f["value"] is None and not f["heading"]]
