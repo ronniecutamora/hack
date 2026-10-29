@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "_trust.html" import signal_chips %}
 {% block content %}
+<div id="live-reports" data-live="reports spend">
   <header>
     <h1>Reports</h1>
     <p class="muted">Agent LLM: <code>{{ agent_llm }}</code> · photo judgment by the agent LLM, measurements by SAM 3.1</p>
@@ -98,4 +99,5 @@
     </table>
     </div>
   {% endif %}
+</div>
 {% endblock %}

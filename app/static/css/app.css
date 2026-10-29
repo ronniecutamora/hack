@@ -122,11 +122,11 @@ code { font-family: var(--font-mono); font-size: .875em; }
 /* ---------- Page ---------- */
 
 .page { max-width: var(--page-max); margin: 0 auto; padding: var(--space-5) var(--space-4) var(--space-6); }
-.page > header, .page-head {
+.page header, .page-head {
   display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
   gap: var(--space-2) var(--space-4); margin-bottom: var(--space-3);
 }
-.page > header > *, .page-head > * { margin-bottom: 0; }
+.page header > *, .page-head > * { margin-bottom: 0; }
 
 .muted { color: var(--c-muted); font-size: .9375rem; }
 .gap { color: var(--c-warn-fg); font-style: italic; }
@@ -273,3 +273,33 @@ button[type=button]:hover, .button.secondary:hover { background: var(--c-info-bg
   .banner { background: none !important; color: #000 !important; border: 1px solid #000; border-left-width: 4px; }
   .gap { color: #000; }
 }
+
+/* ---------- Live updates ---------- */
+
+.live {
+  display: flex; align-items: center; gap: var(--space-2); margin: 0 0 0 auto; white-space: nowrap;
+  font-size: .875rem; color: var(--c-header-text);
+}
+.live[hidden] { display: none; }
+.live__dot { width: .7rem; height: .7rem; border-radius: 50%; background: #9aa7b4; box-shadow: 0 0 0 3px rgb(255 255 255 / .12); }
+.live[data-state="live"] .live__dot, .live[data-state="polling"] .live__dot { background: #4ade80; }
+.live[data-state="reconnecting"] .live__dot, .live[data-state="connecting"] .live__dot { background: var(--c-header-accent); }
+.live[data-state="offline"] .live__dot { background: #f87171; }
+.live__updated { color: var(--c-header-muted); }
+@media (max-width: 40rem) { .live { margin-left: 0; } .live__updated { display: none; } }
+
+[data-live] { overflow-anchor: none; }
+.live-notice {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-3); margin: 0 0 var(--space-3); border-radius: var(--radius);
+  background: var(--c-info-bg); color: var(--c-info-fg); border: 1px solid var(--c-info-line);
+}
+
+@keyframes ulat-new { from { background-color: var(--c-warn-bg); } to { background-color: transparent; } }
+.is-new, tr.is-new > td { animation: ulat-new 4s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .is-new, tr.is-new > td { animation: none; }
+  .is-new { box-shadow: inset 4px 0 0 var(--c-info-line); }
+  tr.is-new > td:first-child { box-shadow: inset 4px 0 0 var(--c-info-line); }
+}
+@media print { .live, .live-notice { display: none !important; } }

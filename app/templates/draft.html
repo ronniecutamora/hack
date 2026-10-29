@@ -3,6 +3,7 @@
 {% from "_links.html" import report_href %}
 {% block title %}{% if draft.kind == 'rdana' %}RDANA draft · {{ draft.barangay }} v{{ draft.version }}{% elif nol %}Notice of Loss draft · incident #{{ draft.incident_id }} v{{ draft.version }}{% else %}Damaged houses v{{ draft.version }}{% endif %}{% endblock %}
 {% block content %}
+<div id="live-draft" data-live="drafts reports incidents">
   {% set gap = c.not_in_reports or "— not in reports (for the RDANA team)" %}
   <p class="no-print toolbar"><a href="/drafts">← Drafts</a> · <button type="button" onclick="window.print()">Print</button>{% if draft.kind == 'damaged_houses' %} · <a href="/drafts/{{ draft.id }}.csv">Download this version as CSV</a>{% endif %}</p>
 
@@ -133,4 +134,5 @@
     {% endfor %}
     </ol>
   </section>
+</div>
 {% endblock %}

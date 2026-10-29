@@ -11,6 +11,7 @@ cannot generate or approve drafts.
 """
 
 import hashlib
+import json
 import mimetypes
 from collections import defaultdict
 from collections.abc import AsyncIterator, Callable
@@ -22,7 +23,14 @@ from typing import Any
 from urllib.parse import parse_qsl, urlsplit
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    RedirectResponse,
+    Response,
+    StreamingResponse,
+)
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import Engine
@@ -54,9 +62,11 @@ from app.drafts import (
     regenerate_form,
 )
 from app.gazetteer import BY_NAME
+from app.live import ChangeHub, close_on_shutdown_signals, event_stream
 from app.meta.factory import make_agent_llm
 from app.meta.llm import AgentLLM
 from app.models import (
+    MANILA,
     AgentDecision,
     Assessment,
     Draft,
@@ -102,7 +112,16 @@ def static_url(name: str) -> str:
     return f"/static/{name}?v={digest}"
 
 
+def live_tokens(request: Request) -> str:
+    """The live topic tokens as of this render, so the page's script refreshes only what changes
+    after it (a change it already shows costs at most one extra refresh)."""
+    hub = getattr(request.app.state, "live", None)
+    return json.dumps(hub.snapshot()["tokens"] if hub else {}, separators=(",", ":"))
+
+
 templates.env.filters["manila_time"] = manila_time
+templates.env.globals["live_tokens"] = live_tokens
+templates.env.globals["render_time"] = lambda: datetime.now(MANILA).strftime("%H:%M:%S")
 templates.env.globals["NAV"] = NAV
 templates.env.globals["nav_current"] = nav_current
 templates.env.globals["static_url"] = static_url
@@ -303,7 +322,12 @@ def create_app(
         # Building a client makes no request; a missing key surfaces as a recorded fallback.
         llm = summary_llm or make_agent_llm(settings, make_recorder(app.state.engine))
         app.state.drafts = DraftService(settings, app.state.engine, llm, clock or utcnow)
+        app.state.live = ChangeHub(settings.db_path)
+        await app.state.live.start()
+        restore_signals = close_on_shutdown_signals(app.state.live)
         yield
+        restore_signals()
+        await app.state.live.stop()
         if summary_llm is None:
             await llm.aclose()
         app.state.engine.dispose()
@@ -332,6 +356,25 @@ def create_app(
     @app.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/events")
+    async def events(request: Request) -> StreamingResponse:
+        """Server-sent events naming which data changed (see app.live); read-only."""
+        hub: ChangeHub = request.app.state.live
+        if not hub.accepting():
+            raise HTTPException(503, "Live updates are not available right now.")
+        return StreamingResponse(
+            event_stream(hub),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+        )
+
+    @app.get("/events/token")
+    def events_token(request: Request) -> JSONResponse:
+        """The same snapshot as the stream's hello event, for clients that fall back to polling."""
+        return JSONResponse(
+            request.app.state.live.snapshot(), headers={"Cache-Control": "no-store"}
+        )
 
     @app.get("/reports", response_class=HTMLResponse)
     def reports(request: Request, around: int | None = None) -> HTMLResponse:

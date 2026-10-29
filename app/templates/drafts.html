@@ -4,6 +4,7 @@
 {% from "_deadline.html" import clock, deadline_notes %}
 {% from "_status.html" import draft_status %}
 {% block content %}
+<div id="live-drafts" data-live="reports incidents drafts">
   <header>
     <h1>Officer drafts</h1>
     <p class="muted">RDANA form (NDRRMC Memo 107 s. 2021, Annex I) per barangay · {{ rdana_deadline.label }} within {{ rdana_deadline.window_text }} of {{ rdana_deadline.start }} (<a href="{{ rdana_deadline.url }}">{{ rdana_deadline.source }}</a>) · Philippine time (GMT+8)</p>
@@ -133,4 +134,5 @@
   </table>
   </div>
   {% endif %}
+</div>
 {% endblock %}

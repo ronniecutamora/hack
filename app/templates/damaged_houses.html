@@ -2,6 +2,7 @@
 {% from "_evidence.html" import houses_table %}
 {% block title %}Damaged houses{% endblock %}
 {% block content %}
+<div id="live-damaged-houses" data-live="reports incidents">
   <header>
     <h1>Damaged houses by barangay</h1>
     <p class="no-print toolbar"><a href="/damaged-houses.csv">Download CSV</a> · <button type="button" onclick="window.print()">Print</button></p>
@@ -12,4 +13,5 @@
   {% else %}
     {{ houses_table(t) }}
   {% endif %}
+</div>
 {% endblock %}

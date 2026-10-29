@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="{{ static_url('css/app.css') }}">
   {% block head %}{% endblock %}
 </head>
-<body>
+<body data-live-tokens="{{ live_tokens(request) }}">
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="site-header">
     <div class="site-header__inner">
@@ -23,11 +23,17 @@
         {% endfor %}
         </ul>
       </nav>
+      <p class="live" data-live-status data-state="connecting" hidden>
+        <span class="live__dot" aria-hidden="true"></span>
+        <span data-live-label role="status">Connecting</span>
+        <span class="live__updated">· updated <time data-live-updated>{{ render_time() }}</time></span>
+      </p>
     </div>
   </header>
   <main id="main" class="page" tabindex="-1">
     {% block content %}{% endblock %}
   </main>
+  <script src="{{ static_url('vendor/htmx-2.0.11/htmx.min.js') }}" defer></script>
   <script src="{{ static_url('js/app.js') }}" defer></script>
   {% block scripts %}{% endblock %}
 </body>

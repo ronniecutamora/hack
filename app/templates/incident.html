@@ -4,6 +4,7 @@
 {% from "_status.html" import incident_status %}
 {% block title %}Incident #{{ incident.id }}{% endblock %}
 {% block content %}
+<div id="live-incident" data-live="incidents reports drafts">
   <header>
     <h1>{{ incident.title }}</h1>
     {{ incident_status(incident.status) }}
@@ -60,4 +61,5 @@
     </article>
   {% endfor %}
   </div>
+</div>
 {% endblock %}

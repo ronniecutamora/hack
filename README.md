@@ -206,6 +206,17 @@ drafting, deadline and approval code never names a commodity; a test adds a dumm
 Only fisheries is built: crop insurance (rice, corn, high-value crops) is later work, one more entry once its PCIC
 deadlines are verified for Biñan.
 
+### Officer dashboard
+
+The officer works in one server-rendered dashboard (FastAPI, Jinja, HTMX; no build step, every page usable with
+JavaScript off). It updates live: the web app watches the shared SQLite file once per process (`PRAGMA
+data_version`, so it sees the bot's writes from its separate process) and tells each open tab over server-sent
+events which topics changed (reports, incidents, drafts, model spend), never report text. Each marked section
+re-fetches only itself, keeps the scroll position, highlights new rows briefly and never replaces a section the
+officer is typing in: it shows "New updates. Refresh section" there instead, and a requested refresh keeps the typed
+values. The header shows Live, Reconnecting or Offline with the time of the last update in Philippine time; when the
+stream keeps failing, the page checks `/events/token` every 20 seconds instead.
+
 ## Demo
 
 - Video (3 min): _TBD_
@@ -238,7 +249,7 @@ cp .env.example .env   # add META_API_KEY, TELEGRAM_BOT_TOKEN, PSEUDONYM_SALT (o
 uv run python -m app.bot                  # Telegram intake bot (long polling)
 uv run python -m app.bot_profile --dry-run  # bot name, descriptions and commands: print what would change
 uv run python -m app.bot_profile --photo    # apply only what differs, and upload assets/brand/ulat-avatar.png
-uv run uvicorn app.main:app --reload      # web app: /health, /reports, /incidents, /drafts, /damaged-houses (.csv), /media/<id> (localhost only: no login yet)
+uv run uvicorn app.main:app --reload      # web app: /health, /reports, /incidents, /drafts, /damaged-houses (.csv), /media/<id>, live updates at /events (localhost only: no login yet)
 uv run pytest                             # tests (all HTTP is mocked, no API calls)
 uv run ruff check . && uv run ruff format --check .
 ```
@@ -333,10 +344,11 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-29 | Correction routing (fix from the live bot test): the pair judge now compares a report with every candidate incident up to `MAX_JUDGED_CANDIDATES` instead of stopping at the first match, and the best accepted match wins: an incident not waiting for review, then for a correction the incident stating the corrected figure, then confidence. A Casile "2 houses, not 3" correction had merged into an unconfirmed old-photo incident; re-grouping moves such a report, and the stored reason names why the incident won |
 | 2026-10-29 | Late captions (fix from the live bot test): a text sent within 2 minutes of the same reporter's caption-less photo or image file, with no other report in between, becomes the photo's caption instead of a caption-only report; the bot confirms it, the photo is re-assessed (cached photo calls, new facts and barangay from the caption) and re-grouped, and the joined text is exempt from the rate limit. An assessment whose text or pin changed while it ran no longer ends "assessed" with stale facts: the report stays new for the queued re-run, also across a spend-cap hold |
 | 2026-10-29 | Bot profile as data (`app/bot_profile.py`): the name, short description, description and command list for @UlatPH_bot in Taglish and English (what to send, Biñan typhoon and flood damage, reports go to the City DRRM Office, not an emergency line: call 911, the same privacy line as `/start`), with Telegram's length limits enforced by a test; an idempotent CLI compares the live values and sets only what differs (`--dry-run` prints the changes), and `--photo` uploads the avatar as a square JPEG; `/help` repeats `/start` |
+| 2026-10-29 | Live dashboard: one database watcher per web process (`PRAGMA data_version` on a dedicated read-only connection, then per-topic tokens in one read transaction) fanned out over server-sent events (`/events`, typed topics, heartbeat, retry, no report text) with a polling fallback (`/events/token`); marked page sections refresh in place without wiping typed input, keep scroll position and highlight new rows; Live / Reconnecting / Offline indicator; streams close on Ctrl+C or reload so uvicorn never hangs |
 
 ### Third-party code and assets
 
-Licenses read from each installed package's metadata. No third-party source code is copied into this repository; the libraries are installed dependencies (see `pyproject.toml` and `uv.lock`). The one third-party data file is listed under Data below.
+Licenses read from each installed package's metadata. The Python libraries are installed dependencies (see `pyproject.toml` and `uv.lock`); the only third-party code copied into this repository is the vendored, unmodified browser libraries marked below, each with its license file, so the dashboard needs no CDN. The one third-party data file is listed under Data below.
 
 | Name | License | Used for |
 |---|---|---|
@@ -354,6 +366,7 @@ Licenses read from each installed package's metadata. No third-party source code
 | [pytest-asyncio](https://github.com/pytest-dev/pytest-asyncio) | Apache-2.0 | Async tests (dev) |
 | [respx](https://github.com/lundberg/respx) | BSD-3-Clause | HTTP mocking in tests (dev) |
 | [Ruff](https://github.com/astral-sh/ruff) | MIT | Lint and format (dev) |
+| [htmx](https://github.com/bigskysoftware/htmx) 2.0.11 (vendored in `app/static/vendor/htmx-2.0.11/` with its LICENSE, from the npm package, integrity checked) | 0BSD | Swapping live-updated page sections in place |
 | [FFmpeg](https://ffmpeg.org) (external program, not bundled) | LGPL/GPL depending on build | Voice note conversion to WAV |
 | Ulat bot avatar (`assets/brand/ulat-avatar.png`), generated for this project with OpenAI's image model through the Codex CLI ("GPT Terra") | Output owned by the user under OpenAI's [terms of use](https://openai.com/policies/terms-of-use/) | Branding only: the Telegram bot's profile photo. Not part of the report pipeline |
 
@@ -399,7 +412,9 @@ app/
   bot.py               Telegram bot (python -m app.bot)
   bot_profile.py       The bot's public profile (name, descriptions, commands) as data; idempotent CLI that applies it
   main.py, templates/  FastAPI officer pages: reports, incidents, timelines, decision audit, drafts and media
-  static/              Dashboard stylesheet (css/app.css, design tokens), script (js/app.js) and favicon
+  live.py              Live updates: one database watcher per process and the server-sent event streams
+  static/              Dashboard stylesheet (css/app.css, design tokens), script (js/app.js), favicon and
+                       vendor/ (pinned browser libraries with their licenses)
   evaluation.py        WER, Cohen's kappa and F1 helpers
 scripts/
   eval_transcribe.py   WER on your own recordings (outside the repo)

@@ -3,6 +3,7 @@
 {% from "_status.html" import incident_status %}
 {% block title %}Incidents{% endblock %}
 {% block content %}
+<div id="live-incidents" data-live="incidents reports">
   <header><h1>Incidents</h1><p class="muted">Newest activity first · Philippine time (GMT+8)</p></header>
   {% if not items %}
     <p class="empty">No incidents yet. Successfully assessed reports are grouped here.</p>
@@ -24,4 +25,5 @@
     </table>
     </div>
   {% endif %}
+</div>
 {% endblock %}
