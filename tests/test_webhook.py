@@ -47,7 +47,7 @@ class MarkAssessed:
     def __init__(self, engine):
         self.engine = engine
 
-    async def assess(self, report_id):
+    async def assess(self, report_id, **_kwargs):
         with Session(self.engine) as session:
             report = session.get(Report, report_id)
             report.status = STATUS_ASSESSED
@@ -345,3 +345,32 @@ def test_polling_starts_the_purge_with_the_bot(settings):
     assert application.post_init is bot.start_upkeep
     webhook = bot.build_application(polling_settings(settings))
     assert webhook.post_init is None  # the web app starts the upkeep itself
+
+
+# --- Interrupted reports resume at startup -------------------------------------------------------
+
+
+async def test_a_report_cut_off_by_a_restart_is_assessed_at_the_next_start(
+    webhook_settings, monkeypatch
+):
+    monkeypatch.setattr(bot, "RESUME_PAUSE_S", 0)
+    engine = make_engine(webhook_settings)
+    init_db(engine)
+    intake = IntakeService(webhook_settings, engine)
+    queued = await intake.ingest_text(1, "Baha sa Malaban")
+    cut_off = await intake.ingest_text(2, "Baha sa Casile")
+    with Session(engine) as session:
+        row = session.get(Report, cut_off.id)
+        row.status, row.assessing_started_at = "assessing", utcnow()
+        session.add(row)
+        session.commit()
+    engine.dispose()
+
+    fake = FakeTelegram(get_me_status=502)  # resuming needs no Telegram
+    with TestClient(webhook_app(webhook_settings, fake), base_url=f"https://{HOST}") as client:
+
+        def statuses():
+            with Session(client.app.state.engine) as session:
+                return {r.id: r.status for r in session.exec(select(Report)).all()}
+
+        assert wait_for(lambda: statuses() == {queued.id: "assessed", cut_off.id: "assessed"})

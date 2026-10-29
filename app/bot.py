@@ -28,7 +28,7 @@ from telegram.ext import (
 )
 from telegram.request import BaseRequest
 
-from app.assessment import make_assessor
+from app.assessment import RESUME_STATUSES, make_assessor, resumable_report_ids
 from app.config import Settings, get_settings
 from app.db import init_db, make_engine, make_recorder
 from app.intake import Admission, IntakeService
@@ -52,6 +52,10 @@ TELEGRAM_RETRY_DELAYS_S = (1, 3)
 ALLOWED_UPDATES = [Update.MESSAGE]
 # Runs after the message handlers (group 0) for every update: see _after_update.
 AFTER_UPDATE_GROUP = 1
+
+# At startup, at most this many interrupted reports are resumed, this many seconds apart.
+RESUME_LIMIT = 50
+RESUME_PAUSE_S = 2.0
 
 # Shutdown is bounded: Modal gives a stopping container 30 s (MODAL_EXIT_GRACE_S) for the
 # app's shutdown and the final database snapshot together. In order (app.telegram_webhook):
@@ -458,17 +462,45 @@ def build_application(
     return application
 
 
+async def resume_interrupted(
+    assessor: Any, engine: Engine, *, limit: int = RESUME_LIMIT, pause_s: float = RESUME_PAUSE_S
+) -> list[int]:
+    """Assess the reports a restart left new or assessing (app.assessment.RESUME_STATUSES), one
+    at a time with a pause between, so live reports and the model APIs are not swamped; the
+    spend cap still holds each one. An "assessing" row at startup was cut off: one process
+    writes the database (the lease on a deploy), and the status is re-checked under the report's
+    lock, so a report a live message assessed meanwhile is skipped. Returns the ids tried."""
+    ids, total = await asyncio.to_thread(resumable_report_ids, engine, limit)
+    if not ids:
+        return []
+    logger.info("resuming %d interrupted report(s)", len(ids))
+    if total > len(ids):
+        logger.warning(
+            "%d older interrupted report(s) not resumed; run: python -m app.assessment --pending",
+            total - len(ids),
+        )
+    for index, report_id in enumerate(ids):
+        if index:
+            await asyncio.sleep(pause_s)
+        await assessor.assess(report_id, only_if=RESUME_STATUSES)
+    return ids
+
+
 async def start_upkeep(application: Application) -> None:
     """Start, once per process, the work it owns besides answering updates: the hourly
     retention purge (RA 10173: raw media must go even while Telegram is down or the token is
-    revoked, so this never depends on the bot starting). Polling runs it as post_init; the web
-    app calls it from its lifespan in webhook mode. stop_upkeep ends it."""
+    revoked, so this never depends on the bot starting) and resuming the reports a restart
+    interrupted. Polling runs it as post_init; the web app calls it from its lifespan in webhook
+    mode. stop_upkeep ends both (an unfinished resume continues at the next start)."""
     data = application.bot_data
     if data.get("purge_task") is not None:
         return
+    engine = data["intake"].engine
     data["purge_task"] = asyncio.create_task(
-        purge_loop(data["settings"], data["intake"].engine), name="retention-purge"
+        purge_loop(data["settings"], engine), name="retention-purge"
     )
+    if (assessor := data.get("assessor")) is not None:
+        data["inflight"].spawn(resume_interrupted(assessor, engine), name="resume-interrupted")
 
 
 async def stop_upkeep(application: Application) -> None:

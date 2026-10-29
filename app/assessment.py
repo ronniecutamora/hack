@@ -20,7 +20,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import Engine
+from sqlalchemy import Engine, func
 from sqlmodel import Session, col, select
 
 from app.audio import AudioConversionError, to_wav_chunks
@@ -71,6 +71,11 @@ PENDING_STATUSES = (
     STATUS_ASSESSMENT_FAILED,
     STATUS_HELD,
 )
+# What a restart can leave half done (the bot queued it, or its run was cut off): the bot
+# process resumes these once at startup (app.bot.resume_interrupted). Held and failed reports
+# are not resumed there: they wait for the officer, a lifted cap or `--pending`, so a bad input
+# cannot loop or re-spend at every start.
+RESUME_STATUSES = (STATUS_NEW, STATUS_ASSESSING)
 
 
 @dataclass(frozen=True)
@@ -167,21 +172,29 @@ class AssessmentService:
     def _session(self) -> Session:
         return Session(self.engine, expire_on_commit=False)
 
-    async def assess(self, report_id: int) -> Report | None:
+    async def assess(
+        self, report_id: int, *, only_if: tuple[str, ...] | None = None
+    ) -> Report | None:
         """Assess one report; errors are stored on the assessment, never raised.
 
-        Returns None if the report does not exist.
+        Returns None if the report does not exist. With `only_if`, a report whose status
+        (checked under the report's lock) is not one of these is returned untouched: a resumed
+        report that a live message assessed meanwhile is not assessed twice.
         """
         # Every model call below is logged against this report (app.trace).
         with traced(report_id=report_id):
-            return await self._assess_locked(report_id)
+            return await self._assess_locked(report_id, only_if)
 
-    async def _assess_locked(self, report_id: int) -> Report | None:
+    async def _assess_locked(
+        self, report_id: int, only_if: tuple[str, ...] | None = None
+    ) -> Report | None:
         async with self._locks[report_id]:  # a pin and a photo may arrive moments apart
             with self._session() as session:
                 report = session.get(Report, report_id)
                 if report is None:
                     return None
+                if only_if is not None and report.status not in only_if:
+                    return report
                 reason = hold_reason(session, report, self.settings)
                 if reason:
                     if report.status == STATUS_ASSESSED:
@@ -489,6 +502,22 @@ class AssessmentService:
             )
         with self._session() as session:
             return list(session.exec(query).all())
+
+
+def resumable_report_ids(engine: Engine, limit: int) -> tuple[list[int], int]:
+    """The newest `limit` reports a restart left new or assessing, oldest first (the order
+    grouping expects), and how many there are in all. Blocked reporters' reports are skipped."""
+    pending = (
+        select(Report.id)
+        .join(Reporter, Reporter.id == Report.reporter_id)
+        .where(col(Report.status).in_(RESUME_STATUSES), Reporter.blocked == False)  # noqa: E712
+    )
+    with Session(engine) as session:
+        newest = session.exec(
+            pending.order_by(col(Report.received_at).desc(), col(Report.id).desc()).limit(limit)
+        ).all()
+        total = session.exec(select(func.count()).select_from(pending.subquery())).one()
+    return list(reversed(newest)), total
 
 
 async def _none() -> tuple[None, None]:
