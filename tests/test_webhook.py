@@ -1,6 +1,9 @@
 """Webhook mode: the web app runs the bot, and Telegram's secret header guards the route."""
 
+import asyncio
 import logging
+import sqlite3
+import threading
 import time
 
 import pytest
@@ -169,3 +172,119 @@ def test_polling_refuses_to_start_while_a_webhook_is_set(settings, monkeypatch, 
 async def test_current_webhook_is_empty_when_polling_is_safe():
     fake = FakeTelegram()
     assert await bot.current_webhook(bot.Bot(TOKEN, request=fake, get_updates_request=fake)) == ""
+
+
+# --- Durability of acknowledged reports and a bounded shutdown ---------------------------------
+
+
+class HangingAssessor:
+    """An assessment that never finishes (a slow model): shutdown must not wait for it."""
+
+    def __init__(self):
+        self.started = []
+        self.cancelled = []
+
+    async def assess(self, report_id, **_kwargs):
+        self.started.append(report_id)
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            self.cancelled.append(report_id)
+            raise
+
+
+def snapshot_texts(folder):
+    """Report texts in each finished snapshot on the (shared) volume, oldest first."""
+    found = []
+    for path in sorted(folder.glob("app-*.db")):
+        connection = sqlite3.connect(f"file:{path}?mode=ro&immutable=1", uri=True)
+        try:
+            found.append([row[0] for row in connection.execute("SELECT text FROM report")])
+        except sqlite3.Error:
+            found.append([])
+        finally:
+            connection.close()
+    return found
+
+
+def durable_settings(webhook_settings, tmp_path, disk):
+    return webhook_settings.model_copy(
+        update={
+            "database_path": tmp_path / disk / "app.db",
+            "snapshot_dir": tmp_path / "volume" / "snapshots",
+            "snapshot_interval_minutes": 60.0,  # only a request or the shutdown snapshots
+        }
+    )
+
+
+def test_shutdown_fits_modal_grace_with_room_for_the_snapshots():
+    stages = bot.SHUTDOWN_DRAIN_S + bot.SHUTDOWN_ASSESS_S + 2 * bot.SHUTDOWN_STOP_S
+    assert stages + 5 <= bot.MODAL_EXIT_GRACE_S
+
+
+async def test_flush_ends_the_quiet_period_at_once():
+    acks = Acknowledgements(quiet_s=60)
+    waiting = asyncio.create_task(acks.quiet())
+    await asyncio.sleep(0)
+    acks.flush()
+    await asyncio.wait_for(waiting, timeout=1)
+    await asyncio.wait_for(acks.quiet(), timeout=1)  # and every later wait is skipped too
+
+
+def test_an_acknowledged_report_is_in_a_snapshot_within_seconds(webhook_settings, tmp_path):
+    """A crash (no shutdown snapshot) must not lose a report the bot already acknowledged."""
+    settings = durable_settings(webhook_settings, tmp_path, "disk1")
+    fake = FakeTelegram()
+    application = bot.build_application(settings, request=fake)
+    application.bot_data["assessor"] = MarkAssessed(application.bot_data["intake"].engine)
+    folder = settings.snapshot_dir
+    with TestClient(
+        create_app(settings, telegram_application=application), base_url=f"https://{HOST}"
+    ) as client:
+        assert post_update(client, text_update("Baha sa Brgy. Malaban")).status_code == 200
+        assert wait_for(lambda: ["Baha sa Brgy. Malaban"] in snapshot_texts(folder))
+
+
+def test_a_report_acknowledged_just_before_shutdown_survives_the_restart(
+    webhook_settings, tmp_path, monkeypatch
+):
+    """Telegram got its 200, then the container stops while the assessment hangs: the report is
+    snapshotted before the (bounded) wait for the assessment, and the next container has it."""
+    monkeypatch.setattr(bot, "SHUTDOWN_ASSESS_S", 1.5)
+    first = durable_settings(webhook_settings, tmp_path, "disk1")
+    fake = FakeTelegram()
+    application = bot.build_application(first, request=fake)
+    assessor = HangingAssessor()
+    application.bot_data["assessor"] = assessor
+    app = create_app(first, telegram_application=application)
+    posted = threading.Event()
+
+    def container():
+        with TestClient(app, base_url=f"https://{HOST}") as client:
+            response = post_update(client, text_update("Bagsak ang bubong sa Casile"))
+            assert response.status_code == 200
+            posted.set()
+        # leaving the block is the stop: the lifespan's shutdown runs now
+
+    started = time.monotonic()
+    worker = threading.Thread(target=container, daemon=True)
+    worker.start()
+    assert posted.wait(5)
+    # Durable while the shutdown still waits for the hanging assessment.
+    assert wait_for(lambda: ["Bagsak ang bubong sa Casile"] in snapshot_texts(first.snapshot_dir))
+    assert worker.is_alive()
+    worker.join(timeout=15)
+    assert not worker.is_alive(), "shutdown waited for the assessment without a limit"
+    assert time.monotonic() - started < 10
+    assert assessor.cancelled == assessor.started != []
+    assert fake.sent_texts() == [bot.RECEIVED]
+
+    second = first.model_copy(  # the next container, without a bot: only its database matters
+        update={"database_path": tmp_path / "disk2" / "app.db", "telegram_mode": "polling"}
+    )
+    with (
+        TestClient(create_app(second), base_url=f"https://{HOST}") as client,
+        Session(client.app.state.engine) as session,
+    ):
+        (report,) = session.exec(select(Report)).all()
+    assert report.text == "Bagsak ang bubong sa Casile"

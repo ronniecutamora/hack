@@ -9,8 +9,9 @@ token has a webhook (it would otherwise delete the webhook and take the bot from
 import asyncio
 import logging
 import sys
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Coroutine
 from functools import wraps
+from typing import Any
 
 from sqlalchemy import Engine
 from sqlmodel import Session, select
@@ -21,6 +22,7 @@ from telegram.ext import (
     CommandHandler,
     ContextTypes,
     MessageHandler,
+    TypeHandler,
     filters,
 )
 from telegram.request import BaseRequest
@@ -47,6 +49,18 @@ TELEGRAM_RETRY_DELAYS_S = (1, 3)
 
 # The handlers below read only new messages, so Telegram need not send anything else.
 ALLOWED_UPDATES = [Update.MESSAGE]
+# Runs after the message handlers (group 0) for every update: see _after_update.
+AFTER_UPDATE_GROUP = 1
+
+# Shutdown is bounded: Modal gives a stopping container 30 s (MODAL_EXIT_GRACE_S) for the
+# app's shutdown and the final database snapshot together. In order (app.telegram_webhook):
+# handle the updates Telegram already got a 200 for (each becomes a stored report), snapshot,
+# give in-flight assessments a short grace (unfinished ones resume at the next start), then
+# stop the bot. The sum leaves room for the snapshots (a test keeps it that way).
+MODAL_EXIT_GRACE_S = 30.0
+SHUTDOWN_DRAIN_S = 8.0
+SHUTDOWN_ASSESS_S = 8.0
+SHUTDOWN_STOP_S = 4.0
 
 MISSING_TOKEN_MESSAGE = (
     "TELEGRAM_BOT_TOKEN is not set. Create a bot with @BotFather on Telegram, then put the "
@@ -128,6 +142,48 @@ def _intake(context: ContextTypes.DEFAULT_TYPE) -> IntakeService:
     return context.application.bot_data["intake"]
 
 
+class Inflight:
+    """Background assessments this process started, so shutdown can give them a bounded grace
+    instead of waiting for model calls without limit."""
+
+    def __init__(self) -> None:
+        self._tasks: set[asyncio.Task[Any]] = set()
+
+    def __len__(self) -> int:
+        return len(self._tasks)
+
+    def track(self, task: asyncio.Task[Any]) -> asyncio.Task[Any]:
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        return task
+
+    def spawn(self, coroutine: Coroutine[Any, Any, Any], *, name: str) -> asyncio.Task[Any]:
+        task = self.track(asyncio.create_task(coroutine, name=name))
+        task.add_done_callback(_log_failure)
+        return task
+
+    async def settle(self, grace_s: float) -> int:
+        """Wait up to `grace_s` for every task, then cancel the rest. Returns how many were
+        cancelled (a cancelled assessment stays new or assessing and resumes at the next start)."""
+        if not self._tasks:
+            return 0
+        _, pending = await asyncio.wait(set(self._tasks), timeout=grace_s)
+        for task in pending:
+            task.cancel()
+        if pending:
+            await asyncio.wait(pending, timeout=1.0)
+            logger.warning(
+                "shutdown cut %d background assessment(s) short; they resume at the next start",
+                len(pending),
+            )
+        return len(pending)
+
+
+def _log_failure(task: asyncio.Task[Any]) -> None:
+    if not task.cancelled() and (error := task.exception()) is not None:
+        logger.error("background task %s failed", task.get_name(), exc_info=error)
+
+
 async def _with_retries[T](call: Callable[[], Awaitable[T]]) -> T:
     """Run a Telegram network call, retrying transient network failures."""
     for delay in TELEGRAM_RETRY_DELAYS_S:
@@ -161,10 +217,12 @@ def _assess_later(
         return
     acks: Acknowledgements | None = application.bot_data.get("acks")
     generation = acks.touch(report.id, message) if acks and message is not None else None
-    application.create_task(
+    task = application.create_task(
         _assess_and_acknowledge(application, assessor, report.id, generation),
         name=f"assess-{report.id}",
     )
+    if (inflight := application.bot_data.get("inflight")) is not None:
+        inflight.track(task)
 
 
 async def _assess_and_acknowledge(
@@ -175,7 +233,7 @@ async def _assess_and_acknowledge(
     if generation is None or acks is None or report is None:
         return
     # Wait for the quiet period: a later caption, pin or album photo supersedes this task.
-    await asyncio.sleep(acks.quiet_s)
+    await acks.quiet()
     message = acks.due(report_id, generation)
     if message is None:
         return
@@ -323,6 +381,14 @@ async def on_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     _assess_later(context, report, message)  # re-maps a report assessed before the pin came
 
 
+async def _after_update(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """After every update's handler: the deploy asks for a database snapshot here, so a report
+    the bot acknowledged survives a crash that skips the shutdown snapshot (bot_data
+    "after_update", set by the web app; absent when polling)."""
+    if (hook := context.application.bot_data.get("after_update")) is not None:
+        hook()
+
+
 async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.error("update failed", exc_info=context.error)
     if isinstance(update, Update) and update.effective_message:
@@ -341,6 +407,7 @@ def add_handlers(application: Application) -> None:
     application.add_handler(MessageHandler(private & filters.Document.IMAGE, on_image_document))
     application.add_handler(MessageHandler(private & filters.VOICE, on_voice))
     application.add_handler(MessageHandler(private & filters.LOCATION, on_location))
+    application.add_handler(TypeHandler(Update, _after_update), group=AFTER_UPDATE_GROUP)
     application.add_error_handler(on_error)
 
 
@@ -381,6 +448,7 @@ def build_application(
     application.bot_data["intake"] = IntakeService(settings, engine, transcriber)
     application.bot_data["assessor"] = assessor
     application.bot_data["acks"] = Acknowledgements()  # in memory only: chats are never stored
+    application.bot_data["inflight"] = Inflight()
     add_handlers(application)
     return application
 
@@ -393,11 +461,36 @@ async def start_application(application: Application) -> None:
     await application.start()
 
 
+async def drain_updates(application: Application, timeout_s: float = SHUTDOWN_DRAIN_S) -> bool:
+    """Handle the updates already queued (Telegram got a 200 for each), for at most
+    `timeout_s`. True when the queue is empty and every handler finished."""
+    try:
+        await asyncio.wait_for(application.update_queue.join(), timeout=timeout_s)
+    except TimeoutError:
+        logger.error(
+            "shutdown: %d queued update(s) not handled within %.0f s",
+            application.update_queue.qsize(),
+            timeout_s,
+        )
+        return False
+    return True
+
+
 async def stop_application(application: Application) -> None:
-    """Handle the updates already queued and finish background tasks, then close the clients."""
-    if application.running:
-        await application.stop()
-    await application.shutdown()
+    """Bounded stop: summaries skip their quiet period, in-flight assessments get
+    SHUTDOWN_ASSESS_S (the rest resume at the next start), then the bot stops and its clients
+    close within SHUTDOWN_STOP_S each. Call drain_updates first to handle queued updates."""
+    if (acks := application.bot_data.get("acks")) is not None:
+        acks.flush()
+    if (inflight := application.bot_data.get("inflight")) is not None:
+        await inflight.settle(SHUTDOWN_ASSESS_S)
+    for step in (application.stop if application.running else None, application.shutdown):
+        if step is None:
+            continue
+        try:
+            await asyncio.wait_for(step(), timeout=SHUTDOWN_STOP_S)
+        except TimeoutError:
+            logger.error("shutdown: %s took over %.0f s; moving on", step.__name__, SHUTDOWN_STOP_S)
     if application.post_shutdown:
         await application.post_shutdown(application)
 

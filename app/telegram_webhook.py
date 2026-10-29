@@ -4,9 +4,13 @@ One process does both jobs, so a deploy has a single SQLite writer. Telegram POS
 `webhook_path(secret)` with the secret in X-Telegram-Bot-Api-Secret-Token. The handler checks the
 header in constant time, puts the update on the Application's queue and answers 200 at once; the
 Application then handles updates one at a time, in order, exactly as polling does (an album's
-photos and a caption sent right after a photo depend on that order). Shutdown handles what is
-queued before it stops (Application.stop), and the assessor's background tasks run in the same
-loop as the dashboard.
+photos and a caption sent right after a photo depend on that order). The assessor's background
+tasks run in the same loop as the dashboard.
+
+Shutdown is bounded (the constants in app.bot): new updates get 503 (Telegram re-sends them to
+the next container), the queued ones are handled, then `checkpoint` makes them durable (a
+database snapshot) before anything slower; in-flight assessments get a short grace and resume at
+the next start when cut off.
 
 Registering the webhook with Telegram is a separate, explicit command (`python -m app.deploy
 webhook set`), never done at startup, so booting a staging copy cannot take a bot from another
@@ -19,6 +23,7 @@ import hashlib
 import hmac
 import json
 import logging
+from collections.abc import Awaitable, Callable
 
 from fastapi import Request
 from fastapi.responses import Response
@@ -26,7 +31,7 @@ from telegram import Update
 from telegram.error import InvalidToken, TelegramError
 from telegram.ext import Application
 
-from app.bot import start_application, stop_application
+from app.bot import drain_updates, start_application, stop_application
 
 logger = logging.getLogger(__name__)
 
@@ -89,14 +94,23 @@ class TelegramWebhook:
             if await self._try_start():
                 return
 
-    async def stop(self) -> None:
+    async def stop(self, checkpoint: Callable[[], Awaitable[object]] | None = None) -> None:
+        """Refuse new updates, handle the acknowledged ones, run `checkpoint` (the deploy's
+        database snapshot), then stop the bot. Every step is bounded (app.bot)."""
         if self._starter is not None:
             self._starter.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await self._starter
-        if self.ready:
-            self.ready = False
-            await stop_application(self.application)
+        if not self.ready:
+            return
+        self.ready = False  # from here on handle() answers 503
+        await drain_updates(self.application)
+        if checkpoint is not None:
+            try:
+                await checkpoint()
+            except Exception:
+                logger.exception("shutdown: the snapshot after the queued updates failed")
+        await stop_application(self.application)
 
     async def handle(self, request: Request, path_token: str) -> Response:
         """One update from Telegram. 404 for a wrong path, 403 for a wrong secret header."""
@@ -117,5 +131,7 @@ class TelegramWebhook:
             update = None
         if update is None:
             return Response(status_code=400)
+        if not self.ready:  # shutdown began while the body was read: let Telegram re-send it
+            return Response(status_code=503, headers={"Retry-After": "30"})
         await self.application.update_queue.put(update)
         return Response(status_code=200)

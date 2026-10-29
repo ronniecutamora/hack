@@ -7,14 +7,18 @@ finished snapshot files:
 1. **Start:** take the lease (below), then restore the newest healthy snapshot (or the one
    named in a RESTORE request) to the local database path. No snapshot: start empty (a deploy may
    then seed the synthetic demo, app.seed).
-2. **Every SNAPSHOT_INTERVAL_MINUTES** and **at shutdown:** an online backup with SQLite's backup
-   API (consistent while the app keeps writing) to a temp file on the volume, then an atomic
-   rename and a volume commit. An unchanged database writes nothing. The newest SNAPSHOT_KEEP
-   are kept, plus the newest of each of the last SNAPSHOT_KEEP_DAILY days.
+2. **Every SNAPSHOT_INTERVAL_MINUTES**, **soon after a report is acknowledged** (`request()`, at
+   most one snapshot per SNAPSHOT_SOON_S) and **at shutdown:** an online backup with SQLite's
+   backup API (consistent while the app keeps writing) to a temp file on the volume, then an
+   atomic rename and a volume commit. An unchanged database writes nothing. The newest
+   SNAPSHOT_KEEP spaced at least half an interval apart are kept (so a burst of reports does not
+   push the older history out), plus the newest of each of the last SNAPSHOT_KEEP_DAILY days.
 
-Loss window: a crash that skips the shutdown snapshot loses at most the last interval of
-database writes (default 2 minutes). Media files are written to the volume directly and are
-committed with each snapshot (and by Modal's background commits every few seconds).
+Loss window: a crash that skips the shutdown snapshot loses the database writes since the last
+snapshot: at most about SNAPSHOT_SOON_S of acknowledged reports, and at most one interval
+(default 2 minutes) of everything else (assessments, officer actions). Media files are written
+to the volume directly and are committed with each snapshot (and by Modal's background commits
+every few seconds).
 
 **Lease:** one writer at a time. A starting container waits (up to LEASE_WAIT_S) for a previous
 container that still holds a fresh lease to write its final snapshot and release it, so a
@@ -28,6 +32,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import sqlite3
 import threading
 import time
@@ -46,9 +51,15 @@ logger = logging.getLogger(__name__)
 SNAPSHOT_PREFIX = "app-"
 SNAPSHOT_SUFFIX = ".db"
 LEASE_NAME = "LEASE.json"
+SNAPSHOT_NAME = re.compile(
+    rf"{re.escape(SNAPSHOT_PREFIX)}\d{{8}}T\d{{12}}Z{re.escape(SNAPSHOT_SUFFIX)}"
+)  # what snapshot_name() writes; anything else in the folder is left alone
 RESTORE_REQUEST = "RESTORE"  # holds a snapshot file name: restore that one at the next start
 LEASE_WAIT_S = 45.0  # Modal gives a stopping container 30 s for its exit handler
 LEASE_POLL_S = 2.0
+# A requested snapshot (an acknowledged report) runs at once, but at most one per this many
+# seconds: a burst of reports costs one snapshot, not one each.
+SNAPSHOT_SOON_S = 5.0
 
 
 class Volume(Protocol):
@@ -132,6 +143,7 @@ class SnapshotStore:
         *,
         volume: Volume | None = None,
         interval_s: float = 120.0,
+        soon_s: float = SNAPSHOT_SOON_S,
         keep: int = 15,
         keep_daily: int = 7,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
@@ -142,6 +154,7 @@ class SnapshotStore:
         self.dir = snapshot_dir
         self.volume = volume or LocalVolume()
         self.interval_s = interval_s
+        self.soon_s = soon_s
         self.keep = keep
         self.keep_daily = keep_daily
         self.clock = clock
@@ -151,6 +164,7 @@ class SnapshotStore:
         self.closed = False
         self._last_digest: str | None = None
         self._lock = threading.Lock()
+        self._wanted: asyncio.Event | None = None  # set by request(), created by run()
 
     @classmethod
     def from_settings(cls, settings: Settings, volume: Volume | None = None) -> "SnapshotStore":
@@ -171,11 +185,7 @@ class SnapshotStore:
         """Finished snapshots, oldest first (names sort by time)."""
         if not self.dir.is_dir():
             return []
-        return sorted(
-            p
-            for p in self.dir.glob(f"{SNAPSHOT_PREFIX}*{SNAPSHOT_SUFFIX}")
-            if not p.name.startswith(".")
-        )
+        return sorted(p for p in self.dir.iterdir() if SNAPSHOT_NAME.fullmatch(p.name))
 
     # -- lease --
 
@@ -298,20 +308,48 @@ class SnapshotStore:
             self.volume.commit()
             return final
 
+    def request(self) -> None:
+        """Ask for a snapshot soon: something that must survive a crash was just written (a
+        report the bot acknowledged). Coalesced by run(); a no-op while run() is not running."""
+        if self._wanted is not None:
+            self._wanted.set()
+
     async def run(self) -> None:
-        """Snapshot every interval until cancelled (the web app's lifespan runs this)."""
-        while True:
-            await asyncio.sleep(self.interval_s)
-            try:
-                await asyncio.to_thread(self.backup)
-            except Exception:
-                logger.exception("database snapshot failed; the next tick tries again")
+        """Snapshot every interval, and soon after each request(), until cancelled (the web
+        app's lifespan runs this)."""
+        self._wanted = wanted = asyncio.Event()
+        loop = asyncio.get_running_loop()
+        last = -self.soon_s  # the first request snapshots at once
+        try:
+            while True:
+                with contextlib.suppress(TimeoutError):
+                    await asyncio.wait_for(wanted.wait(), timeout=self.interval_s)
+                    # Requested: at once, unless the last snapshot was under soon_s ago.
+                    await asyncio.sleep(max(0.0, self.soon_s - (loop.time() - last)))
+                wanted.clear()  # a request from here on is caught by this snapshot or the next
+                try:
+                    await asyncio.to_thread(self.backup)
+                except Exception:
+                    logger.exception("database snapshot failed; the next tick tries again")
+                last = loop.time()
+        finally:
+            self._wanted = None
 
     def prune(self) -> list[Path]:
-        """Delete snapshots beyond the newest `keep` and the newest of each of `keep_daily`
-        days. Returns what was deleted."""
+        """Delete snapshots beyond the newest `keep` spaced at least half an interval apart
+        (the newest always stays) and the newest of each of `keep_daily` days. Returns what was
+        deleted."""
         snapshots = self.snapshots()
-        kept = set(snapshots[-self.keep :])
+        kept: set[Path] = set()
+        spacing = timedelta(seconds=self.interval_s / 2)
+        previous: datetime | None = None
+        for path in reversed(snapshots):
+            if len(kept) >= self.keep:
+                break
+            when = snapshot_time(path)
+            if previous is None or previous - when >= spacing:
+                kept.add(path)
+                previous = when
         newest_per_day: dict[str, Path] = {}
         for path in snapshots:
             newest_per_day[path.name[len(SNAPSHOT_PREFIX) : len(SNAPSHOT_PREFIX) + 8]] = path

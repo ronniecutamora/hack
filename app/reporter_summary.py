@@ -6,6 +6,8 @@ redaction as every other output (`redacted_place`): the reply never repeats a na
 number, not even the reporter's own.
 """
 
+import asyncio
+import contextlib
 import time
 from collections import OrderedDict
 from collections.abc import Callable
@@ -139,6 +141,23 @@ class Acknowledgements:
         )
         self._pending: dict[int, _Pending] = {}
         self._sent: OrderedDict[tuple[Any, Any], tuple[int, float]] = OrderedDict()
+        self._flushed = False
+        self._flush: asyncio.Event | None = None  # created in the event loop, by quiet()
+
+    async def quiet(self) -> None:
+        """Wait out the quiet period, or less once flush() ran (the bot is shutting down)."""
+        if self._flushed:
+            return
+        if self._flush is None:
+            self._flush = asyncio.Event()
+        with contextlib.suppress(TimeoutError):
+            await asyncio.wait_for(self._flush.wait(), timeout=self.quiet_s)
+
+    def flush(self) -> None:
+        """End every quiet period now: at shutdown a summary goes out at once or never."""
+        self._flushed = True
+        if self._flush is not None:
+            self._flush.set()
 
     def touch(self, report_id: int, message: Any) -> int:
         previous = self._pending.get(report_id)

@@ -1,5 +1,7 @@
 """Database snapshots on a (fake) network volume: round-trips, retention, the lease and restarts."""
 
+import asyncio
+import contextlib
 import sqlite3
 from datetime import UTC, datetime, timedelta
 
@@ -270,3 +272,51 @@ async def test_the_app_restores_at_start_and_snapshots_at_shutdown(settings, tmp
     with TestClient(create_app(second), base_url="http://localhost") as client:
         html = client.get("/reports").text
     assert "Baha sa Malaban" in html and "Bagsak ang puno sa Casile" in html
+
+
+def test_a_burst_of_snapshots_does_not_push_the_history_out(tmp_path):
+    """Reports snapshot every few seconds in a burst; the history keeps its spacing."""
+    store = SnapshotStore(tmp_path / "app.db", tmp_path / "snaps", interval_s=120, keep=4)
+    store.dir.mkdir()
+    start = datetime(2026, 10, 30, 1, 0, tzinfo=UTC)
+    history = [snapshot_name(start + timedelta(minutes=2 * i)) for i in range(3)]  # 01:00-01:04
+    burst = [snapshot_name(start + timedelta(minutes=10, seconds=5 * i)) for i in range(10)]
+    for name in history + burst:
+        (store.dir / name).write_bytes(b"x")
+    (store.dir / "app-manual-copy.db").write_bytes(b"x")  # not ours: never listed or pruned
+    store.prune()
+    left = sorted(p.name for p in store.dir.iterdir())
+    # The newest of the burst, then the history at least a minute apart.
+    assert left == sorted([history[0], history[1], history[2], burst[-1], "app-manual-copy.db"])
+
+
+async def test_requests_snapshot_soon_and_coalesce(settings, volume, clock):
+    await add_reports(settings, ["first"])
+    store = store_for(settings, volume, clock, interval_s=3600, soon_s=0.3)
+    store.open()
+    backups = []
+    real_backup = store.backup
+    store.backup = lambda: backups.append(clock()) or real_backup()
+    runner = asyncio.create_task(store.run())
+    try:
+        await asyncio.sleep(0)
+        store.request()  # the first request: at once
+        for _ in range(100):
+            if backups:
+                break
+            await asyncio.sleep(0.01)
+        assert backups == [clock()]
+        await add_reports(settings, ["second"])
+        clock.advance(1)
+        store.request()
+        store.request()  # coalesced with the one before
+        await asyncio.sleep(0.1)
+        assert len(backups) == 1  # not before soon_s since the last snapshot
+        await asyncio.sleep(0.5)
+        assert backups == [clock.now - timedelta(seconds=1), clock.now]
+        assert store.snapshots()[-1].name == snapshot_name(clock.now)
+    finally:
+        runner.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await runner
+    store.request()  # after run() stopped: a no-op, never an error

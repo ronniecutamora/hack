@@ -402,6 +402,8 @@ def create_app(
             application = telegram_application or build_application(
                 settings, engine=app.state.engine
             )
+            if snapshots is not None:  # an acknowledged report is in a snapshot within seconds
+                application.bot_data["after_update"] = snapshots.request
             secret = settings.telegram_webhook_secret.get_secret_value()
             app.state.telegram = TelegramWebhook(application, secret)
             await app.state.telegram.start()
@@ -409,8 +411,12 @@ def create_app(
         yield
         restore_signals()
         if app.state.telegram is not None:
-            # First, while the database is open: it handles queued updates and assessments.
-            await app.state.telegram.stop()
+            # First, while the database is open, and bounded (app.bot): it handles the queued
+            # updates, snapshots them at once, then gives assessments a short grace.
+            checkpoint = (
+                (lambda: asyncio.to_thread(snapshots.backup)) if snapshots is not None else None
+            )
+            await app.state.telegram.stop(checkpoint)
         if snapshot_loop is not None:
             snapshot_loop.cancel()
             with contextlib.suppress(asyncio.CancelledError):

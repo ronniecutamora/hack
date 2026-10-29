@@ -71,12 +71,19 @@ database is kept on the container as `app.db.before-restore` until the next rest
 ## Durability
 
 - The live SQLite database is on the container's disk (`/var/lib/ulat/app.db`); the volume only receives finished
-  snapshot files. Every 2 minutes (`SNAPSHOT_INTERVAL_MINUTES`) and at shutdown the app takes an online backup
-  (SQLite backup API), renames it into place and commits the volume. The newest 15 are kept plus one per day for
-  7 days. Media files and the model cache are written to the volume directly.
-- **Loss window:** a graceful stop, redeploy or preemption takes a final snapshot (tested: a report written 4
-  seconds before a forced `modal container stop` was there after the restart). A crash that skips shutdown loses
-  at most the last 2 minutes of database writes; media are committed every few seconds.
+  snapshot files. The app takes an online backup (SQLite backup API), renames it into place and commits the
+  volume every 2 minutes (`SNAPSHOT_INTERVAL_MINUTES`), within 5 seconds of each update the bot handled
+  (`SNAPSHOT_SOON_S`, at most one per 5 s) and at shutdown. The newest 15 at least a minute apart are kept, plus
+  one per day for 7 days. Media files and the model cache are written to the volume directly.
+- **Shutdown** is bounded to fit Modal's 30 s (constants in [app/bot.py](../app/bot.py)): new webhook calls get
+  503 (Telegram re-sends them to the next container); the updates already answered with 200 are handled (up to
+  8 s) and snapshotted at once; in-flight assessments get 8 s, and the summary reply skips its 15 s quiet
+  period; the bot stops (up to 4 s); then the final snapshot. An assessment cut off there resumes at the next
+  start.
+- **Loss window:** a graceful stop, redeploy or preemption loses nothing the bot acknowledged. A crash that skips
+  shutdown loses at most about 5 seconds of acknowledged reports (plus a webhook update still in the queue: answered
+  200 but not yet handled, usually under a second) and at most the last 2 minutes of other database writes
+  (assessments, officer actions). Media are committed every few seconds.
 - A lease file (`snapshots/LEASE.json`) keeps one writer: a starting container waits up to 45 s for the previous
   one to release it, and takes over a lease that has not been refreshed for 2 intervals + 60 s.
 - Download a snapshot for an offline copy: `modal volume get ulat-data snapshots/<name> .` (it holds personal
