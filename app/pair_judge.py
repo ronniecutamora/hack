@@ -56,10 +56,40 @@ def redact_names(text: str) -> str:
     return _PERSON.sub("[redacted]", text)
 
 
+_EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
+_HANDLE = re.compile(r"(?<![\w.@])@\w(?:[\w.]*\w)?")
+# "FB: Pedro Santos Jr", "Messenger name: ...": keep the label, drop up to four words of the
+# account name, stopping at punctuation.
+_ACCOUNT = re.compile(
+    r"\b((?:FB|Facebook|Messenger)(?:\s+(?:name|account|acct|page))?\s*:\s*)"
+    r"[^\s,.;:!?]+(?:[ \t]+[^\s,.;:!?]+){0,3}",
+    re.IGNORECASE,
+)
+# Seven or more digits with optional single spaces, dashes or an area-code bracket
+# ("0917 123 4567", "+63 917-123-4567", "(049) 530-0935"). Not inside a word or a decimal
+# (coordinates such as 121.0816034 stay) and not an ISO date (2026-10-28 stays).
+_PHONE = re.compile(
+    r"(?<![\w.])(?!\d{4}-\d{1,2}-\d{1,2}(?!\d))"
+    r"[+(]?\d(?:(?:[\s-]|\)\s?)?\d){6,}(?![\d])"
+)
+
+
+def redact_personal(text: str) -> str:
+    """Names, emails, @handles, Facebook/Messenger account names and phone numbers removed.
+
+    The one helper for any report text an output repeats (Notice of Loss excerpts and photo
+    notes, place details). Dates and coordinates are evidence and stay.
+    """
+    text = _EMAIL.sub("[email]", text)
+    text = _HANDLE.sub("[handle]", text)
+    text = _ACCOUNT.sub(lambda m: m.group(1) + "[account]", text)
+    return _PHONE.sub("[number]", redact_names(text))
+
+
 def redacted_place(value: Any) -> str | None:
     if not isinstance(value, str):
         return None
-    return redact_names(value)[:180]
+    return redact_personal(value)[:180]
 
 
 def safe_facts(facts: dict[str, Any] | None) -> dict[str, Any]:

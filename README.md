@@ -321,6 +321,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-29 | Demo: an 18th synthetic report (a San Antonio fish-pen claim resending the De La Paz photo through a validated `photo_from`, no new image) so the reused-photo warning appears on a Notice of Loss; the loader assesses each report as it arrives, so only the later copy is flagged; `--anchor-now` places scenario times relative to the load so the filing countdowns are live |
 | 2026-10-29 | Review fix (demo): the De La Paz fish-pen report and follow-up move to days 13–14 so its Notice of Loss clock is live after an anchored load; the loader ingests in scenario time order; the San Antonio copy gets its own lakeshore fish-pen place and text so it cannot merge with the San Antonio roof reports, and a scenario check requires a resent photo to have its own place; `--anchor-now` refuses to run on an already loaded demo |
 | 2026-10-29 | Review fix: a Notice of Loss becomes stale when a photo of its incident is added or re-assessed (its fingerprint adds each photo's assessment id, media ids and update time); the RDANA fingerprint is unchanged |
+| 2026-10-29 | Review fix: one redaction helper (`redact_personal`) for Notice of Loss excerpts, photo notes and place details also removes emails, @handles and Facebook/Messenger account names; the phone pattern no longer swallows ISO dates or decimal coordinates |
 
 ### Third-party code and assets
 

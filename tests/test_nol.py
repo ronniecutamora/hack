@@ -193,6 +193,28 @@ def test_phone_numbers_and_names_in_photo_notes_are_removed(client, engine):
     assert notes["judgment"]["notes"] == "Pen of [redacted], call [number]."
 
 
+@pytest.mark.parametrize(
+    "text,redacted",
+    [
+        ("Email po: pedro.santos+pcic@gmail.com salamat", "Email po: [email] salamat"),
+        ("I-message nyo po ako @pedrosantos99 sa FB", "I-message nyo po ako [handle] sa FB"),
+        ("FB: Pedro Santos Jr, salamat po", "FB: [account], salamat po"),
+        ("Messenger name: Nena Salindap. Baha pa", "Messenger name: [account]. Baha pa"),
+        ("Facebook account: Kanor Reyes", "Facebook account: [account]"),
+        # Dates and coordinates are evidence, not phone numbers.
+        ("Nasira noong 2026-10-28 ng gabi", "Nasira noong 2026-10-28 ng gabi"),
+        ("GPS 14.3364012, 121.0816034 po", "GPS 14.3364012, 121.0816034 po"),
+        ("Tawag po sa (049) 530-0935", "Tawag po sa [number]"),
+    ],
+)
+def test_contact_details_are_removed_but_dates_and_coordinates_kept(text, redacted):
+    from app.nol import excerpt
+    from app.pair_judge import redact_personal
+
+    assert redact_personal(text) == redacted
+    assert excerpt(text) == redacted
+
+
 def test_a_photo_change_makes_the_notice_of_loss_stale_but_not_the_rdana(client, engine):
     incident, first, _ = fisherfolk_incident(engine)
     add_photo(engine, first)

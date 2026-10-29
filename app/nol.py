@@ -8,7 +8,6 @@ name-redacted excerpt of the message or voice note, and the trust signals. The f
 stored once and never recomputed; the countdown is computed when the page is shown.
 """
 
-import re
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
@@ -21,7 +20,7 @@ from app.counting import CityEvidence, IncidentEvidence, count, digest
 from app.deadlines import DEADLINES, Countdown, countdown
 from app.models import Assessment, Media, PhotoAssessment, Report, manila_time
 from app.nol_form import ASSURED, Commodity, NolField
-from app.pair_judge import redact_names
+from app.pair_judge import redact_personal
 from app.rdana import HAZARD_TYPES, count_field, figure_text, filled, incident_ref, mean_pin
 from app.rdana_form import CITY, PROVINCE
 
@@ -32,9 +31,6 @@ NOT_FILED = (
 SAM_LABEL = "evidence for the adjuster, not the loss figure"
 NOT_IN_REPORTS = "— not in reports (for the assured)"
 EXCERPT_MAX = 280
-# Seven or more digits, allowing a leading + and spaces, dots or dashes ("0917 123 4567").
-_PHONE = re.compile(r"\+?\d(?:[\s.-]?\d){6,}")
-PHONE_PLACEHOLDER = "[number]"
 JUDGMENT_KEYS = (
     "roof_damage",
     "floodwater",
@@ -111,9 +107,9 @@ def countdowns(rows: list[dict[str, Any]], now: datetime) -> list[tuple[dict, Co
 
 
 def excerpt(text: str) -> str:
-    """Names and phone numbers removed first, then shortened, so a cut never exposes half of
+    """Names and contact details removed first, then shortened, so a cut never exposes half of
     one. The assured gives their own contact number on the form (field 12)."""
-    text = " ".join(_PHONE.sub(PHONE_PLACEHOLDER, redact_names(text)).split())
+    text = " ".join(redact_personal(text).split())
     return text if len(text) <= EXCERPT_MAX else text[: EXCERPT_MAX - 1].rstrip() + "…"
 
 
