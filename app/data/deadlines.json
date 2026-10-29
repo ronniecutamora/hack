@@ -1,0 +1,39 @@
+{
+  "timezone": "Asia/Manila",
+  "rows": [
+    {
+      "key": "pcic_fisheries_nl",
+      "label": "PCIC Notice of Loss (fisheries)",
+      "amount": 2,
+      "unit": "calendar_days",
+      "start": "occurrence of loss",
+      "source": "PCIC Fisheries Insurance general information, 2024 V4 (Sept 2024), section \"Notice of Loss\": written NL within 2 calendar days from occurrence of loss and before harvest",
+      "url": "https://pcic.gov.ph/wp-content/uploads/2024/09/Fisheries-Insurance-2024-V4.pdf",
+      "caveat": "⚠️ Not confirmed: whether PCIC relaxed fisheries deadlines for declared calamities after 2024. The 2024 brochure is the newest official text found.",
+      "first_notice": {
+        "text": "A first notice may be sent by text message, official email or official FB Messenger to the PCIC Regional or Extension Office, with the assured's name and address, the type of insurance, and the date and cause of loss; the written Notice of Loss must follow.",
+        "source": "PCIC Citizen's Charter 2026, 1st Edition (13 Jul 2026)",
+        "url": "https://pcic.gov.ph/wp-content/uploads/2026/07/PCIC-Citizens-Charter_2026_1st-Edition_07132026.pdf"
+      }
+    },
+    {
+      "key": "pcic_fisheries_ci",
+      "label": "PCIC Claim for Indemnity (fisheries)",
+      "amount": 7,
+      "unit": "calendar_days",
+      "start": "occurrence of loss",
+      "source": "PCIC Fisheries Insurance general information, 2024 V4 (Sept 2024), section \"Claim for Indemnity\": within 7 calendar days from occurrence of loss",
+      "url": "https://pcic.gov.ph/wp-content/uploads/2024/09/Fisheries-Insurance-2024-V4.pdf",
+      "caveat": "⚠️ Not confirmed: whether PCIC relaxed fisheries deadlines for declared calamities after 2024. The 2024 brochure is the newest official text found."
+    },
+    {
+      "key": "rdana_eoc",
+      "label": "Completed RDANA forms to the EOC",
+      "amount": 72,
+      "unit": "hours",
+      "start": "deployment at the assessment site",
+      "source": "NDRRMC Memorandum No. 107, s. 2021 (RDANA SOP), section 7.5.2",
+      "url": "https://ndrrmc.gov.ph/wp-content/uploads/2026/05/09-22-2021-NDRRMC-Memorandum-No.-107-s-2021-NDRRMC-Rapid-Damage-Assessment-Needs-Analysis-RDANA-Standard-Operating-Procedures.pdf"
+    }
+  ]
+}

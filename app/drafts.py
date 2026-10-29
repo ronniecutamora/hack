@@ -59,7 +59,7 @@ CSV_HEADER = (
 )
 LIVE_CSV_STATUS = "LIVE (NOT APPROVED)"
 # An officer's event date this long before the first report is more likely a typo than a
-# typhoon nobody reported for a month; RDANA is due within 72 hours of the event.
+# typhoon nobody reported for a month; RDANA forms are due within days (app/data/deadlines.json).
 EVENT_MAX_DAYS_BEFORE_FIRST_REPORT = 30
 CITY_TOTAL = "City total"
 CSV_BOM = "\ufeff"  # spreadsheets then read the file as UTF-8 ("Biñan")

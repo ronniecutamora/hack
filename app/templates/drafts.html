@@ -4,7 +4,7 @@
 {% block content %}
   <header>
     <h1>Officer drafts</h1>
-    <p class="muted">RDANA form (NDRRMC Memo 107 s. 2021, Annex I) per barangay · due within 72 hours · Philippine time (GMT+8)</p>
+    <p class="muted">RDANA form (NDRRMC Memo 107 s. 2021, Annex I) per barangay · {{ rdana_deadline.label }} within {{ rdana_deadline.window_text }} of {{ rdana_deadline.start }} (<a href="{{ rdana_deadline.url }}">{{ rdana_deadline.source }}</a>) · Philippine time (GMT+8)</p>
   </header>
   <p>Each draft fills only what the reports show, links every value to its evidence and leaves the rest for the RDANA team. Nothing is submitted until you approve it.</p>
   <p><a href="/damaged-houses">Damaged-houses table (DROMIC columns)</a> · <a href="/damaged-houses.csv">Download CSV</a></p>

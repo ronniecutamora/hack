@@ -245,6 +245,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-29 | Review fix (round 2): open drafts generated before the pending grouping-review bucket count as stale, so approving one needs the confirmation and the page says why |
 | 2026-10-29 | Review fix (round 2): a host allowlist (ALLOWED_HOSTS, default localhost and 127.0.0.1, enforced by Starlette TrustedHostMiddleware) stops DNS rebinding around the same-origin check |
 | 2026-10-29 | Livelihood facts: a report can state livelihood damage without a count (fish pens or cages, fishponds, fishing gear, boats, crops, livestock), a stated fishery area and a livelihood-materials need, with Taglish cues (baklad, kulungan, lambat, kawayan, bangka); the pair judge, incident rollups and RDANA 18.1/18.2 use them, so the two De La Paz fish-pen reports are no longer judged "no damage stated". Older stored facts keep working |
+| 2026-10-29 | Deadlines table (`app/data/deadlines.json`): PCIC fisheries Notice of Loss (2 calendar days) and Claim for Indemnity (7), and RDANA forms to the EOC (72 hours), each row with its source; a countdown in Philippine time with an injected clock; the RDANA drafts page reads its deadline from the table, and a test keeps deadline literals out of the code |
 
 ### Third-party code and assets
 
@@ -299,6 +300,7 @@ app/
   rdana_form.py        The 2021 RDANA form as data (sections, numbering, fill modes)
   rdana.py             Evidence rules that fill the form; rdana_summary.py: the validated 1.4 summary
   drafts.py            Versioned drafts, approve/reject, audit, damaged-houses table and CSV
+  deadlines.py         Filing deadlines from data/deadlines.json (with sources) and countdowns
   pair_judge.py        Text-only pair schema and redacted evidence prompts
   demo/                Synthetic demo: scenario, Muse Image photos, loader (python -m app.demo)
   privacy.py           HMAC pseudonymization of reporter ids

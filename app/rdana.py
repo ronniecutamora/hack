@@ -26,6 +26,7 @@ from app.rdana_form import (
 from app.rdana_summary import SummaryResult
 
 NOT_IN_REPORTS = "— not in reports (for the RDANA team)"
+RDANA_DEADLINE = "rdana_eoc"  # a row of app/data/deadlines.json
 NEED_VALUES = {
     "shelter": "Shelter assistance requested (the reports do not name the item)",
     "food": "Food requested",

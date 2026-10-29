@@ -25,6 +25,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.config import Settings, get_settings
 from app.db import init_db, make_engine, make_recorder
+from app.deadlines import deadline
 from app.drafts import (
     DECIDED_BY_MAX,
     EVENT_NAME_MAX,
@@ -57,7 +58,7 @@ from app.models import (
     manila_time,
     utcnow,
 )
-from app.rdana import EventInput
+from app.rdana import RDANA_DEADLINE, EventInput
 from app.trust import model_spend
 
 REPORT_LIMIT = 200
@@ -399,6 +400,7 @@ def create_app(settings: Settings | None = None, *, summary_llm: AgentLLM | None
             "history": history,
             "unplaced": city.unplaced,
             "has_house_counts": bool(damaged_houses(city)["rows"]),
+            "rdana_deadline": deadline(RDANA_DEADLINE),
         }
         return templates.TemplateResponse(request, "drafts.html", context)
 
