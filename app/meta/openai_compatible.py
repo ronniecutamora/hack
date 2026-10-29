@@ -10,6 +10,7 @@ from app.meta.base import (
     error_from_response,
     json_chat_request,
     parse_json_text,
+    token_cost,
 )
 from app.meta.schema import validate
 
@@ -28,6 +29,8 @@ class ChatReply:
 class OpenAICompatibleClient(ModelClient):
     model: str
     url: str
+    # (input, output) USD per 1M tokens for the call log and spend caps; None = unknown (logs 0).
+    price_per_m_tokens: tuple[float, float] | None = None
 
     def response_error(self, response):
         return error_from_response(self.service, response)
@@ -63,9 +66,13 @@ class OpenAICompatibleClient(ModelClient):
             return response.json()
 
         raw_check = (lambda raw: check(parse_reply(raw, self.service))) if check else None
-        # Provider credits and pricing are tracked externally; no price is assumed here.
+        prices = self.price_per_m_tokens
         raw = await self._call(
-            model, body if key_payload is None else key_payload, fetch, check=raw_check
+            model,
+            body if key_payload is None else key_payload,
+            fetch,
+            (lambda raw: token_cost(raw.get("usage"), prices)) if prices else lambda _raw: 0.0,
+            raw_check,
         )
         return parse_reply(raw, self.service)
 

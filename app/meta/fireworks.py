@@ -9,6 +9,9 @@ class FireworksSparkOpenClient(OpenAICompatibleClient):
     model = "accounts/fireworks/models/muse-spark-open"
     url = "https://api.fireworks.ai/inference/v1/chat/completions"
     key_env_var = "FIREWORKS_API_KEY"
+    # USD per 1M tokens (input, output), Fireworks model page:
+    # https://fireworks.ai/models/fireworks/muse-spark-open
+    price_per_m_tokens = (1.25, 4.25)
 
     def response_error(self, response) -> ModelApiError:
         error = error_from_response(self.service, response)
@@ -27,3 +30,4 @@ class FireworksSparkOpenClient(OpenAICompatibleClient):
 
 class FireworksGlimmerClient(FireworksSparkOpenClient):
     model = "accounts/fireworks/models/muse-glimmer-30b"
+    price_per_m_tokens = None  # not published by Fireworks; a third-party figure is unverified

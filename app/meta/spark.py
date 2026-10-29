@@ -8,6 +8,7 @@ from app.meta.base import (
     error_from_response,
     json_chat_request,
     parse_json_text,
+    token_cost,
 )
 from app.meta.schema import validate
 
@@ -18,11 +19,7 @@ PRICE_PER_M_TOKENS = (1.25, 4.25)
 
 
 def estimate_cost(usage: dict[str, Any] | None) -> float:
-    usage = usage or {}
-    price_in, price_out = PRICE_PER_M_TOKENS
-    return (
-        usage.get("prompt_tokens", 0) * price_in + usage.get("completion_tokens", 0) * price_out
-    ) / 1_000_000
+    return token_cost(usage, PRICE_PER_M_TOKENS)
 
 
 class SparkClient(ModelClient):

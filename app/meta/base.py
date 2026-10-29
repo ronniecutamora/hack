@@ -49,6 +49,14 @@ class ModelOutputError(MetaError):
     """The API answered 200 but the content was not usable (bad JSON, empty, truncated)."""
 
 
+class UncachedCallError(MetaError):
+    """A cache-only client was asked for a reply it has not cached; answering would cost money."""
+
+    def __init__(self, service: str, model: str) -> None:
+        self.service, self.model = service, model
+        super().__init__(f"{service}: no cached {model} reply, and the client is cache-only")
+
+
 def error_from_response(service: str, response: httpx.Response) -> ModelApiError:
     """Build a ModelApiError from an already-read error response."""
     code = message = None
@@ -78,6 +86,18 @@ class CallRecord:
 Recorder = Callable[[CallRecord], None]
 
 
+def token_cost(usage: dict[str, Any] | None, price_per_m_tokens: tuple[float, float]) -> float:
+    """USD for a chat reply's `usage` at (input, output) list prices per 1M tokens.
+
+    Cached-input discounts are ignored, so this is an upper bound.
+    """
+    usage = usage or {}
+    price_in, price_out = price_per_m_tokens
+    return (
+        usage.get("prompt_tokens", 0) * price_in + usage.get("completion_tokens", 0) * price_out
+    ) / 1_000_000
+
+
 class ModelClient:
     """Base class: owns the httpx client and wraps every call with retry, cache and logging."""
 
@@ -94,6 +114,7 @@ class ModelClient:
         recorder: Recorder | None = None,
         max_attempts: int = 3,
         backoff_s: float = 1.0,
+        cache_only: bool = False,
     ) -> None:
         self._api_key = api_key
         self._http = http
@@ -102,6 +123,10 @@ class ModelClient:
         self.recorder = recorder
         self.max_attempts = max_attempts
         self.backoff_s = backoff_s
+        # cache_only answers from the cache and raises UncachedCallError instead of calling
+        # the API, so a dry run can prove a job is free. `uncached` lists the models it refused.
+        self.cache_only = cache_only
+        self.uncached: list[str] = []
 
     @property
     def http(self) -> httpx.AsyncClient:
@@ -139,6 +164,9 @@ class ModelClient:
             if hit is not None and _passes(check, hit):
                 self._record(model, started, cached=True, cost=0.0)
                 return hit
+        if self.cache_only:
+            self.uncached.append(model)
+            raise UncachedCallError(self.service, model)
         data = await self._with_retry(fetch)
         self._record(model, started, cached=False, cost=cost(data))
         if check is not None:
