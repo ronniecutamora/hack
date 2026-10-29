@@ -402,7 +402,7 @@ class DraftService:
                 raise DraftError(
                     f"Incident #{incident_id} has no assessed report of {commodity.name} damage."
                 )
-            entries = annex(session, incident)
+            entries = annex(session, incident, commodity)
         drafted_at = self.clock()
         draft = Draft(
             kind=commodity.kind,

@@ -19,7 +19,7 @@ from sqlmodel import Session, col, select
 from app.counting import CityEvidence, IncidentEvidence, count, digest
 from app.deadlines import DEADLINES, Countdown, countdown
 from app.models import Assessment, Media, PhotoAssessment, Report, manila_time
-from app.nol_form import ASSURED, Commodity, NolField
+from app.nol_form import ASSURED, SAM_CONCEPTS, Commodity, NolField
 from app.pair_judge import redact_personal
 from app.rdana import HAZARD_TYPES, count_field, figure_text, filled, incident_ref, mean_pin
 from app.rdana_form import CITY, PROVINCE
@@ -40,7 +40,6 @@ JUDGMENT_KEYS = (
     "house_count_estimate",
     "notes",
 )
-MEASUREMENT_KEYS = ("roof_count", "floodwater_present", "floodwater_fraction")
 
 
 def _reporting(incident: IncidentEvidence, list_field: str, values: tuple[str, ...]):
@@ -121,7 +120,9 @@ def _judgment(judgment: dict[str, Any] | None) -> dict[str, Any]:
     return kept
 
 
-def annex(session: Session, incident: IncidentEvidence) -> list[dict[str, Any]]:
+def annex(
+    session: Session, incident: IncidentEvidence, commodity: Commodity
+) -> list[dict[str, Any]]:
     """The evidence annex: one entry per report in the incident, oldest first."""
     ids = incident.report_ids
     reports = {r.id: r for r in session.exec(select(Report).where(col(Report.id).in_(ids)))}
@@ -143,6 +144,7 @@ def annex(session: Session, incident: IncidentEvidence) -> list[dict[str, Any]]:
             col(Media.id).not_in(select(PhotoAssessment.media_id)),
         )
     ).all()
+    measured = [k for concept in commodity.sam_concepts for k in SAM_CONCEPTS[concept]]
     entries = []
     for member in incident.members:
         report, assessment = reports[member.id], assessments.get(member.id)
@@ -162,9 +164,7 @@ def annex(session: Session, incident: IncidentEvidence) -> list[dict[str, Any]]:
                         "overlay_media_id": p.overlay_media_id,
                         "judgment": _judgment(p.judgment),
                         "measurement": {
-                            k: p.measurement[k]
-                            for k in MEASUREMENT_KEYS
-                            if k in (p.measurement or {})
+                            k: p.measurement[k] for k in measured if k in (p.measurement or {})
                         },
                         "model": p.llm_model,
                     }
@@ -327,6 +327,7 @@ def fill_nol(
         "loss_bands": commodity.loss_bands,
         "loss_bands_source": commodity.loss_bands_source,
         "sam_label": SAM_LABEL,
+        "sam_caveat": commodity.sam_caveat,
         "not_filed": NOT_FILED,
         "annex": entries,
         "reused_photos": reused,

@@ -53,7 +53,7 @@
 
 <section>
   <h2>Evidence annex for the PCIC adjuster</h2>
-  <p class="muted">Every report in incident #{{ c.incident_id }}, oldest first. Photo judgments are by the agent LLM; SAM 3.1 measurements are {{ c.sam_label }}. Names and phone numbers are removed from the excerpts and the agent's photo notes. Photo links work until raw media are deleted after the retention period; the judgments and measurements stay.</p>
+  <p class="muted">Every report in incident #{{ c.incident_id }}, oldest first. Photo judgments are by the agent LLM; SAM 3.1 measurements are {{ c.sam_label }}.{% if c.sam_caveat %} {{ c.sam_caveat }}{% endif %} Names and contact details (phone numbers, emails, handles, account names) are removed from the excerpts and the agent's photo notes. Photo links work until raw media are deleted after the retention period; the judgments and measurements stay.</p>
   <table>
     <thead><tr><th>Report</th><th>Photo evidence</th><th>What the reporter said</th><th>Trust</th></tr></thead>
     <tbody>
@@ -77,7 +77,10 @@
                 {% if j.notes %}<div class="muted">Agent: {{ j.notes }}</div>{% endif %}
               {% else %}<div class="muted">Not judged.</div>{% endif %}
               {% set m = p.measurement %}
-              {% if m %}<div class="muted">SAM 3.1 measured ({{ c.sam_label }}): {{ m.roof_count }} roof{{ "s" if m.roof_count != 1 }}{% if m.floodwater_present %}, floodwater over {{ "%.0f"|format(m.floodwater_fraction * 100) }}% of the photo{% else %}, no floodwater{% endif %}</div>{% endif %}
+              {% set parts = [] %}
+              {% if m and "roof_count" in m %}{% set _ = parts.append(m.roof_count ~ " roof" ~ ("s" if m.roof_count != 1 else "")) %}{% endif %}
+              {% if m and "floodwater_present" in m %}{% set _ = parts.append(("floodwater over " ~ "%.0f"|format(m.floodwater_fraction * 100) ~ "% of the photo") if m.floodwater_present else "no floodwater") %}{% endif %}
+              {% if parts %}<div class="muted">SAM 3.1 measured ({{ c.sam_label }}): {{ parts|join(", ") }}</div>{% endif %}
             </div>
           {% else %}<span class="muted">No photo.</span>{% endfor %}
         </td>

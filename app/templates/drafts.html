@@ -63,7 +63,7 @@
   {% set rows = nol_statuses|selectattr("commodity.key", "equalto", commodity.key)|list %}
   <section id="nol-{{ commodity.key }}">
     <h2>PCIC Notice of Loss ({{ commodity.name }})</h2>
-    <p>One draft of the {{ commodity.form_id }} ({{ commodity.revision }}) per incident whose reports state damage to {{ commodity.eligible_livelihood|map("replace", "_", " ")|join(", or ") }}. The agent fills the location, cause, first-reported time and extent from the reports and packages the evidence for the PCIC adjuster; the assured's name, address, policy, lot, harvest date, underwriter and contact are left for the assured. Nothing is filed: the assured files with PCIC.</p>
+    <p>One draft of the {{ commodity.form_id }} ({{ commodity.revision }}) per incident whose reports state damage to {{ commodity.eligible_livelihood|map("replace", "_", " ")|join(", or ") }}. The agent fills {{ commodity.fields|selectattr("mode", "equalto", "evidence")|map(attribute="label")|join(", ") }} from the reports and packages the evidence for the PCIC adjuster; {{ commodity.fields|selectattr("mode", "equalto", "assured")|map(attribute="label")|join(", ") }} are left for the assured{% if commodity.preamble_blanks %}, as are the {{ commodity.preamble_blanks|join(" and ") }} in the opening line{% endif %}. Nothing is filed: the assured files with PCIC.</p>
     {% if not rows %}
       <p class="empty">No assessed report states {{ commodity.name }} damage yet.</p>
     {% else %}

@@ -157,7 +157,9 @@ def test_evidence_fields_are_filled_and_identity_fields_are_left_for_the_assured
     assert page.count(ASSURED) >= len(ASSURED_FIELDS) + 1  # plus the letter's date
     assert "Regional Office No. IV" in page and "Calamba City" in page
     assert "Left for the assured: type of policy, insurance policy number." in page
-    assert f"SAM 3.1 measured ({SAM_LABEL}): 0 roofs, floodwater over 40% of the photo" in page
+    assert f"SAM 3.1 measured ({SAM_LABEL}): floodwater over 40% of the photo" in page
+    assert "0 roofs" not in page  # roofs are not fisheries evidence
+    assert "lake or pond water" in page  # SAM's "floodwater" also covers the lake around pens
     assert "Agent: Broken bamboo." in page
 
 
@@ -499,6 +501,10 @@ def test_a_new_commodity_needs_one_definition_and_no_code_change(client, engine,
     html = client.get("/drafts").text
     assert "PCIC Notice of Loss (test crop)" in html and f'id="nol-testcrop-{incident}"' in html
     assert "Test crop notice: <strong" in html and "due in 67h 0m" in html
+    section = html[html.index('id="nol-testcrop"') :]
+    assert "fills Location of Farm, Cause, Extent from the reports" in section
+    assert "Name of Farmer are left for the assured" in section
+    assert "underwriter" not in section.split("</section>")[0].lower()
     draft_id = generate(client, incident, commodity="testcrop")
     draft = stored(engine, draft_id)
     assert draft.kind == "pcic_nl_testcrop"

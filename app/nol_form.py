@@ -23,6 +23,11 @@ MODES = ("assured", "evidence")
 RULES = ("location", "cause", "first_reported", "stated_area", "extent")
 KIND_PREFIX = "pcic_nl_"
 ASSURED = "— to be filled by the assured"
+# The SAM 3.1 concepts the pipeline prompts for, and the measurement keys each one yields.
+SAM_CONCEPTS = {
+    "roof": ("roof_count",),
+    "floodwater": ("floodwater_present", "floodwater_fraction"),
+}
 
 
 @dataclass(frozen=True)
@@ -70,6 +75,10 @@ class Commodity:
     area_facts: tuple[str, ...]
     area_unit: str
     required_evidence: tuple[str, ...]  # "photo": at least one photo of the damage
+    # The SAM measurements the annex shows (keys of SAM_CONCEPTS), and what to keep in mind
+    # when reading them for this commodity.
+    sam_concepts: tuple[str, ...]
+    sam_caveat: str
     loss_bands: str
     loss_bands_source: str
     closing: str
@@ -127,6 +136,13 @@ FISHERIES = Commodity(
     area_facts=("fishery_area_hectares",),
     area_unit="ha",
     required_evidence=("photo",),
+    # Roofs are not fisheries evidence; a fish-pen photo would just read "0 roofs".
+    sam_concepts=("floodwater",),
+    sam_caveat=(
+        'SAM 3.1 is prompted with "floodwater", which also covers the lake or pond water '
+        "around pens and cages, so the share of water in a photo is not the extent of "
+        "flooding or of the loss."
+    ),
     loss_bands=(
         "PCIC classifies the loss after verification by at least two adjusters (one from PCIC, "
         "one from the LGU fisheries personnel): total loss 90% and above; partial loss over 10% "
@@ -156,6 +172,9 @@ def check(commodity: Commodity) -> None:
     for key in (commodity.deadline, *commodity.later_deadlines):
         if key not in DEADLINES:
             raise ValueError(f"{commodity.key}: deadline {key!r} is not in the deadlines table")
+    for concept in commodity.sam_concepts:
+        if concept not in SAM_CONCEPTS:
+            raise ValueError(f"{commodity.key}: unknown SAM concept {concept!r}")
     if not (commodity.eligible_livelihood or commodity.eligible_counts):
         raise ValueError(f"{commodity.key}: no eligibility rule")
 

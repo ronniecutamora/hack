@@ -171,8 +171,10 @@ audit and same-origin rules as the RDANA drafts.
 | Left for the assured | Type of policy and policy number (preamble), 1 name, 2 address, 7 lot number, 8 expected harvest date, 10 policy number, 11 underwriter, 12 contact number, date and signature. Ulat stores no names, addresses or phone numbers |
 
 An **evidence annex** for the PCIC adjuster lists every report in the incident: its time, links to the photo and the
-SAM overlay (until retention deletes the raw files), the photo judgments and measurements, an excerpt of the message
-or voice note with names and phone numbers removed, and its trust chips. A photo another reporter already sent (`photo_reused`) is a
+SAM overlay (until retention deletes the raw files), the photo judgments and the floodwater measurement (roof counts
+are hidden for fisheries, and a caveat says SAM's "floodwater" also covers the lake or pond water around pens), an
+excerpt of the message or voice note with names and contact details (phone numbers, emails, @handles, Facebook or
+Messenger account names) removed, and its trust chips. A photo another reporter already sent (`photo_reused`) is a
 red chip linking the earlier report and a red banner on the draft: one photo cannot prove two losses. Single-source
 incidents, missing photos and grouping still pending officer review are marked too.
 
@@ -322,6 +324,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-29 | Review fix (demo): the De La Paz fish-pen report and follow-up move to days 13–14 so its Notice of Loss clock is live after an anchored load; the loader ingests in scenario time order; the San Antonio copy gets its own lakeshore fish-pen place and text so it cannot merge with the San Antonio roof reports, and a scenario check requires a resent photo to have its own place; `--anchor-now` refuses to run on an already loaded demo |
 | 2026-10-29 | Review fix: a Notice of Loss becomes stale when a photo of its incident is added or re-assessed (its fingerprint adds each photo's assessment id, media ids and update time); the RDANA fingerprint is unchanged |
 | 2026-10-29 | Review fix: one redaction helper (`redact_personal`) for Notice of Loss excerpts, photo notes and place details also removes emails, @handles and Facebook/Messenger account names; the phone pattern no longer swallows ISO dates or decimal coordinates |
+| 2026-10-29 | Review fix: the `/drafts` Notice of Loss summary lists the fields the agent fills and the fields left for the assured from each commodity's field definitions; the annex shows only the SAM concepts a commodity lists (fisheries: floodwater, no roof count) with a caveat that lake or pond water reads as floodwater |
 
 ### Third-party code and assets
 
