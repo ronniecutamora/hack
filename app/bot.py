@@ -154,9 +154,6 @@ class Inflight:
     def __init__(self) -> None:
         self._tasks: set[asyncio.Task[Any]] = set()
 
-    def __len__(self) -> int:
-        return len(self._tasks)
-
     def track(self, task: asyncio.Task[Any]) -> asyncio.Task[Any]:
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
