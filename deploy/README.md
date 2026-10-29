@@ -117,6 +117,8 @@ Only after Ronnie's go. Staging must have passed the same steps first.
 
 - Modal logs every request path. The webhook path is derived from the secret (HMAC), not the secret itself, and
   the secret header is never logged, but treat Modal log access as access to that path.
-- Seeded demo photos are ordinary media to the retention purge: they are deleted `RAW_MEDIA_TTL_HOURS` (24) after
-  the seed, like every raw photo, and the pages then show "deleted after the retention period".
+- The seeded demo's photos are never purged: the retention purge skips the `demo` channel (generated images,
+  invented reporters, no personal data; see [app/retention.py](../app/retention.py)), so a deployed demo keeps its
+  evidence. Every real report's raw photos and voice notes are still deleted `RAW_MEDIA_TTL_HOURS` (24) after
+  arrival.
 - `--strategy recreate` matters: a rolling deploy would start the new container while the old one still writes.
