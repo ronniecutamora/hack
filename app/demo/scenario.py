@@ -94,6 +94,9 @@ def validate(reports: list[ScenarioReport]) -> list[str]:
                 errors.append(f"{r.key}: photo_from must name another report with a photo")
             if r.photo_prompt is not None:
                 errors.append(f"{r.key}: a resent photo cannot also have its own photo_prompt")
+            # Its own place keeps the copy's pin apart from every other story in that barangay.
+            if not r.place or any(o.place == r.place for o in reports if o.key != r.key):
+                errors.append(f"{r.key}: a resent photo needs its own place")
     if len({r.barangay for r in reports if r.barangay}) < 4:
         errors.append("need reports in at least 4 different barangays")
     errors.extend(_validate_series(reports))

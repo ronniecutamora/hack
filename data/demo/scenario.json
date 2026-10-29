@@ -40,7 +40,7 @@
   {
     "key": "r05",
     "reporter": "demo-05",
-    "day": 2,
+    "day": 13,
     "hour": 14,
     "text": "Mangingisda po ako sa De La Paz, dito sa fish pen area sa tabing-lawa ng Purok 1. Sira po yung mga fish cage namin, nabali po yung mga kawayan at inanod po yung lambat. Paano na po kami?",
     "photo_prompt": "Bamboo fish cages on a wide calm lake, broken bamboo poles leaning at angles, torn nets half-submerged, grey stormy sky, distant shoreline houses",
@@ -136,8 +136,8 @@
   {
     "key": "r15",
     "reporter": "demo-14",
-    "day": 12,
-    "hour": 10,
+    "day": 14,
+    "hour": 9,
     "text": "Follow-up lang po sa De La Paz, sa may Purok 1 sa tabing-lawa, yung lugar ng mga fish pen. Hindi pa rin po namin naaayos, kailangan po namin ng lambat at kawayan.",
     "barangay": "De La Paz",
     "place": "delapaz-purok1-fishpens"
@@ -166,8 +166,9 @@
     "reporter": "demo-17",
     "day": 14,
     "hour": 15,
-    "text": "Taga San Antonio po ako, may fish pen po kami sa tabing-lawa. Sira po lahat ng fish cage namin dahil sa bagyo, inanod pa po yung lambat. Paano po mag-claim sa PCIC?",
+    "text": "Taga San Antonio po ako, sa tabing-lawa po ang fish pen namin. Sira po lahat ng fish cage namin dahil sa bagyo, inanod pa po yung lambat. Paano po mag-claim sa PCIC?",
     "barangay": "San Antonio",
+    "place": "sanantonio-lakeshore-fishpens",
     "photo_from": "r05"
   }
 ]

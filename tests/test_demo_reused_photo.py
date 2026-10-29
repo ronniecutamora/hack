@@ -1,5 +1,6 @@
 """The reused-photo fake (r18), the --anchor-now demo clock and a full fake-client demo load."""
 
+import json
 from dataclasses import replace
 from datetime import datetime, timedelta
 
@@ -32,7 +33,7 @@ from tests.test_demo_loader import (
     reports,
     write_fixture_images,
 )
-from tests.test_incidents import DIFFERENT, FakeJudge
+from tests.test_incidents import DIFFERENT, SAME, FakeJudge
 from tests.test_trust import encoded, flood_scene
 
 SCENARIO = load_scenario(SCENARIO_PATH)
@@ -51,6 +52,24 @@ def test_r18_resends_the_de_la_paz_fish_pen_photo_from_another_barangay():
     assert r18.barangay == "San Antonio" != r05.barangay
     assert "fish pen" in r18.text and "fish cage" in r18.text
     assert received_at(r18) == max(received_at(r) for r in SCENARIO)
+
+
+def test_the_fisherfolk_report_and_follow_up_fall_inside_the_two_day_window():
+    r05, r15, r18 = BY_KEY["r05"], BY_KEY["r15"], BY_KEY["r18"]
+    assert (r05.day, r15.day, r18.day) == (13, 14, 14)
+    assert 12 <= r05.hour < 18 and r15.hour < 12 and r18.hour >= 12  # afternoon, morning
+    assert received_at(r05) < received_at(r15) < received_at(r18)
+    assert received_at(r18) - received_at(r05) < timedelta(days=2)
+
+
+def test_r18_is_its_own_fish_pen_place_not_the_san_antonio_roof_reports():
+    r18 = BY_KEY["r18"]
+    assert r18.place and all(r.place != r18.place for r in SCENARIO if r.key != "r18")
+    assert "bahay" not in r18.text.lower() and "yero" not in r18.text.lower()
+    shared = [replace(r, place="casile-purok2-houses") if r.key == "r18" else r for r in SCENARIO]
+    assert any("r18: a resent photo needs its own place" in e for e in validate(shared))
+    unplaced = [replace(r, place=None) if r.key == "r18" else r for r in SCENARIO]
+    assert any("r18: a resent photo needs its own place" in e for e in validate(unplaced))
 
 
 def test_the_other_stories_are_unchanged():
@@ -125,6 +144,19 @@ def test_the_loader_anchors_only_when_asked(tmp_path, capsys):
             assert "anchored" not in capsys.readouterr().out
 
 
+def test_anchor_now_refuses_an_already_loaded_demo(tmp_path, capsys):
+    settings = demo_settings(tmp_path)
+    engine = engine_for(settings)
+    write_fixture_images(settings.data_dir)
+    kwargs = {"scenario_path": FIXTURE, "assessor": assessor_for(settings, engine)}
+    assert load_command(settings, **kwargs) == 0
+    capsys.readouterr()
+    assert load_command(settings, anchor_now=True, **kwargs) == 2
+    out = capsys.readouterr().out
+    assert "already loaded" in out and "--reset --anchor-now" in out
+    assert len(reports(engine)) == 3
+
+
 def test_the_cli_passes_anchor_now(monkeypatch):
     seen = {}
     monkeypatch.setattr(
@@ -156,18 +188,48 @@ class ScenarioLLM:
         return facts(hazards=["flood"])
 
 
-def test_a_fake_load_flags_r18_only_and_its_notice_of_loss_shows_the_red_banner(tmp_path):
+class LivelihoodJudge(FakeJudge):
+    """ "same" only when both sides state the same livelihood damage at the same place."""
+
+    async def chat_json(self, **kwargs):
+        sent = json.loads(kwargs["user_text"])
+        new = sent["new_report"]["facts"]
+        old = [r["facts"] for r in sent["incident_recent_reports"]]
+        if new.get("livelihood_damage") and all(
+            o.get("livelihood_damage") == new["livelihood_damage"] for o in old
+        ):
+            return SAME
+        return DIFFERENT
+
+
+def fake_load(tmp_path, **kwargs):
     settings = demo_settings(tmp_path)
     engine = engine_for(settings)
     for seed, job in enumerate(jobs_for(SCENARIO, settings.data_dir / "images"), start=1):
         job.path.parent.mkdir(parents=True, exist_ok=True)
         job.path.write_bytes(encoded(flood_scene(seed * 7)))  # distinct synthetic photos
-    llm = ScenarioLLM()
-    judge = FakeJudge(*[DIFFERENT] * 50)
+    judge = LivelihoodJudge()
     assessor = AssessmentService(
-        settings, engine, llm, FakeSam(), IncidentService(settings, engine, judge)
+        settings, engine, ScenarioLLM(), FakeSam(), IncidentService(settings, engine, judge)
     )
-    assert load_command(settings, assessor=assessor) == 0
+    assert load_command(settings, assessor=assessor, **kwargs) == 0
+    return settings, engine
+
+
+def test_an_anchored_load_gives_the_de_la_paz_notice_a_live_clock(tmp_path):
+    now = datetime(2026, 11, 2, 3, 27)
+    settings, engine = fake_load(tmp_path, anchor_now=True, now=now)
+    statuses = DraftService(settings, engine, None, clock=lambda: now).nol_statuses()
+    by_place = {n.incident.barangay: n for n in statuses}
+    assert set(by_place) == {"De La Paz", "San Antonio"}
+    de_la_paz = by_place["De La Paz"]
+    assert len(de_la_paz.incident.report_ids) == 2  # the damage report and its follow-up
+    (nl, clock), _claim = de_la_paz.clocks
+    assert clock.due_at > now and not clock.overdue and clock.text.startswith("due in 2")
+
+
+def test_a_fake_load_flags_r18_only_and_its_notice_of_loss_shows_the_red_banner(tmp_path):
+    settings, engine = fake_load(tmp_path)
 
     with Session(engine) as session:
         by_text = {r.text: r for r in session.exec(select(Report)).all()}

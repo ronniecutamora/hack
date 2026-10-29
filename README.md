@@ -218,9 +218,11 @@ De La Paz fisherfolk's broken fish pens and a follow-up asking for nets and bamb
 with one Notice of Loss; and a new reporter in San Antonio who claims fish-pen damage with the De La Paz photo
 (`"photo_from": "r05"`, the same file byte for byte), so the reused-photo warning shows in red on that Notice of
 Loss. The loader assesses each report as it arrives, as the bot does, so only the later copy is flagged.
-`--anchor-now` moves every scenario time so the latest report arrives an hour before the load: the San Antonio
-claim then shows a live "due in" countdown, while the De La Paz loss, first reported ten days before, shows
-"overdue" with the first-notice fallback.
+The fish-pen reports come late in the scenario (De La Paz on day 13 afternoon, its follow-up on day 14 morning, the
+San Antonio copy on day 14 afternoon). `--anchor-now` moves every scenario time so the latest report arrives an hour
+before the load, so both Notices of Loss show a live "due in" countdown: about 47 hours for San Antonio and about 22
+hours for De La Paz, first reported the afternoon before. The command refuses to anchor on top of an existing load;
+use it with `--reset`.
 
 ## Getting started
 
@@ -317,6 +319,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-29 | Review fix: phone numbers are removed from Notice of Loss excerpts, and the agent's free-text photo notes are redacted like excerpts |
 | 2026-10-29 | Filing clock: Notice of Loss and Claim for Indemnity countdowns from the first report on `/drafts`, the draft page and the incident page, with the Citizen's Charter first-notice fallback; approval reads "approved for filing, not filed" and does not stop the clock. Notice of Loss drafts reuse the versioning, staleness, approval, audit and same-origin rules (a draft now records its incident) |
 | 2026-10-29 | Demo: an 18th synthetic report (a San Antonio fish-pen claim resending the De La Paz photo through a validated `photo_from`, no new image) so the reused-photo warning appears on a Notice of Loss; the loader assesses each report as it arrives, so only the later copy is flagged; `--anchor-now` places scenario times relative to the load so the filing countdowns are live |
+| 2026-10-29 | Review fix (demo): the De La Paz fish-pen report and follow-up move to days 13–14 so its Notice of Loss clock is live after an anchored load; the loader ingests in scenario time order; the San Antonio copy gets its own lakeshore fish-pen place and text so it cannot merge with the San Antonio roof reports, and a scenario check requires a resent photo to have its own place; `--anchor-now` refuses to run on an already loaded demo |
 
 ### Third-party code and assets
 

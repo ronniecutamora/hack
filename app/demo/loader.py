@@ -2,15 +2,16 @@
 
 ``python -m app.demo load [--reset] [--yes] [--anchor-now]`` ingests every scenario
 report with ``channel="demo"`` into a separate demo database (DATA_DIR must end in
-"demo"), backdates it to scenario time and assesses it before the next one arrives, as
-the bot does: a check such as "this photo was already sent by another reporter" sees
+"demo"), backdates it to scenario time and assesses it before the next one arrives, in scenario
+time order, as the bot would: a check such as "this photo was already sent by another reporter" sees
 only earlier reports. A manifest in the demo data dir maps scenario keys to report ids,
 so re-running skips loaded reports instead of duplicating them.
 
 Scenario times are fixed (a fictional landfall in early October 2026). ``--anchor-now``
 moves them all so the latest report arrives an hour before the load, which makes the
-filing countdowns live in a fresh load; use it with ``--reset``, since loaded reports
-keep their times. Production code never shifts the clock.
+filing countdowns live in a fresh load. It needs ``--reset`` once anything is loaded,
+since loaded reports keep their times (the command refuses otherwise). Production code
+never shifts the clock.
 """
 
 import argparse
@@ -127,7 +128,8 @@ async def load_reports(
             }
         manifest = {k: v for k, v in manifest.items() if v in known}
         assessed, failed = 0, 0
-        for report in reports:
+        # In scenario time order, as the reports would reach the bot.
+        for report in sorted(reports, key=received_at):
             if report.key in manifest:
                 existing += 1
                 continue
@@ -217,6 +219,13 @@ def load_command(
         print(f"Missing {len(missing)} image(s) for: {', '.join(missing)}.")
         print("Generate them first: DATA_DIR=var/demo uv run python -m app.demo images")
         return 1
+    if anchor_now and _read_manifest(data_dir):
+        print(
+            "--anchor-now moves every report's time, but reports are already loaded at their "
+            "old times. Reload from scratch: DATA_DIR=var/demo uv run python -m app.demo load "
+            "--reset --anchor-now"
+        )
+        return 2
     shift = anchor_shift(reports, now or utcnow()) if anchor_now else timedelta(0)
     if anchor_now:
         latest = max(received_at(r, shift) for r in reports)
