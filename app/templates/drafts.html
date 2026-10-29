@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Drafts{% endblock %}
+{% block content %}
+  <header>
+    <h1>Officer drafts</h1>
+    <p class="muted">RDANA form (NDRRMC Memo 107 s. 2021, Annex I) per barangay · due within 72 hours · Philippine time (GMT+8)</p>
+  </header>
+  <p>Each draft fills only what the reports show, links every value to its evidence and leaves the rest for the RDANA team. Nothing is submitted until you approve it.</p>
+  <p><a href="/damaged-houses">Damaged-houses table (DROMIC columns)</a> · <a href="/damaged-houses.csv">Download CSV</a></p>
+  {% if not statuses %}
+    <p class="empty">No barangay has assessed reports yet. Drafts can be generated once reports are assessed and placed.</p>
+  {% else %}
+    <table>
+      <thead><tr><th>Barangay</th><th>Evidence</th><th>Latest RDANA draft</th><th class="no-print">Generate</th></tr></thead>
+      <tbody>
+      {% for s in statuses %}
+        <tr id="barangay-{{ s.barangay|replace(' ', '-') }}">
+          <td><strong>{{ s.barangay }}</strong></td>
+          <td>
+            {% if s.evidence %}
+              {{ s.evidence.report_ids|length }} report{{ 's' if s.evidence.report_ids|length != 1 }} in {{ s.evidence.incidents|length }} incident{{ 's' if s.evidence.incidents|length != 1 }}
+              <div class="muted">{% for i in s.evidence.incidents %}{% if i.incident_id %}<a href="/incidents/{{ i.incident_id }}">#{{ i.incident_id }}</a>{% else %}ungrouped report #{{ i.report_ids[0] }}{% endif %}{{ ", " if not loop.last }}{% endfor %}</div>
+              {% if s.evidence.unassessed_report_ids %}<div class="chip warn">{{ s.evidence.unassessed_report_ids|length }} report{{ 's' if s.evidence.unassessed_report_ids|length != 1 }} not assessed yet, not counted</div>{% endif %}
+            {% else %}<span class="muted">No assessed reports placed here now.</span>{% endif %}
+          </td>
+          <td>
+            {% if s.latest %}
+              <a href="/drafts/{{ s.latest.id }}">Version {{ s.latest.version }}</a>
+              <span class="chip{% if s.latest.status == 'approved' %}{% elif s.latest.status == 'rejected' %} alert{% else %} warn{% endif %}">{{ s.latest.status }}</span>
+              <div class="muted">{{ s.latest.created_at|manila_time }}</div>
+              {% if s.stale %}<div class="chip warn">New evidence since this version: generate again</div>{% endif %}
+              {% if s.approved and s.approved.id != s.latest.id %}<div class="muted">Approved: <a href="/drafts/{{ s.approved.id }}">version {{ s.approved.version }}</a></div>{% endif %}
+            {% else %}<span class="muted">None yet</span>{% endif %}
+          </td>
+          <td class="no-print">
+            {% if s.evidence %}
+            <form method="post" action="/drafts">
+              <input type="hidden" name="barangay" value="{{ s.barangay }}">
+              <details><summary>Event details (optional)</summary>
+                <label>1.1.1 Name of operation/event <input type="text" name="event_name" maxlength="160" placeholder="e.g. Typhoon response 2026"></label>
+                <label>1.1.2 Type of disaster/event <input type="text" name="event_type" maxlength="80" placeholder="Leave empty to use the reported hazards"></label>
+                <label>1.1.3 Date and time of event <input type="datetime-local" name="event_at"></label>
+                <p class="muted">Leave a field empty to keep the value from the reports.</p>
+              </details>
+              <button type="submit">Generate RDANA draft</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+  {% if unplaced %}
+    <p class="banner warn">{{ unplaced|length }} incident{{ 's' if unplaced|length != 1 }} without a barangay {{ 'are' if unplaced|length != 1 else 'is' }} in no draft until the officer places {{ 'them' if unplaced|length != 1 else 'it' }}:
+      {% for i in unplaced %}{% if i.incident_id %}<a href="/incidents/{{ i.incident_id }}">incident #{{ i.incident_id }}</a>{% else %}<a href="/reports#report-{{ i.report_ids[0] }}">report #{{ i.report_ids[0] }}</a>{% endif %}{{ ", " if not loop.last }}{% endfor %}.</p>
+  {% endif %}
+  <section class="no-print">
+    <h2>Damaged-houses table</h2>
+    {% if has_house_counts %}
+      <form method="post" action="/drafts/damaged-houses"><button type="submit">Save the current table as a draft for approval</button></form>
+    {% else %}<p class="muted">No report states a number of damaged houses yet.</p>{% endif %}
+  </section>
+  <h2>All drafts</h2>
+  {% if not history %}<p class="empty">No drafts generated yet.</p>{% else %}
+  <table>
+    <thead><tr><th>Draft</th><th>Output</th><th>Version</th><th>Status</th><th>Generated</th><th>Decided</th></tr></thead>
+    <tbody>
+    {% for d in history %}
+      <tr>
+        <td><a href="/drafts/{{ d.id }}">#{{ d.id }}</a></td>
+        <td>{% if d.kind == 'rdana' %}RDANA · {{ d.barangay }}{% else %}Damaged houses · city{% endif %}</td>
+        <td>{{ d.version }}</td>
+        <td><span class="chip{% if d.status == 'rejected' %} alert{% elif d.status == 'draft' %} warn{% endif %}">{{ d.status }}</span></td>
+        <td>{{ d.created_at|manila_time }}</td>
+        <td>{% if d.decided_at %}{{ d.decided_at|manila_time }}{% if d.decided_by %} · {{ d.decided_by }}{% endif %}{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+{% endblock %}

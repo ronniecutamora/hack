@@ -1,0 +1,59 @@
+{% from "_trust.html" import incident_trust %}
+{% macro report_link(ref, report_id) -%}
+  {%- if ref.incident_id -%}<a href="/incidents/{{ ref.incident_id }}#report-{{ report_id }}">#{{ report_id }}</a>
+  {%- else -%}<a href="/reports#report-{{ report_id }}">#{{ report_id }}</a>{%- endif -%}
+{%- endmacro %}
+
+{% macro incident_link(ref) -%}
+  {%- if ref.incident_id -%}<a href="/incidents/{{ ref.incident_id }}">incident #{{ ref.incident_id }}</a>
+  {%- else -%}ungrouped report{%- endif -%}
+{%- endmacro %}
+
+{# One line per incident: link, the value it contributed, its reports and trust chips. #}
+{% macro evidence_refs(refs) %}
+  {% if refs %}
+  <ul class="evidence-refs">
+  {% for ref in refs %}
+    <li>
+      {{ incident_link(ref) }}{% if ref.value is defined %}: <strong>{{ "%g"|format(ref.value) }}</strong> ({{ ref.rule }}, report {{ report_link(ref, ref.source_report_id) }}){% endif %}
+      · report{{ 's' if ref.report_ids|length != 1 }} {% for r in ref.report_ids %}{{ report_link(ref, r) }}{{ ", " if not loop.last }}{% endfor %}
+      {{ incident_trust(ref.trust) }}
+      {% if ref.status == "needs_officer" %}<span class="chip warn">grouping needs officer review</span>{% endif %}
+      {% if ref.flagged_report_ids %}<span class="chip alert">flagged: {% for r in ref.flagged_report_ids %}{{ report_link(ref, r) }}{{ ", " if not loop.last }}{% endfor %}</span>{% endif %}
+    </li>
+  {% endfor %}
+  </ul>
+  {% endif %}
+{% endmacro %}
+
+{# The DROMIC damaged-houses table, shared by the live page and a frozen draft. #}
+{% macro houses_table(t) %}
+  <table>
+    <thead>
+      <tr><th rowspan="2">Region</th><th rowspan="2">Province</th><th rowspan="2">City/Municipality</th><th rowspan="2">Barangay</th><th colspan="3">No. of damaged houses</th><th rowspan="2">Evidence</th></tr>
+      <tr><th class="num">Total</th><th class="num">Totally</th><th class="num">Partially</th></tr>
+    </thead>
+    <tbody>
+    {% for row in t.rows %}
+      <tr>
+        <td>{{ t.region }}</td><td>{{ t.province }}</td><td>{{ t.city }}</td><td><strong>{{ row.barangay }}</strong></td>
+        <td class="num">{{ "%g"|format(row.total) }}</td>
+        <td class="num">{% if row.totally is not none %}{{ "%g"|format(row.totally) }}{% else %}<span class="gap" title="not in reports">—</span>{% endif %}</td>
+        <td class="num">{% if row.partially is not none %}{{ "%g"|format(row.partially) }}{% else %}<span class="gap" title="not in reports">—</span>{% endif %}</td>
+        <td>
+          {{ evidence_refs(row.evidence) }}
+          <div class="muted">{{ "%g"|format(row.single_source) }} of {{ "%g"|format(row.total) }} from single-source incidents · {{ "%g"|format(row.flagged) }} from flagged reports</div>
+        </td>
+      </tr>
+    {% endfor %}
+      <tr>
+        <td>{{ t.region }}</td><td>{{ t.province }}</td><td>{{ t.city }}</td><td><strong>City total</strong></td>
+        <td class="num"><strong>{% if t.total.total is not none %}{{ "%g"|format(t.total.total) }}{% endif %}</strong></td>
+        <td class="num">{% if t.total.totally is not none %}{{ "%g"|format(t.total.totally) }}{% else %}<span class="gap">—</span>{% endif %}</td>
+        <td class="num">{% if t.total.partially is not none %}{{ "%g"|format(t.total.partially) }}{% else %}<span class="gap">—</span>{% endif %}</td>
+        <td class="muted">{{ t.total.report_ids|length }} report{{ 's' if t.total.report_ids|length != 1 }}{% if t.total.single_source is not none %} · {{ "%g"|format(t.total.single_source) }} from single-source incidents{% endif %}</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="muted">{{ t.counting_rule }} An empty cell means no report states that number; it is not zero. Barangays whose reports state no house-damage number are not listed.{% if t.unplaced_incidents %} {{ t.unplaced_incidents }} incident{{ 's' if t.unplaced_incidents != 1 }} without a barangay {{ 'are' if t.unplaced_incidents != 1 else 'is' }} not counted until the officer places {{ 'them' if t.unplaced_incidents != 1 else 'it' }}.{% endif %}</p>
+{% endmacro %}

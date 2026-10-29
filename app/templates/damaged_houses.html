@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% from "_evidence.html" import houses_table %}
+{% block title %}Damaged houses{% endblock %}
+{% block content %}
+  <header>
+    <h1>Damaged houses by barangay</h1>
+    <p class="no-print"><a href="/damaged-houses.csv">Download CSV</a> · <button type="button" onclick="window.print()">Print</button></p>
+  </header>
+  <p class="muted">Live from the current reports, in the DSWD DROMIC damaged-houses columns. Reported figures for verification, not verified damage. To freeze a version for approval, use <a href="/drafts">Drafts</a>.</p>
+  {% if not t.rows %}
+    <p class="empty">No report states a number of damaged houses yet.</p>
+  {% else %}
+    {{ houses_table(t) }}
+  {% endif %}
+{% endblock %}

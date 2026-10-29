@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Request not completed{% endblock %}
+{% block content %}
+  <h1>Request not completed</h1>
+  <p class="banner alert">{{ message }}</p>
+  <p><a href="javascript:history.back()">Go back</a> · <a href="/drafts">Drafts</a></p>
+{% endblock %}

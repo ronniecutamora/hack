@@ -1,4 +1,4 @@
-"""FastAPI app: health check, the officer's report list with assessments, and evidence media.
+"""FastAPI app: health check, the officer's reports, incidents, RDANA drafts and evidence media.
 
 Run with: uv run uvicorn app.main:app --reload
 
@@ -12,14 +12,32 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qsl
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, col, select
 
 from app.config import Settings, get_settings
-from app.db import init_db, make_engine
+from app.db import init_db, make_engine, make_recorder
+from app.drafts import (
+    DECIDED_BY_MAX,
+    EVENT_NAME_MAX,
+    EVENT_TYPE_MAX,
+    KIND_DAMAGED_HOUSES,
+    REASON_MAX,
+    REASON_MIN,
+    DraftError,
+    DraftService,
+    clean_text,
+    damaged_houses,
+    damaged_houses_csv,
+    parse_event_at,
+)
+from app.gazetteer import BY_NAME
+from app.meta.factory import make_agent_llm
+from app.meta.llm import AgentLLM
 from app.models import (
     AgentDecision,
     Assessment,
@@ -29,10 +47,14 @@ from app.models import (
     Report,
     Reporter,
     manila_time,
+    utcnow,
 )
+from app.rdana import EventInput
 from app.trust import model_spend
 
 REPORT_LIMIT = 200
+FORM_CONTENT_TYPE = "application/x-www-form-urlencoded"
+FORM_MAX_BYTES = 16_384
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
@@ -122,17 +144,56 @@ def related_incidents(session: Session, assessments: list[Assessment]) -> dict[i
     )
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def csv_response(text: str, filename: str) -> Response:
+    return Response(
+        text,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+async def form_fields(request: Request) -> dict[str, str]:
+    """A small URL-encoded HTML form body, parsed without extra dependencies.
+
+    An empty body is an empty form (a button-only POST); anything else must be URL-encoded.
+    """
+    body = await request.body()
+    if len(body) > FORM_MAX_BYTES:
+        raise HTTPException(413, "Form too large.")
+    if not body:
+        return {}
+    if request.headers.get("content-type", "").split(";")[0].strip() != FORM_CONTENT_TYPE:
+        raise HTTPException(415, f"Send the form as {FORM_CONTENT_TYPE}.")
+    try:
+        pairs = parse_qsl(body.decode("utf-8"), keep_blank_values=True, strict_parsing=False)
+    except UnicodeDecodeError as exc:
+        raise HTTPException(400, "Form is not UTF-8.") from exc
+    return dict(pairs)
+
+
+def create_app(settings: Settings | None = None, *, summary_llm: AgentLLM | None = None) -> FastAPI:
+    """`summary_llm` replaces the configured agent LLM for RDANA summaries (tests, offline)."""
     settings = settings or get_settings()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.engine = make_engine(settings)
         init_db(app.state.engine)
+        # Building a client makes no request; a missing key surfaces as a recorded fallback.
+        llm = summary_llm or make_agent_llm(settings, make_recorder(app.state.engine))
+        app.state.drafts = DraftService(settings, app.state.engine, llm)
         yield
+        if summary_llm is None:
+            await llm.aclose()
         app.state.engine.dispose()
 
     app = FastAPI(title="Typhoon damage reports", lifespan=lifespan)
+
+    @app.exception_handler(DraftError)
+    async def draft_error(request: Request, exc: DraftError) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request, "error.html", {"message": str(exc)}, status_code=exc.status_code
+        )
 
     @app.get("/health")
     def health() -> dict[str, str]:
@@ -264,6 +325,77 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "related_incidents": related,
             },
         )
+
+    @app.get("/drafts", response_class=HTMLResponse)
+    def drafts_page(request: Request) -> HTMLResponse:
+        city, statuses, history = request.app.state.drafts.overview()
+        context = {
+            "statuses": statuses,
+            "history": history,
+            "unplaced": city.unplaced,
+            "has_house_counts": bool(damaged_houses(city)["rows"]),
+        }
+        return templates.TemplateResponse(request, "drafts.html", context)
+
+    @app.post("/drafts")
+    async def generate_draft(request: Request) -> RedirectResponse:
+        form = await form_fields(request)
+        barangay = form.get("barangay", "")
+        if barangay not in BY_NAME:
+            raise DraftError("Choose one of Biñan's barangays.")
+        event = EventInput(
+            name=clean_text(form.get("event_name"), label="Event name", max_length=EVENT_NAME_MAX),
+            type=clean_text(form.get("event_type"), label="Event type", max_length=EVENT_TYPE_MAX),
+            at=parse_event_at(form.get("event_at")),
+        )
+        draft = await request.app.state.drafts.generate_rdana(barangay, event)
+        return RedirectResponse(f"/drafts/{draft.id}", status_code=303)
+
+    @app.post("/drafts/damaged-houses")
+    def generate_houses_draft(request: Request) -> RedirectResponse:
+        draft = request.app.state.drafts.generate_damaged_houses()
+        return RedirectResponse(f"/drafts/{draft.id}", status_code=303)
+
+    @app.get("/drafts/{draft_id:int}", response_class=HTMLResponse)
+    def draft_page(request: Request, draft_id: int) -> HTMLResponse:
+        draft, events, newest = request.app.state.drafts.get(draft_id)
+        context = {
+            "draft": draft,
+            "c": draft.content,
+            "events": events,
+            "newest": newest,
+            "reason_min": REASON_MIN,
+            "reason_max": REASON_MAX,
+            "decided_by_max": DECIDED_BY_MAX,
+        }
+        return templates.TemplateResponse(request, "draft.html", context)
+
+    @app.get("/drafts/{draft_id:int}.csv")
+    def draft_csv(request: Request, draft_id: int) -> Response:
+        draft, _events, _newest = request.app.state.drafts.get(draft_id)
+        if draft.kind != KIND_DAMAGED_HOUSES:
+            raise HTTPException(404, "Only damaged-houses drafts have a CSV.")
+        name = f"binan-damaged-houses-v{draft.version}-{draft.status}.csv"
+        return csv_response(damaged_houses_csv(draft.content), name)
+
+    @app.post("/drafts/{draft_id:int}/{action}")
+    async def decide_draft(request: Request, draft_id: int, action: str) -> RedirectResponse:
+        form = await form_fields(request)
+        request.app.state.drafts.decide(
+            draft_id, action, reason=form.get("reason"), decided_by=form.get("decided_by")
+        )
+        return RedirectResponse(f"/drafts/{draft_id}", status_code=303)
+
+    @app.get("/damaged-houses", response_class=HTMLResponse)
+    def damaged_houses_page(request: Request) -> HTMLResponse:
+        table = damaged_houses(request.app.state.drafts.evidence())
+        return templates.TemplateResponse(request, "damaged_houses.html", {"t": table})
+
+    @app.get("/damaged-houses.csv")
+    def damaged_houses_download(request: Request) -> Response:
+        table = damaged_houses(request.app.state.drafts.evidence())
+        name = f"binan-damaged-houses-{utcnow():%Y%m%d-%H%M}-utc.csv"
+        return csv_response(damaged_houses_csv(table), name)
 
     @app.get("/media/{media_id}")
     def media_file(request: Request, media_id: int) -> FileResponse:
