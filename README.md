@@ -142,7 +142,9 @@ changed definition reaches an existing database (a backfill that must update dec
 whole schema setup runs in one `BEGIN IMMEDIATE` transaction, so the bot and the web app can start together. The
 `/drafts` list and the draft page show when new evidence arrived after a version was generated, with a button that
 generates a new version keeping the officer's event details. Approval re-checks this inside its write transaction:
-approving a stale version needs an explicit confirmation (otherwise 409), and the audit row records `stale`. **There is no login yet** (planned):
+approving a stale version needs an explicit confirmation (otherwise 409), and the audit row records `stale`. A
+draft generated before the pending grouping-review bucket existed always counts as stale, since its totals may
+include pending figures. **There is no login yet** (planned):
 anyone who can reach the web app can approve, so it must only listen on localhost. Every state-changing request
 (generate, approve, reject) must be same-origin: when the browser sends an `Origin` or `Referer` header it must name
 this host, or the app answers 403, so another site open in the officer's browser cannot post to it. This is a
@@ -239,6 +241,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-29 | Review fix: evidence links to reports outside an incident open /reports around that report, so they work past the 200-report page; trust-signal links use the same target |
 | 2026-10-29 | Review fix (round 2): schema setup, including the trigger rebuild, runs in one BEGIN IMMEDIATE transaction, so the bot and the web app starting together cannot both drop the triggers |
 | 2026-10-29 | Review fix (round 2): every number in the 1.4 summary needs a label naming exactly one computed count; unlabelled numbers, people with no qualifier and "one of" followed by a count word are rejected |
+| 2026-10-29 | Review fix (round 2): open drafts generated before the pending grouping-review bucket count as stale, so approving one needs the confirmation and the page says why |
 
 ### Third-party code and assets
 

@@ -39,6 +39,7 @@ from app.drafts import (
     damaged_houses_csv,
     parse_event_at,
     pending_report_ids,
+    predates_pending_bucket,
 )
 from app.gazetteer import BY_NAME
 from app.meta.factory import make_agent_llm
@@ -414,6 +415,7 @@ def create_app(settings: Settings | None = None, *, summary_llm: AgentLLM | None
         context = {
             "draft": draft,
             "stale": request.app.state.drafts.is_stale(draft),
+            "predates_pending": predates_pending_bucket(draft),
             "event_at_local": draft.event_at and manila_time(draft.event_at).replace(" ", "T"),
             "c": draft.content,
             "events": events,

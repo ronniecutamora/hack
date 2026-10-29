@@ -444,6 +444,43 @@ def test_a_current_draft_is_approved_without_confirmation_and_rejection_never_ne
     assert decision_events(client, houses_id)[0].detail == {"stale": True}
 
 
+@pytest.mark.parametrize("kind", ["rdana", "damaged_houses"])
+def test_a_draft_made_before_the_pending_bucket_counts_as_stale(client, kind):
+    engine = client.app.state.engine
+    add_report(engine, incident=add_incident(engine), houses_partially_damaged=4)
+    if kind == "rdana":
+        current = generate(client)
+    else:
+        made = client.post("/drafts/damaged-houses", follow_redirects=False)
+        current = int(made.headers["location"].rsplit("/", 1)[1])
+    model = stored(client, current)
+    content = dict(model.content)
+    if kind == "rdana":
+        del content["pending_report_ids"]
+    else:
+        content["total"] = {k: v for k, v in content["total"].items() if k != "pending_report_ids"}
+    with Session(engine) as session:  # the same evidence, as the pre-fix code stored it
+        old = Draft(
+            kind=model.kind,
+            barangay=model.barangay,
+            version=model.version + 1,
+            content=content,
+            evidence_fingerprint=model.evidence_fingerprint,
+            created_at=model.created_at,
+        )
+        session.add(old)
+        session.commit()
+        old_id = old.id
+    assert "NEW EVIDENCE SINCE THIS VERSION" not in client.get(f"/drafts/{current}").text
+    assert "NEW EVIDENCE SINCE THIS VERSION" in client.get(f"/drafts/{old_id}").text
+    assert "before figures pending grouping review" in client.get(f"/drafts/{old_id}").text
+    refused = client.post(f"/drafts/{old_id}/approve", data={})
+    assert refused.status_code == 409 and "before figures pending grouping review" in refused.text
+    confirmed = client.post(f"/drafts/{old_id}/approve", data={"confirm_stale": "1"})
+    assert confirmed.status_code == 200 and stored(client, old_id).status == "approved"
+    assert decision_events(client, old_id)[0].detail == {"stale": True}
+
+
 # --- Same-origin check -------------------------------------------------------------------
 
 

@@ -102,7 +102,17 @@ def current_fingerprint(city: CityEvidence, kind: str, barangay: str | None) -> 
     return evidence.fingerprint() if evidence else None
 
 
+def predates_pending_bucket(draft: Draft) -> bool:
+    """Generated before figures pending grouping review were kept apart: its totals may count
+    them, so it is never current (see `is_stale`)."""
+    content = draft.content if draft.kind == KIND_RDANA else draft.content.get("total", {})
+    return "pending_report_ids" not in content
+
+
 def is_stale(draft: Draft, city: CityEvidence) -> bool:
+    """The evidence changed after the draft was generated, or it predates the pending bucket."""
+    if predates_pending_bucket(draft):
+        return True
     return draft.evidence_fingerprint != current_fingerprint(city, draft.kind, draft.barangay)
 
 
@@ -363,9 +373,15 @@ class DraftService:
                 )
             stale = is_stale(draft, collect(session))
             if status == DRAFT_APPROVED and stale and not confirm_stale:
+                why = (
+                    f"Version {draft.version} was generated before figures pending grouping "
+                    "review were kept out of the totals."
+                    if predates_pending_bucket(draft)
+                    else f"The evidence changed after version {draft.version} was generated."
+                )
                 raise DraftConflict(
-                    f"The evidence changed after version {draft.version} was generated. "
-                    "Generate a new version, or confirm that you approve this version as it is."
+                    f"{why} Generate a new version, or confirm that you approve this version "
+                    "as it is."
                 )
             pending = pending_report_ids(draft)
             if status == DRAFT_APPROVED and pending and len(reason or "") < REASON_MIN:
