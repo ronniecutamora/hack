@@ -3,7 +3,9 @@
 Run with: uv run uvicorn app.main:app --reload
 
 There is no login yet, so the app must only listen on localhost (uvicorn's default). Add
-authentication before exposing it anywhere: the pages show reports and photos.
+authentication before exposing it anywhere: the pages show reports and photos. Until then, every
+state-changing request must come from the app's own pages (a same-origin check), so another site
+open in the officer's browser cannot generate or approve drafts.
 """
 
 import mimetypes
@@ -12,7 +14,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qsl
+from urllib.parse import parse_qsl, urlsplit
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
@@ -54,6 +56,7 @@ from app.rdana import EventInput
 from app.trust import model_spend
 
 REPORT_LIMIT = 200
+STATE_CHANGING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 FORM_CONTENT_TYPE = "application/x-www-form-urlencoded"
 FORM_MAX_BYTES = 16_384
 
@@ -172,6 +175,20 @@ async def form_fields(request: Request) -> dict[str, str]:
     return dict(pairs)
 
 
+def foreign_origin(request: Request) -> str | None:
+    """The other site a request came from, or None when it is same-origin or does not say.
+
+    Browsers send Origin on a cross-site form POST (Referer when they do not); either one, when
+    present, must name this host. A request without both (curl, tests) is allowed: this is a
+    same-origin guard, not authentication.
+    """
+    host = request.headers.get("host", "").lower()
+    for header in ("origin", "referer"):
+        if (value := request.headers.get(header)) is not None:
+            return None if urlsplit(value).netloc.lower() == host else value
+    return None
+
+
 def create_app(settings: Settings | None = None, *, summary_llm: AgentLLM | None = None) -> FastAPI:
     """`summary_llm` replaces the configured agent LLM for RDANA summaries (tests, offline)."""
     settings = settings or get_settings()
@@ -189,6 +206,15 @@ def create_app(settings: Settings | None = None, *, summary_llm: AgentLLM | None
         app.state.engine.dispose()
 
     app = FastAPI(title="Typhoon damage reports", lifespan=lifespan)
+
+    @app.middleware("http")
+    async def same_origin_only(request: Request, call_next):
+        if request.method in STATE_CHANGING_METHODS and (origin := foreign_origin(request)):
+            message = f"Refused: this request came from another site ({origin[:100]})."
+            return templates.TemplateResponse(
+                request, "error.html", {"message": message}, status_code=403
+            )
+        return await call_next(request)
 
     @app.exception_handler(DraftError)
     async def draft_error(request: Request, exc: DraftError) -> HTMLResponse:

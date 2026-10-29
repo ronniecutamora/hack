@@ -136,7 +136,10 @@ changed definition reaches an existing database (a backfill that must update dec
 `/drafts` list and the draft page show when new evidence arrived after a version was generated, with a button that
 generates a new version keeping the officer's event details. Approval re-checks this inside its write transaction:
 approving a stale version needs an explicit confirmation (otherwise 409), and the audit row records `stale`. **There is no login yet** (planned):
-anyone who can reach the web app can approve, so it must only listen on localhost.
+anyone who can reach the web app can approve, so it must only listen on localhost. Every state-changing request
+(generate, approve, reject) must be same-origin: when the browser sends an `Origin` or `Referer` header it must name
+this host, or the app answers 403, so another site open in the officer's browser cannot post to it. This is a
+cross-site guard, not authentication.
 
 ## Demo
 
@@ -223,6 +226,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-29 | Review fix: figures from reports waiting for grouping review (`needs_officer`, grouping errors, never grouped) form a pending bucket beside each count and CSV row instead of being summed, with a draft banner and a required reason to approve |
 | 2026-10-29 | Review fix: the 1.4 summary validator is an allowlist of the confirmed computed counts, each matched to the words next to it; spelled numbers are read whole; times, dates, ordinals, report ids, vague amounts and unquoted place numbers are rejected, and the prompt asks for digits |
 | 2026-10-29 | Review fix: staleness is re-checked when a draft is approved: the draft page shows a new-evidence banner with a regenerate button, approving a stale version needs an explicit confirmation, and the audit records it |
+| 2026-10-29 | Review fix: a same-origin check on every state-changing request (an Origin or Referer for another host gets 403) until the dashboard has a login |
 
 ### Third-party code and assets
 

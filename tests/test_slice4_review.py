@@ -387,3 +387,35 @@ def test_a_current_draft_is_approved_without_confirmation_and_rejection_never_ne
     rejected = client.post(f"/drafts/{houses_id}/reject", data={"reason": "Counts changed"})
     assert rejected.status_code == 200 and stored(client, houses_id).status == "rejected"
     assert decision_events(client, houses_id)[0].detail == {"stale": True}
+
+
+# --- Same-origin check -------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("headers", "status"),
+    [
+        ({"Origin": "http://evil.example"}, 403),
+        ({"Origin": "null"}, 403),
+        ({"Origin": "http://testserver.evil.example"}, 403),
+        ({"Referer": "http://evil.example/drafts"}, 403),
+        ({"Origin": "http://testserver"}, 303),
+        ({"Referer": "http://testserver/drafts/1"}, 303),
+        ({}, 303),
+    ],
+)
+def test_state_changing_posts_must_be_same_origin(client, headers, status):
+    engine = client.app.state.engine
+    add_report(engine, incident=add_incident(engine), houses_partially_damaged=4)
+    draft_id = generate(client)
+    response = client.post(
+        f"/drafts/{draft_id}/approve", data={}, headers=headers, follow_redirects=False
+    )
+    assert response.status_code == status
+    assert stored(client, draft_id).status == ("draft" if status == 403 else "approved")
+    if status == 403:
+        assert "came from another site" in response.text
+    generated = client.post(
+        "/drafts", data={"barangay": "Malaban"}, headers=headers, follow_redirects=False
+    )
+    assert generated.status_code == status
