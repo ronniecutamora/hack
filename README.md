@@ -10,7 +10,27 @@
 
 ## The problem
 
-_TBD: one paragraph on who suffers, how much, and why now, with sourced numbers._
+The Philippines has the highest disaster risk of
+[193 countries in the WorldRiskReport 2026](https://www.welthungerhilfe.org/fileadmin/pictures/publications/en/studies_analysis/2026-worldriskreport-beh.pdf).
+[About 20 tropical cyclones a year](https://www.pagasa.dost.gov.ph/climate/tropical-cyclone-information) enter its
+area of responsibility, and 8 or 9 cross the country. Six storms in a row in October and November 2024 affected
+[more than 13 million people](https://reliefweb.int/report/philippines/philippines-six-tropical-cyclones-100-days-after-26-february-2025).
+
+Lake floods last. After Typhoon Ondoy in 2009, areas near the Laguna de Bay shore
+[stayed under water for more than a month](https://dil-opac.bosai.go.jp/publication/nied_natural_disaster/pdf/45/45-04E.pdf).
+Biñan sits on that shore. After Severe Tropical Storm Paeng in 2022, DSWD counted
+[2,088 affected families in Biñan on 4 November](https://dromic.dswd.gov.ph/wp-content/uploads/2022/11/DSWD-DROMIC-Report-20-on-Severe-Tropical-Storm-Paeng-as-of-04-November-2022-6PM.pdf),
+[20,087 on 18 November](https://dromic.dswd.gov.ph/wp-content/uploads/2022/11/DSWD-DROMIC-Report-40-on-Severe-Tropical-Storm-Paeng-as-of-18-November-2022-6AM.pdf),
+and [575 families still displaced on 24 December](https://dromic.dswd.gov.ph/wp-content/uploads/2022/12/DSWD-DROMIC-Report-68-on-Severe-Tropical-Storm-Paeng-as-of-24-December-2022-6AM.pdf).
+
+The bottleneck is paperwork. The city's disaster office has to turn scattered photos, calls and Taglish voice notes,
+by hand, into the RDANA Form 1
+([within 72 hours](https://ndrrmc.gov.ph/wp-content/uploads/2026/05/09-22-2021-NDRRMC-Memorandum-No.-107-s-2021-NDRRMC-Rapid-Damage-Assessment-Needs-Analysis-RDANA-Standard-Operating-Procedures.pdf)
+of the assessment team's deployment) and the damaged-houses counts that DSWD's DROMIC reports roll up. An insured
+fish farmer whose cage or pen was hit has
+[2 calendar days](https://pcic.gov.ph/wp-content/uploads/2024/09/Fisheries-Insurance-2024-V4.pdf) to send PCIC a
+written Notice of Loss. Because the water stays for weeks, the same streets are reported again and again. Ulat is a
+prototype for that gap; the city has not adopted it.
 
 ## What it does
 
@@ -545,6 +565,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-30 | Fix found in the staging restart check: a stored report is queued for assessment before the bot replies "received", so a reporter who blocked the bot (or a failed reply) no longer leaves it unassessed until the next restart |
 | 2026-10-30 | Fix found in the staging restart check: a restart that cuts off grouping after the facts were saved left the report assessed but never grouped; startup now also groups such reports (no new facts call) |
 | 2026-10-30 | Production deploy and license: Ulat went live on Modal at 13:30 Manila (app `ulat`, commit `8510536`, seeded with the synthetic scenario through the real pipeline), with @UlatPH_bot moved from local polling to the webhook and checked with a phone message; the project is released under the MIT License (`LICENSE`, `pyproject.toml` metadata) with third-party code and data keeping their own terms; the README gains the live URL, a 2-minute "try it" path for judges and corrections of lines the deploy made stale (login, local bot, retention, loss window) |
+| 2026-10-30 | README "The problem" section: the national, Laguna de Bay and Biñan picture and the 72-hour RDANA and 2-day PCIC deadlines, each figure linked to the primary source it was checked against (WorldRiskReport 2026, PAGASA, UN OCHA, NIED report No. 45, DSWD DROMIC reports #20, #40 and #68 on Paeng, NDRRMC Memo 107 s. 2021, the PCIC fisheries brochure) |
 
 ### Third-party code and assets
 
