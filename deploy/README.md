@@ -102,6 +102,10 @@ One container at 0.25 CPU and 512 MiB, always on: about $2.65 per 7 days at Moda
 
 Only after Ronnie's go. Staging must have passed the same steps first.
 
+**Done on 2026-10-30:** production went live at 13:30 Manila on commit `8510536`
+(<https://ronniecutamora47--ulat.modal.run>, @UlatPH_bot on the webhook, the local polling bot stopped), steps 1–8
+completed. Keep the list for a re-run, for example after rolling back to the local bot.
+
 1. `git status` clean on the commit to ship; the remote test runner is green.
 2. `uv run python -m app.deploy secrets --target production --yes` (generates the production webhook secret,
    passcode and session secret into `.env`).

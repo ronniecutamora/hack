@@ -1,8 +1,10 @@
-# (Project name TBD)
+# Ulat
 
 > An entry for the **Meta Global AI Developer Hackathon** (Oct 27 – Nov 4, 2026), built for the Philippines with Meta's Muse models.
 
-**Status:** building; slices 1–4 (intake, assessment/mapping, incident coordination, abuse guards, RDANA draft and officer approval) implemented and locally tested; slice 5 (fisheries Notice of Loss) implemented and tested with fake model clients. Typhoon and flood damage reporting for Philippine LGUs, plus fisheries insurance claims: one agent turns photos, Taglish voice notes, and texts from barangays and fisherfolk into an officer-approved RDANA report, a damaged-houses table, and a PCIC Notice of Loss for each fish cage or pen loss. Crop insurance (rice, corn) is later work. Demo area: Biñan City, Laguna.
+**Status:** live prototype. Since 2026-10-30 it runs on Modal: the officer dashboard at
+<https://ronniecutamora47--ulat.modal.run>, seeded with a synthetic typhoon scenario, and the Telegram bot
+[@UlatPH_bot](https://t.me/UlatPH_bot) (see [Demo](#demo)). It is a hackathon prototype, not a service of Biñan City. Typhoon and flood damage reporting for Philippine LGUs, plus fisheries insurance claims: one agent turns photos, Taglish voice notes, and texts from barangays and fisherfolk into an officer-approved RDANA report, a damaged-houses table, and a PCIC Notice of Loss for each fish cage or pen loss. Crop insurance (rice, corn) is later work. Demo area: Biñan City, Laguna.
 
 ---
 
@@ -209,12 +211,12 @@ whole schema setup runs in one `BEGIN IMMEDIATE` transaction, so the bot and the
 generates a new version keeping the officer's event details. Approval re-checks this inside its write transaction:
 approving a stale version needs an explicit confirmation (otherwise 409), and the audit row records `stale`. A
 draft generated before the pending grouping-review bucket existed always counts as stale, since its totals may
-include pending figures. **There is no login yet** (planned):
-anyone who can reach the web app can approve, so it must only listen on localhost. Every state-changing request
-(generate, approve, reject) must be same-origin: when the browser sends an `Origin` or `Referer` header it must name
-this host, or the app answers 403, so another site open in the officer's browser cannot post to it. The app also
-answers only to the host names in `ALLOWED_HOSTS` (default `localhost,127.0.0.1`; other names get 400), so a DNS
-rebinding site cannot pose as this host. These are cross-site guards, not authentication.
+include pending figures. **Who may approve:** every page and action sits behind the
+officer login (one shared passcode; see [Deploy](#deploy)); only a localhost dev server without `OFFICER_PASSCODE`
+runs without it. Every state-changing request (generate, approve, reject) must also be same-origin: when the
+browser sends an `Origin` or `Referer` header it must name this host, or the app answers 403, so another site open
+in the officer's browser cannot post to it. The app answers only to the host names in `ALLOWED_HOSTS` (default
+`localhost,127.0.0.1`; other names get 400), so a DNS rebinding site cannot pose as this host.
 
 ### Insurance: fisheries Notice of Loss
 
@@ -309,7 +311,8 @@ officer can:
 - **block or unblock the reporter**, with the same function as `python -m app.trust block`.
 
 Every override is an append-only `OfficerAction` row (database triggers refuse updates and deletes) with the officer's
-initials (required, at most 40 characters, until the deploy slice adds a login) and an optional note, written in the
+initials (required, at most 40 characters; prefilled from the initials typed at login, and self-declared, since the
+officers share one passcode) and an optional note, written in the
 same transaction as the change. A separate table rather than new `AgentDecision` kinds, because an officer also
 reviews signals and blocks reporters, which have no incident, and every row names a person; the incident page shows
 agent and officer entries together, labelled "Agent" and "Officer JDC". Overrides **stick**: a merge or keep-separate
@@ -322,9 +325,32 @@ cross-site posts get a 403.
 
 ## Demo
 
+- **Live officer dashboard:** <https://ronniecutamora47--ulat.modal.run> (production, on Modal since 2026-10-30).
+  It needs the officer passcode: judges get it in the submission's private judging notes. It starts with the
+  synthetic typhoon scenario below (no real people), plus whatever has been sent to the bot since.
+- **Telegram bot:** [@UlatPH_bot](https://t.me/UlatPH_bot). A prototype, not run or monitored by Biñan City: don't
+  use it for emergencies, **call 911**. Real messages are processed by Meta's models; raw photos and voice notes are
+  deleted after 24 hours (at most 72 while processing is paused by the spend cap).
 - Video (3 min): _TBD_
-- Live app: _TBD_
 - X post: _TBD_
+
+### Try it in 2 minutes
+
+1. Open the dashboard and sign in with the passcode (initials are optional). The overview shows the scenario's
+   incidents, the review queue, drafts, the filing deadline, a map and "Meta models at work" (the last 24 hours, so
+   it fills up once you send a report).
+2. Open **Incidents** and the Malaban flood: its timeline shows the water rising from ankle- to waist-deep and going
+   down again, the agent's reasons for grouping each report, and an **agent trace** per report (which Meta model ran
+   each step, its time and cost).
+3. Open **Drafts**: generate the RDANA draft for a barangay (one Spark 1.3 call writes its 1.4 summary; every number is
+   checked against the evidence) and approve or reject it. Then generate the San Antonio fish-pen **Notice of
+   Loss**: a red "PHOTO REUSED" banner links the De La Paz report that sent the same photo first. The filing clocks
+   count from when the scenario was seeded, so by now they may read "overdue".
+4. Message @UlatPH_bot from your phone, for example `Baha dito sa Malaban, hanggang tuhod, 3 bahay nasira`, or a
+   photo, voice note or location pin. It answers "received", then a summary of what the agent understood; the report
+   appears on the open dashboard live, mapped to its barangay. Reply to the summary to correct it.
+5. **Review** lists what the agent could not settle (an ambiguous place, a reused photo, a fallen tree to confirm);
+   **Accuracy** shows how often each model is right on the labelled sets.
 
 The synthetic scenario ([data/demo/scenario.json](data/demo/scenario.json), no real people) has 18 Taglish reports
 over two weeks after a fictional typhoon: a Malaban street flooding ankle-, knee-, then waist-deep and receding; a
@@ -349,10 +375,10 @@ Requires Python 3.12+, [uv](https://docs.astral.sh/uv/), and `ffmpeg` (voice not
 uv sync
 cp .env.example .env   # add META_API_KEY, TELEGRAM_BOT_TOKEN, PSEUDONYM_SALT (openssl rand -hex 32); BASETEN_API_KEY for Baseten; FIREWORKS_API_KEY for Fireworks
 # AGENT_LLM=muse-spark-1.3 (default); optional independent PAIR_JUDGE_LLM
-uv run python -m app.bot                  # Telegram intake bot (long polling)
+uv run python -m app.bot                  # Telegram intake bot (long polling; use your own bot's token: @UlatPH_bot is on the production webhook, and polling refuses to start while a webhook is set)
 uv run python -m app.bot_profile --dry-run  # bot name, descriptions and commands: print what would change
 uv run python -m app.bot_profile --photo    # apply only what differs, and upload assets/brand/ulat-avatar.png
-uv run uvicorn app.main:app --reload      # web app: / (overview), /map, /health, /reports, /incidents, /drafts, /damaged-houses (.csv), /media/<id>, live updates at /events (no login on localhost unless OFFICER_PASSCODE is set)
+uv run uvicorn app.main:app --reload      # web app: / (overview), /review, /incidents, /reports, /map, /drafts, /damaged-houses (.csv), /accuracy, /media/<id>, /health, live updates at /events (no login on localhost unless OFFICER_PASSCODE is set)
 uv run pytest                             # tests (all HTTP is mocked, no API calls)
 uv run ruff check . && uv run ruff format --check .
 ```
@@ -393,7 +419,7 @@ uv run python -m scripts.eval_facts /path/to/recordings [--llm muse-spark-open] 
 uv run python -m app.retention
 ```
 
-Model responses are cached on disk under `DATA_DIR/model_cache` when `MODEL_CACHE=true`, so repeated development runs do not spend credits. Raw photos, voice notes and photo overlays are deleted after `RAW_MEDIA_TTL_HOURS` (default 24), or up to `HELD_MEDIA_MAX_HOURS` (default 72 from media creation) while processing is paused by the spend cap. Blocked reporters use the normal TTL. Retention runs hourly and skips active assessments until processing finishes. The synthetic demo scenario's media (channel `demo`) is exempt: its photos are generated by Muse Image and stamped as such and its reporters are invented, so it holds no personal data, and a deployed demo would otherwise show "deleted after the retention period" on every demo photo the day after seeding. Every real channel is purged. Reports, transcripts and assessments are kept. The bot's bilingual `/start` privacy notice states both configured retention periods. Names that reporters say when introducing themselves ("Ako po si …") are redacted before any text reaches a model.
+Model responses are cached on disk under `DATA_DIR/model_cache` when `MODEL_CACHE=true`, so repeated development runs do not spend credits. Raw photos, voice notes and photo overlays are deleted after `RAW_MEDIA_TTL_HOURS` (default 24), or up to `HELD_MEDIA_MAX_HOURS` (default 72 from media creation) while processing is paused by the spend cap. Blocked reporters use the normal TTL. Retention runs hourly and skips the media of a report while it is being assessed (for at most an hour). The synthetic demo scenario's media (channel `demo`) is exempt: its photos are generated by Muse Image and stamped as such and its reporters are invented, so it holds no personal data, and a deployed demo would otherwise show "deleted after the retention period" on every demo photo the day after seeding. Every real channel is purged. Reports, transcripts and assessments are kept. The bot's bilingual `/start` privacy notice states both configured retention periods. Names that reporters say when introducing themselves ("Ako po si …") are redacted before any text reaches a model.
 
 ## Deploy
 
@@ -409,21 +435,24 @@ Ulat runs on [Modal](https://modal.com) as **one always-on container** (commands
 4. Staging (`ulat-staging`, @UlatPH_dev_bot) and production (`ulat`, @UlatPH_bot) have separate apps, secrets,
    volumes and pseudonym salts. A fresh volume seeds the synthetic demo through the real pipeline.
 5. The webhook is registered by an explicit command, never at startup, and local polling refuses to start while
-   a webhook is set, so the two never fight over the bot.
+   a webhook is set, so the two never fight over the bot. Production has run on the webhook since 2026-10-30; no
+   bot runs on the developer's machine.
 
 - **Cost:** about $2.65 per week for the container (0.25 CPU, 512 MiB, always on, at Modal's list rates of
   $0.0000131 per core-second and $0.00000222 per GiB-second: [modal.com/pricing](https://modal.com/pricing)), plus
   model calls, capped at $10 a day on the public instance (`DAILY_SPEND_CAP_USD`) on top of the per-reporter
   limits.
 - **Login:** every page and photo needs the officer passcode (report photos and texts are personal data under
-  RA 10173). Only `/health`, `/login`, the static files and the webhook are open. The passcode opens a signed, HttpOnly,
+  RA 10173). Only `/health`, `/login`, `/logout`, the static files and the webhook are open. The passcode opens a signed, HttpOnly,
   Secure, SameSite=Lax cookie for 12 hours; wrong passcodes are limited to 10 per 15 minutes per client address.
   Initials typed at login prefill the review forms; with a shared passcode they are self-declared.
-- **Durability and loss window:** a stop, redeploy or preemption takes a final snapshot first, so nothing is lost
-  (tested by force-stopping the staging container 4 seconds after a report arrived). A crash that skips shutdown
-  loses at most the last 2 minutes of database writes. Snapshots: the newest 15 plus one a day for a week.
-- **Judges:** open the URL in the Demo section and sign in with the passcode given in the submission's judging
-  notes. The dashboard starts with the synthetic typhoon scenario; messages to the bot appear on it live.
+- **Durability and loss window:** a stop, redeploy or preemption takes a final snapshot first, so nothing the bot
+  acknowledged is lost (measured on staging on 2026-10-30, see [deploy/README.md](deploy/README.md#durability)). A
+  crash that skips shutdown loses at most about 5 seconds of acknowledged reports, since the bot asks for a snapshot
+  after each update it handles, and at most the last 2 minutes of other database writes. Snapshots: the newest 15
+  plus one a day for a week.
+- **Judges:** see [Demo](#demo) for the URL, the bot and what to try; the passcode is in the submission's private
+  judging notes. Staging (`ulat-staging`, the dev bot) is for testing only and is not a public entry point.
 
 ## Built during the hackathon
 
@@ -515,6 +544,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-30 | Review fix: incident titles use the facts as the officer adjusted them (a ruled-out fallen tree leaves the title, a confirmed one joins the hazards), and a fallen-tree verdict refreshes its incident |
 | 2026-10-30 | Fix found in the staging restart check: a stored report is queued for assessment before the bot replies "received", so a reporter who blocked the bot (or a failed reply) no longer leaves it unassessed until the next restart |
 | 2026-10-30 | Fix found in the staging restart check: a restart that cuts off grouping after the facts were saved left the report assessed but never grouped; startup now also groups such reports (no new facts call) |
+| 2026-10-30 | Production deploy and license: Ulat went live on Modal at 13:30 Manila (app `ulat`, commit `8510536`, seeded with the synthetic scenario through the real pipeline), with @UlatPH_bot moved from local polling to the webhook and checked with a phone message; the project is released under the MIT License (`LICENSE`, `pyproject.toml` metadata) with third-party code and data keeping their own terms; the README gains the live URL, a 2-minute "try it" path for judges and corrections of lines the deploy made stale (login, local bot, retention, loss window) |
 
 ### Third-party code and assets
 
