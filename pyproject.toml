@@ -2,6 +2,9 @@
 name = "hackathon-app"
 version = "0.1.0"
 requires-python = ">=3.12"
+# PEP 639: SPDX expression; third-party code and data keep their own terms (README).
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = [
     "fastapi>=0.162.0",
     "httpx>=0.28.1",

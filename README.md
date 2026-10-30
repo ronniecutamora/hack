@@ -556,6 +556,7 @@ Data:
 AGENTS.md              Instructions for AI coding agents (Muse Code, Claude Code, …)
 .agents/skills/        Provider notes for coding agents: baseten, fireworks, modal (SKILL.md each)
 README.md              This file
+LICENSE                MIT License for the project's own code
 pyproject.toml         Python project and tool config (uv)
 .env.example           Names of the environment variables (no secrets)
 app/
@@ -620,4 +621,13 @@ tests/                 Mocked-HTTP tests and synthetic dedupe_pairs.json (64 lab
 
 ## License
 
-_TBD (choose before submission; the repo must be public)._
+The code and documentation in this repository are released under the [MIT License](LICENSE), Copyright (c) 2026
+Ronnie Cutamora.
+
+The MIT License covers only what was written for this project. Everything listed under
+[Third-party code and assets](#third-party-code-and-assets) keeps its own terms: the Python libraries and the
+vendored Leaflet and htmx files (their licenses are in the table, and the vendored copies keep their LICENSE files),
+the OCHA COD-AB boundaries (CC BY-IGO, credit to OCHA, PSA and NAMRIA), the OpenStreetMap tiles (ODbL, "©
+OpenStreetMap contributors"), the Wikimedia Commons eval photos (CC BY, CC BY-SA or public domain per photo; not in
+this repository, credited by author above) and the bot avatar (see its row). Meta's models are used through their
+APIs under Meta's terms and are not part of this repository.
