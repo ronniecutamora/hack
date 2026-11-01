@@ -37,6 +37,7 @@ ICONS = (
     "close",
     "download",
     "error",
+    "filter_alt_off",
     "info",
     "logout",
     "print",

@@ -438,6 +438,8 @@ div.chip, p.chip { display: block; width: fit-content; margin: var(--space-1) 0;
 .status-assessed { color: var(--md-ext-color-success); }
 .status-assessment_failed, .status-transcription_failed { color: var(--md-sys-color-error); }
 .status-assessing, .status-new, .status-held { color: var(--md-ext-color-warning); }
+/* A message screened out as not a report: a neutral chip, the officer may restore it. */
+.chip.status-chip { background: var(--md-sys-color-surface-container-high); border-color: transparent; color: var(--md-sys-color-on-surface-variant); }
 
 .banner {
   padding: var(--space-3) var(--space-4); border-radius: var(--md-sys-shape-corner-medium); margin: var(--space-3) 0;

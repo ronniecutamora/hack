@@ -4,8 +4,11 @@ import re
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlmodel import Session
 
+from app.intake import IntakeService
 from app.main import NAV, create_app, nav_current, static_url
+from app.models import STATUS_NOT_A_REPORT, Report
 from app.nav import NAV_BAR_MAX, PRIMARY, SECONDARY, more_current
 from scripts.build_icons import ICONS, NAV_ICONS
 
@@ -129,3 +132,28 @@ def test_pages_and_assets_are_compressed_fonts_are_not(client):
         assert client.get(url, headers=gzip).headers.get("content-encoding") == "gzip", url
     font = client.get("/static/vendor/roboto/roboto-latin-wght.woff2", headers=gzip)
     assert "content-encoding" not in font.headers  # already compressed
+
+
+async def test_a_screened_out_message_shows_a_chip_and_can_be_restored_from_reports(
+    settings, client
+):
+    intake = IntakeService(settings, client.app.state.engine)
+    report = await intake.ingest_text(333, "hello po")
+    with Session(client.app.state.engine) as session:
+        row = session.get(Report, report.id)
+        row.status = STATUS_NOT_A_REPORT
+        row.screening = {
+            "source": "rule",
+            "verdict": "no",
+            "code": "greeting",
+            "reason": "a greeting",
+        }
+        session.add(row)
+        session.commit()
+    html = client.get("/reports").text
+    assert 'filter_alt_off"></use></svg>not a report</span>' in html and "a greeting" in html
+    assert f'action="/reports/{report.id}/review/restore"' in html
+    done = client.post(
+        f"/reports/{report.id}/review/restore", data={"officer": "JDC", "next": "/review"}
+    )
+    assert done.status_code == 200 and "restored as a report" in done.text

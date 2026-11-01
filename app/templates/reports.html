@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "_trust.html" import signal_chips %}
 {% from "_trace.html" import agent_trace %}
+{% from "_icons.html" import icon %}
 {% block content %}
 <div id="live-reports" data-live="reports spend">
   <header>
@@ -88,7 +89,22 @@
             {% endfor %}
           </td>
           <td data-label="Status">
+            {% if r.status == "not_a_report" %}
+              {# Screened out (app.screening): kept for the officer, never counted; restoring it re-runs the pipeline. #}
+              <span class="chip status-chip">{{ icon("filter_alt_off") }}not a report</span>
+              {% if r.screening and r.screening.reason %}<div class="muted">{{ r.screening.reason }}</div>{% endif %}
+              <details class="review-group">
+                <summary>Restore as a report</summary>
+                <form method="post" action="/reports/{{ r.id }}/review/restore" data-done="Report #{{ r.id }} restored: the agent assesses it again">
+                  <input type="hidden" name="next" value="/review">
+                  <label>Your initials <input type="text" name="officer" required maxlength="{{ REVIEW_LIMITS.officer }}" autocomplete="off" value="{{ current_officer() }}" placeholder="e.g. JDC, CDRRMO"></label>
+                  <label>Note (optional) <textarea name="note" rows="2" maxlength="{{ REVIEW_LIMITS.note }}"></textarea></label>
+                  <button type="submit">Restore report #{{ r.id }}</button>
+                </form>
+              </details>
+            {% else %}
             <span class="status-{{ r.status }}">{{ r.status|replace("_", " ") }}</span>
+            {% endif %}
             {% if r.status == 'held' and r.hold_reason %}<div class="chip warn">{{ r.hold_reason }}</div>{% endif %}
             {% if r.incident_id %}<div><a href="/incidents/{{ r.incident_id }}">Incident #{{ r.incident_id }}</a></div>{% else %}<div class="muted">Not grouped yet</div>{% endif %}
             {% if r.grouping_error %}<div class="error">Grouping needs officer review: {{ r.grouping_error }}</div>{% endif %}
