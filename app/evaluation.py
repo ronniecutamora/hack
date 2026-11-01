@@ -3,11 +3,13 @@
 import re
 import string
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 import jiwer
+
+from app.gazetteer import normalize as normalize_place
 
 # Apostrophes are dropped (don't -> dont); every other punctuation mark becomes a space.
 _PUNCT = re.compile(f"[{re.escape(string.punctuation.replace(chr(39), ''))}]")
@@ -29,6 +31,15 @@ def corpus_word_error_rate(pairs: list[tuple[str, str]]) -> float:
     references = [normalize_text(ref) for ref, _ in pairs]
     hypotheses = [normalize_text(hyp) for _, hyp in pairs]
     return jiwer.wer(references, hypotheses)
+
+
+def names_heard(names: Iterable[str], text: str) -> int:
+    """How many of `names` occur in `text` as whole words, ignoring case, accents and punctuation.
+
+    A name counts only when it was transcribed with its spelling ("Talimusak", not "Talimosak").
+    """
+    haystack = f" {normalize_place(text)} "
+    return sum(bool(n) and f" {n} " in haystack for n in map(normalize_place, names))
 
 
 def cohen_kappa(labels: Sequence[str], predictions: Sequence[str]) -> float:

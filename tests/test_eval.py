@@ -51,11 +51,14 @@ def test_script_end_to_end_with_mocked_api(tmp_path, monkeypatch, settings, caps
         return_value=httpx.Response(200, json={"transcript": "baha na", "audioDurationMs": 5})
     )
 
-    assert eval_transcribe.main([str(tmp_path)]) == 0
+    assert eval_transcribe.main([str(tmp_path), "--yes"]) == 0
 
     out = capsys.readouterr().out
-    assert "clip.wav" in out and "orphan" not in out
-    assert "33.3%" in out and "OVERALL" in out
+    rows = [line.split() for line in out.splitlines()]
+    # One WER per setting; without place labels the "own place names" setting is not run.
+    assert ["clip", "33.3%", "33.3%", "33.3%", "3"] in rows
+    assert not any(row and row[0] == "orphan" for row in rows)
+    assert "1 notes, 3 reference words" in out
 
 
 def test_cohen_kappa_perfect_chance_and_partial():
