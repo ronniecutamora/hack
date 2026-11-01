@@ -12,7 +12,8 @@ from app.evaluation import names_heard
 from app.gazetteer import transcription_keywords
 from app.intake import LANGUAGE_BIAS
 from app.meta.base import MetaError
-from app.meta.transcribe import MODEL
+from app.meta.factory import make_transcriber
+from app.meta.transcribe import MODEL, PRICE_PER_AUDIO_HOUR
 from scripts import eval_transcribe
 from tests.test_intake import FakeTranscriber
 
@@ -171,3 +172,19 @@ def test_a_record_must_match_its_dataset(recordings, capsys, extra, message):
     args = [str(folder), "--yes", "--record", str(results), *dataset, *extra]
     assert eval_transcribe.main(args) == 2
     assert message in capsys.readouterr().err
+
+
+async def test_the_dry_run_prices_every_uncached_call_by_its_audio(recordings, settings):
+    folder, _ = recordings
+    notes = [(a.stem, r.read_text(), a) for a, r in eval_transcribe.find_pairs(folder)]
+    labels = eval_transcribe.place_labels(folder)
+    transcriber = make_transcriber(settings)
+    try:
+        usd, detail = await eval_transcribe.estimate_cost(
+            notes, eval_transcribe.SETTINGS, labels, transcriber
+        )
+    finally:
+        await transcriber.aclose()
+    # 2 notes x 4 settings, about 1 s of audio each: nothing is called, every miss is priced.
+    assert detail == "8 uncached call(s), 8 s of audio"
+    assert usd == pytest.approx(8 * 32_004 / 32_000 / 3600 * PRICE_PER_AUDIO_HOUR)

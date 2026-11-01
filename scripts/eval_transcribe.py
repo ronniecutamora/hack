@@ -197,7 +197,6 @@ async def evaluate(
     labels: dict[str, list[str]],
     transcriber: Transcriber,
     stop: Callable[[], bool] = lambda: False,
-    misses: Callable[[], int] = lambda: 0,
     echo: Callable[[str], None] = print,
 ) -> tuple[list[Scored], int, int]:
     """Transcribe every (id, reference, audio) note under every setting; print per-note WERs.
@@ -215,24 +214,29 @@ async def evaluate(
             skipped += 1
             echo(f"{note:12} skipped: the spend cap was reached")
             continue
-        before = misses()
-        try:
-            hypotheses = [
-                await transcribe_file(
-                    transcriber,
-                    audio,
-                    language_bias=s.language_bias,
-                    keywords=s.keyword_list(all_places),
+        # Every setting is tried even after one fails, so a dry run prices all the misses.
+        hypotheses: list[str] = []
+        problems: list[Exception] = []
+        for s in settings:
+            try:
+                hypotheses.append(
+                    await transcribe_file(
+                        transcriber,
+                        audio,
+                        language_bias=s.language_bias,
+                        keywords=s.keyword_list(all_places),
+                    )
                 )
-                for s in settings
-            ]
-        except (MetaError, AudioConversionError) as exc:
-            if misses() > before:
-                skipped += 1
-                echo(f"{note:12} skipped: not cached")
-            else:
-                failed += 1
-                echo(f"{note:12} failed: {exc}")
+            except (MetaError, AudioConversionError) as exc:
+                problems.append(exc)
+        real = [p for p in problems if not isinstance(p, UncachedCallError)]
+        if real:
+            failed += 1
+            echo(f"{note:12} failed: {real[0]}")
+            continue
+        if problems:
+            skipped += 1
+            echo(f"{note:12} skipped: not cached")
             continue
         places = labels.get(note, [])
         for result, hypothesis in zip(scored, hypotheses, strict=True):
@@ -361,9 +365,7 @@ async def run(args: argparse.Namespace) -> int:
     try:
         if args.cached_only:
             with spend.probe(transcriber):
-                scored, failed, skipped = await evaluate(
-                    notes, settings, labels, transcriber, misses=lambda: spend.misses(transcriber)
-                )
+                scored, failed, skipped = await evaluate(notes, settings, labels, transcriber)
         else:
             estimate, detail = await estimate_cost(notes, settings, labels, transcriber)
             if not ledger.approve(estimate, detail):
