@@ -38,6 +38,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import Engine
 from sqlmodel import Session, col, select
 from starlette.concurrency import run_in_threadpool
+from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from telegram.ext import Application
 
@@ -437,6 +438,9 @@ def create_app(
             )
         return await call_next(request)
 
+    # Pages, styles and scripts travel compressed (a slow phone connection loads a page several
+    # times faster); Starlette never compresses the event stream, photos or fonts.
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
     # Added last, so it runs first: a request for another host name never reaches a route.
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

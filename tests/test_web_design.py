@@ -121,3 +121,11 @@ def test_print_rules_hide_the_dashboard_chrome(client):
     print_rules = css[css.index("@media print") :]
     assert ".app-bar" in print_rules and ".nav" in print_rules and ".no-print" in print_rules
     assert "@page { size: A4" in css
+
+
+def test_pages_and_assets_are_compressed_fonts_are_not(client):
+    gzip = {"Accept-Encoding": "gzip"}
+    for url in ("/drafts", static_url("css/app.css"), static_url("js/app.js")):
+        assert client.get(url, headers=gzip).headers.get("content-encoding") == "gzip", url
+    font = client.get("/static/vendor/roboto/roboto-latin-wght.woff2", headers=gzip)
+    assert "content-encoding" not in font.headers  # already compressed
