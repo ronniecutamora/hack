@@ -142,7 +142,7 @@ Measured on labelled sets with real (cached) model calls, not mocks. Every numbe
 
 | Model | Dataset | n | Precision | Recall | Real reports wrongly filtered | Non-reports filtered | By the free rule | Screening calls | Date |
 |---|---|---|---|---|---|---|---|---|---|
-| muse-spark-1.3 | Synthetic bot messages (synthetic) | 56 | 0.97 | 1.00 | 0 | 25 of 26 | 20 | 5 | 2026-11-02 |
+| muse-spark-1.3 | Synthetic bot messages (synthetic) | 60 | 0.94 | 1.00 | 0 | 28 of 30 | 20 | 8 | 2026-11-02 |
 
 <!-- eval-results:end -->
 
@@ -155,14 +155,13 @@ Read these numbers with their caveats:
 - **SAM calls the lake "floodwater".** On the synthetic lakeshore scenes, SAM's floodwater precision is 0.28: Laguna de Bay itself, fish-pen water and an irrigated paddy are masked as floodwater. For a lakeshore city, the SAM floodwater mask is evidence for the officer; the LLM's judgment (floodwater F1 0.90 / 0.95 there) decides.
 - **Spark Open is close to Spark 1.3** on photos and equal on pairs, which is what the open-weight mode needs.
 - **The screen kept every real report** on 60 synthetic Telegram-style messages (30 reports, many very short or
-  typo-heavy, and 30 non-reports): 0 real reports wrongly filtered, recall 1.00, precision 0.97. The free rule
-  dropped 20 non-reports with no model call; 5 more were screened out by Muse Spark after the facts call found
-  nothing; one ("Sino may charger ng Samsung dyan?") was kept because the facts call read it as a request for help
-  ("needs: other"), which the precision-first policy keeps on purpose. 4 of the 30 non-reports (n22, n24, n26, n27)
-  are not scored: the run reached its $0.30 spend cap first. The messages are synthetic; residents' own will be
-  messier.
+  typo-heavy, and 30 non-reports): 0 real reports wrongly filtered, recall 1.00, precision 0.94. The free rule
+  dropped 20 non-reports with no model call; 8 more were screened out by Muse Spark after the facts call found
+  nothing. Two were kept because the facts call read them as requests for help ("needs: other"): "Sino may charger
+  ng Samsung dyan?" and "pa-load naman po 50". The precision-first policy keeps such messages on purpose. The
+  messages are synthetic; residents' own will be messier.
 - Spend for the photo and pair runs, including the 40 generated images: $1.93 at list prices, from the eval call
-  log; the screen run added $0.31.
+  log; the screen runs added $0.35.
 
 ## Spam and fake reports
 

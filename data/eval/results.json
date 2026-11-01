@@ -479,27 +479,28 @@
       "backend": "Meta Model API",
       "sam": null,
       "date": "2026-11-02",
-      "commit": "d700da230e38",
-      "n": 56,
-      "errors": 4,
+      "commit": "085a7f97d114",
+      "n": 60,
+      "errors": 0,
       "metrics": {
-        "precision": 0.9677,
+        "precision": 0.9375,
         "recall": 1.0,
-        "f1": 0.9836,
+        "f1": 0.9677,
         "tp": 30,
-        "fp": 1,
+        "fp": 2,
         "fn": 0,
-        "tn": 25,
+        "tn": 28,
         "wrongly_filtered": 0,
-        "non_reports_filtered": 25,
+        "non_reports_filtered": 28,
         "rule_filtered": 20,
-        "model_calls": 5,
+        "model_calls": 8,
         "unsure": 0,
         "miss_ids": [
-          "n19"
+          "n19",
+          "n24"
         ]
       },
-      "spend_usd": 0.3083
+      "spend_usd": 0.3524
     }
   ]
 }
