@@ -32,6 +32,14 @@
       "label_source": "report / not_report labels written with each message by the builder, 2026-11-02",
       "n": 60,
       "location": "data/eval/screen_messages.json (text only, synthetic, no real people)"
+    },
+    "voice-notes-8": {
+      "title": "Taglish voice notes",
+      "provenance": "real",
+      "source": "8 voice notes recorded on a phone by the builder on 2026-10-27 (notes 3-10 of 10; notes 1 and 2 were read from shorter scripts than their references and are left out): one speaker reading written Taglish scripts in the roles of barangay officials, farmers and fisherfolk, with invented names and places. Read speech, not field recordings: no wind, rain, crowd noise or second speaker",
+      "label_source": "references are the scripts read, corrected against the audio by the builder on 2026-10-27; place-name labels (8 barangays, 2 sitios) from the same notes' fact labels",
+      "n": 8,
+      "location": "outside this repo (the builder's own voice: only aggregate metrics are committed)"
     }
   },
   "entries": [
@@ -501,6 +509,74 @@
         ]
       },
       "spend_usd": 0.3524
+    },
+    {
+      "task": "transcribe",
+      "dataset": "voice-notes-8",
+      "model": "muse-voice-transcribe-1.0",
+      "model_id": "muse-voice-transcribe-1.0",
+      "backend": "Meta Model API",
+      "sam": null,
+      "date": "2026-11-02",
+      "commit": "d6d121092781",
+      "n": 8,
+      "errors": 0,
+      "metrics": {
+        "reference_words": 399,
+        "production": "barangays",
+        "settings": {
+          "no_hint": {
+            "label": "No language hint",
+            "language_bias": null,
+            "keywords": "none",
+            "keyword_count": 0,
+            "wer": 0.193,
+            "wer_clean": 0.1654,
+            "place_names_heard": 3,
+            "place_names": 10
+          },
+          "language_hint": {
+            "label": "Language hint (Tagalog, English)",
+            "language_bias": [
+              "Tagalog",
+              "English"
+            ],
+            "keywords": "none",
+            "keyword_count": 0,
+            "wer": 0.198,
+            "wer_clean": 0.1654,
+            "place_names_heard": 3,
+            "place_names": 10
+          },
+          "barangays": {
+            "label": "Hint + Biñan's barangay names",
+            "language_bias": [
+              "Tagalog",
+              "English"
+            ],
+            "keywords": "barangays",
+            "keyword_count": 29,
+            "wer": 0.2155,
+            "wer_clean": 0.183,
+            "place_names_heard": 3,
+            "place_names": 10
+          },
+          "barangays_and_places": {
+            "label": "Hint + barangay names + the notes' own place names",
+            "language_bias": [
+              "Tagalog",
+              "English"
+            ],
+            "keywords": "barangays+places",
+            "keyword_count": 39,
+            "wer": 0.1629,
+            "wer_clean": 0.1504,
+            "place_names_heard": 10,
+            "place_names": 10
+          }
+        }
+      },
+      "spend_usd": 0.0201
     }
   ]
 }
