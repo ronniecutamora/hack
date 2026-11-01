@@ -32,6 +32,7 @@ STEP_LABELS_IN_ORDER = [
     "Judge photo damage",
     "Find roofs (SAM)",
     "Find floodwater (SAM)",
+    "Screen the message",
     "Find the barangay",
     "Check trust signals",
     "Group into an incident",
@@ -69,7 +70,9 @@ async def test_the_report_trace_lists_the_steps_in_order_with_model_latency_cach
 
     positions = [trace.index(label) for label in STEP_LABELS_IN_ORDER]
     assert positions == sorted(positions)
-    assert trace.count("Meta model</span>") == 4 and trace.count("Rule, no model") == 3
+    # The screen is a rule step here: the facts state a flood, so no screening call is made.
+    assert trace.count("Meta model</span>") == 4 and trace.count("Rule, no model") == 4
+    assert "a report (it states report facts)" in trace
     assert "<code>fake-llm</code>" in trace and "<code>fake-sam</code>" in trace
     assert "5 ms · live call · $0.0100" in trace  # the facts call: latency, cache, cost
     assert "7 ms · live call · $0.0025" in trace  # each SAM call
@@ -79,7 +82,7 @@ async def test_the_report_trace_lists_the_steps_in_order_with_model_latency_cach
     assert "started incident #1" in trace
     assert "Total: 4 Meta model calls (0 from cache)" in trace
     assert "$0.0250 estimated" in trace  # 0.01 + 0.01 + 2 x 0.0025
-    assert "Agent trace <span" in trace and "7 steps · 4 Meta model calls" in trace
+    assert "Agent trace <span" in trace and "8 steps · 4 Meta model calls" in trace
 
 
 async def test_the_pair_judgment_shows_its_call_beside_the_decision(settings, client):

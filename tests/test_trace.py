@@ -60,7 +60,13 @@ def test_every_step_is_listed_once_with_a_label_and_an_actor():
     assert set(STEPS) == set(Step) and list(STEP_ORDER) == list(Step)
     assert {info.actor for info in STEPS.values()} == {"model", "rule"}
     rules = {step for step, info in STEPS.items() if info.actor == "rule"}
-    assert rules == {Step.CLEANUP, Step.GEOLOCATE, Step.TRUST, Step.GROUPING_RULE}
+    assert rules == {
+        Step.SCREEN_RULE,
+        Step.CLEANUP,
+        Step.GEOLOCATE,
+        Step.TRUST,
+        Step.GROUPING_RULE,
+    }
 
 
 def test_contexts_nest_and_reset():

@@ -28,6 +28,7 @@ from app.models import (
     STATUS_ASSESSED,
     STATUS_HELD,
     STATUS_NEW,
+    STATUS_NOT_A_REPORT,
     STATUS_TRANSCRIPTION_FAILED,
     Media,
     Report,
@@ -35,6 +36,7 @@ from app.models import (
     utcnow,
 )
 from app.privacy import pseudonymize
+from app.screening import NUDGE_SKIP_AFTER_REPORT, Attachments, counted, rule_screen
 from app.trace import Step, traced
 from app.trust import HASH_UNAVAILABLE, HOLD_BLOCKED, hold_reason, photo_hash
 
@@ -51,6 +53,9 @@ CAPTION_JOIN_WINDOW = timedelta(minutes=2)
 # The photos join one report (one situation, one assessment, one acknowledgement), so a text
 # sent after a caption-less album captions all of it through the caption join above.
 ALBUM_JOIN_WINDOW = timedelta(minutes=2)
+# A caption, pin or album photo joining a finished report makes it "new" again, so it is
+# re-assessed and re-grouped; one screened out as not a report is screened again with it.
+REOPEN_STATUSES = (STATUS_ASSESSED, STATUS_NOT_A_REPORT)
 
 ConvertFn = Callable[[Path, Path], Awaitable[list[Path]]]
 
@@ -105,8 +110,28 @@ class IntakeService:
         # Serialize admission through storage, including slow downloads, for Telegram albums.
         self._admission_locks: WeakValueDictionary[str, asyncio.Lock] = WeakValueDictionary()
 
+    def pseudonym(self, user_ref: int | str) -> str:
+        return pseudonymize(self.settings.pseudonym_salt.get_secret_value(), user_ref)
+
+    def reported_recently(self, pseudonym: str, *, exclude: int | None = None) -> bool:
+        """The reporter sent a real report (not screened out) within NUDGE_SKIP_AFTER_REPORT."""
+        with self._session() as session:
+            return (
+                session.exec(
+                    select(Report.id)
+                    .join(Reporter, col(Reporter.id) == Report.reporter_id)
+                    .where(
+                        Reporter.pseudonym == pseudonym,
+                        counted(),
+                        Report.id != (exclude or 0),
+                        Report.received_at > utcnow() - NUDGE_SKIP_AFTER_REPORT,
+                    )
+                ).first()
+                is not None
+            )
+
     def admission_lock(self, user_ref: int | str) -> asyncio.Lock:
-        key = pseudonymize(self.settings.pseudonym_salt.get_secret_value(), user_ref)
+        key = self.pseudonym(user_ref)
         lock = self._admission_locks.get(key)
         if lock is None:
             lock = asyncio.Lock()
@@ -115,7 +140,7 @@ class IntakeService:
 
     def admit(self, user_ref: int | str) -> Admission:
         """Bot-only volume guard. Direct ingest (demo, imports, tests) stays unrestricted."""
-        pseudonym = pseudonymize(self.settings.pseudonym_salt.get_secret_value(), user_ref)
+        pseudonym = self.pseudonym(user_ref)
         with self._session() as session:
             reporter = session.exec(select(Reporter).where(Reporter.pseudonym == pseudonym)).first()
             if reporter is None:
@@ -185,7 +210,7 @@ class IntakeService:
     def _can_attach(
         self, user_ref: int | str, find: Callable[[Session, int], Report | None]
     ) -> bool:
-        pseudonym = pseudonymize(self.settings.pseudonym_salt.get_secret_value(), user_ref)
+        pseudonym = self.pseudonym(user_ref)
         with self._session() as session:
             reporter = session.exec(select(Reporter).where(Reporter.pseudonym == pseudonym)).first()
             return (
@@ -212,7 +237,7 @@ class IntakeService:
         return Session(self.engine, expire_on_commit=False)
 
     def _reporter(self, session: Session, user_ref: int | str) -> Reporter:
-        pseudonym = pseudonymize(self.settings.pseudonym_salt.get_secret_value(), user_ref)
+        pseudonym = self.pseudonym(user_ref)
         reporter = session.exec(select(Reporter).where(Reporter.pseudonym == pseudonym)).first()
         if reporter is None:
             reporter = Reporter(pseudonym=pseudonym)
@@ -267,7 +292,11 @@ class IntakeService:
         corrects_report_id: int | None = None,
     ) -> Report:
         """Store a text report. `corrects_report_id` marks it as a correction of the sender's own
-        earlier report (a reply to its summary); another reporter's report is never linked."""
+        earlier report (a reply to its summary); another reporter's report is never linked.
+
+        The free screening rule runs here (app.screening): a text that is only a greeting, a
+        test, laughter, emoji or keyboard mash is stored as "not a report" and never queued for
+        a model. A blocked reporter's text stays held."""
         text = text.strip()
         if not text:
             raise ValueError("text report is empty")
@@ -278,6 +307,9 @@ class IntakeService:
                 if earlier is not None and earlier.reporter_id == report.reporter_id:
                     report.corrects_report_id = earlier.id
                     session.add(report)
+            if report.status == STATUS_NEW and (dropped := rule_screen(text, Attachments())):
+                report.status, report.screening = STATUS_NOT_A_REPORT, dropped.as_dict()
+                session.add(report)
             session.commit()
             return report
 
@@ -292,7 +324,7 @@ class IntakeService:
         text = text.strip()
         if not text:
             return None
-        pseudonym = pseudonymize(self.settings.pseudonym_salt.get_secret_value(), user_ref)
+        pseudonym = self.pseudonym(user_ref)
         with self._session() as session:
             reporter = session.exec(select(Reporter).where(Reporter.pseudonym == pseudonym)).first()
             if reporter is None or reporter.blocked:
@@ -301,7 +333,7 @@ class IntakeService:
             if report is None:
                 return None
             report.text = text
-            if report.status == STATUS_ASSESSED:
+            if report.status in REOPEN_STATUSES:
                 report.status = STATUS_NEW
             session.add(report)
             session.commit()
@@ -331,7 +363,7 @@ class IntakeService:
             else:
                 if caption and not report.text:
                     report.text = caption
-                if report.status == STATUS_ASSESSED:
+                if report.status in REOPEN_STATUSES:
                     report.status = STATUS_NEW
                 session.add(report)
             self._store_media(session, report, "photo", data, ext, phash=phash)
@@ -398,7 +430,7 @@ class IntakeService:
             report = None if reporter.blocked else self._location_target(session, reporter.id)
             if report is None:
                 report = self._new_report(session, user_ref, channel)
-            elif report.status == STATUS_ASSESSED:
+            elif report.status in REOPEN_STATUSES:
                 # A new pin needs remapping even when the spend gate delays processing.
                 report.status = STATUS_NEW
             report.lat, report.lon = lat, lon

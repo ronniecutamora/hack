@@ -199,7 +199,7 @@ templates.env.globals["REVIEW_LIMITS"] = {
 }
 
 # Officer review actions (POST /reports/{id}/review/{action}) and the pages they return to.
-REVIEW_ACTIONS = ("merge", "keep", "place", "signal", "tree", "block", "unblock")
+REVIEW_ACTIONS = ("merge", "keep", "place", "signal", "tree", "block", "unblock", "restore")
 REVIEW_RETURN = re.compile(r"/review|/incidents/\d+")
 DONE_MESSAGES = {
     "merge": "merged into incident #{incident}",
@@ -209,6 +209,7 @@ DONE_MESSAGES = {
     "tree": "fallen tree reviewed",
     "block": "reporter blocked: their new messages are held",
     "unblock": "reporter unblocked",
+    "restore": "restored as a report and sent through the pipeline again",
 }
 templates.env.globals["output_label"] = output_label
 templates.env.globals["deadline_table"] = deadline_table
@@ -405,6 +406,8 @@ def create_app(
             if snapshots is not None:  # an acknowledged report is in a snapshot within seconds
                 application.bot_data["after_update"] = snapshots.request
             await start_upkeep(application)  # the retention purge, whether or not Telegram starts
+            # A restored message is assessed at once by the bot's own assessor (app.review).
+            app.state.review.assessor = application.bot_data.get("assessor")
             secret = settings.telegram_webhook_secret.get_secret_value()
             app.state.telegram = TelegramWebhook(application, secret)
             await app.state.telegram.start()
@@ -735,6 +738,8 @@ def create_app(
                     officer=officer,
                     note=note,
                 )
+            elif action == "restore":
+                incident = await service.restore(report_id, officer=officer, note=note)
             elif action == "tree":
                 incident = await run_in_threadpool(
                     service.review_fallen_tree,

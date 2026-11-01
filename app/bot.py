@@ -34,9 +34,10 @@ from app.db import init_db, make_engine, make_recorder
 from app.intake import Admission, IntakeService
 from app.logs import configure_logging
 from app.meta.factory import make_transcriber
-from app.models import STATUS_HELD, Assessment, Incident, Report
+from app.models import STATUS_HELD, STATUS_NOT_A_REPORT, Assessment, Incident, Report, Reporter
 from app.reporter_summary import Acknowledgements, summary_text
 from app.retention import purge_loop
+from app.screening import NudgeLimiter
 
 logger = logging.getLogger(__name__)
 
@@ -137,6 +138,16 @@ TOO_LARGE = (
 # Images sent as files keep their EXIF GPS (normal photos are stripped by Telegram).
 IMAGE_DOCUMENT_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
 MAX_DOWNLOAD_BYTES = 20 * 1024 * 1024  # Bot API download limit
+# The reply to a message screened out as not a report (app.screening), and to stickers and GIFs:
+# what makes a report, never "rejected". At most one per reporter per NUDGE_INTERVAL_S.
+NOT_A_REPORT_NUDGE = (
+    "Salamat sa mensahe! Para maging report ito, sabihin po kung saan (barangay, purok o "
+    "location pin) at ano ang nangyari (hal. baha hanggang tuhod, nasirang bubong), o "
+    "magpadala ng larawan o voice note. Kung emergency, tumawag sa 911. / "
+    "Thanks for your message! To make it a report, tell us where (barangay, purok or a "
+    "location pin) and what happened (e.g. knee-deep flood, a damaged roof), or send a photo "
+    "or a voice note. For emergencies, call 911."
+)
 ERROR_REPLY = (
     "May problema sa pagproseso. Subukan ulit mamaya. / "
     "Something went wrong. Please try again later."
@@ -145,6 +156,15 @@ ERROR_REPLY = (
 
 def _intake(context: ContextTypes.DEFAULT_TYPE) -> IntakeService:
     return context.application.bot_data["intake"]
+
+
+def _nudge(application: Application, pseudonym: str, *, exclude: int | None = None) -> str | None:
+    """The not-a-report nudge, or None when this reporter had one recently or sent a real report
+    recently (`exclude` is the screened-out message itself)."""
+    if application.bot_data["intake"].reported_recently(pseudonym, exclude=exclude):
+        return None
+    nudges: NudgeLimiter | None = application.bot_data.get("nudges")
+    return NOT_A_REPORT_NUDGE if nudges is None or nudges.allow(pseudonym) else None
 
 
 class Inflight:
@@ -215,7 +235,7 @@ def _assess_later(
     tell them what was understood (when acknowledgements are on and `message` is given)."""
     application = context.application
     assessor = application.bot_data.get("assessor")
-    if assessor is None or report.status == STATUS_HELD:
+    if assessor is None or report.status in (STATUS_HELD, STATUS_NOT_A_REPORT):
         return
     acks: Acknowledgements | None = application.bot_data.get("acks")
     generation = acks.touch(report.id, message) if acks and message is not None else None
@@ -239,8 +259,12 @@ async def _assess_and_acknowledge(
     message = acks.due(report_id, generation)
     if message is None:
         return
-    text = reporter_summary(application.bot_data["intake"].engine, report_id)
-    if text is None:  # held, blocked or failed: the reporter already has "received"
+    engine = application.bot_data["intake"].engine
+    if report.status == STATUS_NOT_A_REPORT:  # the model screened it out: say what a report needs
+        text = _nudge(application, _pseudonym_of(engine, report.reporter_id), exclude=report_id)
+    else:
+        text = reporter_summary(engine, report_id)
+    if text is None:  # held, blocked, failed or nudged recently: the reporter has "received"
         return
     try:
         sent = await _with_retries(lambda: message.reply_text(text))
@@ -259,6 +283,11 @@ async def _stored(
     _assess_later(context, report, message)
     if reply is not None:
         await _reply(message, reply)
+
+
+def _pseudonym_of(engine: object, reporter_id: int) -> str:
+    with Session(engine) as session:
+        return session.get(Reporter, reporter_id).pseudonym
 
 
 def reporter_summary(engine: object, report_id: int) -> str | None:
@@ -328,9 +357,13 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     report = await intake.ingest_text(
         update.effective_user.id, message.text, corrects_report_id=corrects
     )
-    await _stored(
-        context, report, message, CORRECTION_RECEIVED if report.corrects_report_id else RECEIVED
-    )
+    if report.status == STATUS_NOT_A_REPORT:  # the free rule screened it out: no model call
+        reply = _nudge(
+            context.application, intake.pseudonym(update.effective_user.id), exclude=report.id
+        )
+    else:
+        reply = CORRECTION_RECEIVED if report.corrects_report_id else RECEIVED
+    await _stored(context, report, message, reply)
 
 
 def _joins_album(intake: IntakeService, user_ref: int, message: object) -> bool:
@@ -390,6 +423,13 @@ async def on_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await _stored(context, report, message, LOCATION_RECEIVED)
 
 
+async def on_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Stickers and GIFs carry nothing a report needs: not stored, answered with the nudge."""
+    pseudonym = _intake(context).pseudonym(update.effective_user.id)
+    if (reply := _nudge(context.application, pseudonym)) is not None:
+        await _reply(update.effective_message, reply)
+
+
 async def _after_update(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """After every update's handler: the deploy asks for a database snapshot here, so a report
     the bot acknowledged survives a crash that skips the shutdown snapshot (bot_data
@@ -416,6 +456,9 @@ def add_handlers(application: Application) -> None:
     application.add_handler(MessageHandler(private & filters.Document.IMAGE, on_image_document))
     application.add_handler(MessageHandler(private & filters.VOICE, on_voice))
     application.add_handler(MessageHandler(private & filters.LOCATION, on_location))
+    application.add_handler(
+        MessageHandler(private & (filters.Sticker.ALL | filters.ANIMATION), on_sticker)
+    )
     application.add_handler(TypeHandler(Update, _after_update), group=AFTER_UPDATE_GROUP)
     application.add_error_handler(on_error)
 
@@ -462,6 +505,7 @@ def build_application(
     application.bot_data["assessor"] = assessor
     application.bot_data["acks"] = Acknowledgements()  # in memory only: chats are never stored
     application.bot_data["inflight"] = Inflight()
+    application.bot_data["nudges"] = NudgeLimiter()  # in memory only, like acks
     add_handlers(application)
     return application
 

@@ -4,6 +4,7 @@ Run in the background by the bot after each message, and from the command line:
     uv run python -m app.assessment --report 12
     uv run python -m app.assessment --pending
     uv run python -m app.assessment --all --llm muse-spark-open
+    uv run python -m app.assessment --screen     # the free screening rule only, no model call
 
 Model calls are cached, so re-assessing (after a location pin arrives, or to compare LLMs) costs
 nothing for unchanged inputs. No database transaction is held across a model call: a write
@@ -30,7 +31,13 @@ from app.db import init_db, make_engine, make_recorder
 from app.facts import extract_facts
 from app.gazetteer import Barangay, find_in_text
 from app.geo import barangay_at, exif_gps
-from app.incidents import IncidentService, coordination, observations, rollup
+from app.incidents import (
+    IncidentService,
+    coordination,
+    observations,
+    refresh_incidents,
+    rollup,
+)
 from app.intake import ConvertFn, IntakeService, Transcriber
 from app.meta.base import MetaError, Recorder
 from app.meta.factory import (
@@ -48,7 +55,9 @@ from app.models import (
     STATUS_ASSESSMENT_FAILED,
     STATUS_HELD,
     STATUS_NEW,
+    STATUS_NOT_A_REPORT,
     STATUS_TRANSCRIPTION_FAILED,
+    AgentDecision,
     Assessment,
     Incident,
     Media,
@@ -58,6 +67,19 @@ from app.models import (
     utcnow,
 )
 from app.photo import assess_photo
+from app.screening import (
+    Attachments,
+    Screening,
+    counted,
+    kept_without_model,
+    no_words,
+    officer_vouched,
+    photo_cues,
+    rule_screen,
+    screen_with_model,
+    unsure_signal,
+    vouched,
+)
 from app.trace import Step, traced
 from app.transcript_cleanup import clean_transcript
 from app.trust import compute_signals, hold_reason, pending_photo_hashes, photo_taken_at
@@ -130,6 +152,53 @@ def officer_place(report: Report, geo: GeoResult) -> tuple[str, str | None]:
         return geo.source, geo.detail
     found = geo.barangay.name if geo.barangay else "no barangay"
     return "officer", f"set by an officer; the agent found {found} ({geo.source})"
+
+
+def attachments(session: Session, report: Report) -> Attachments:
+    """What came with the report's words (photo judgments are added by the assessment)."""
+    kinds = session.exec(
+        select(Media.kind).where(
+            Media.report_id == report.id, col(Media.kind).in_(("photo", "voice"))
+        )
+    ).all()
+    return Attachments(
+        photos=kinds.count("photo"), voice="voice" in kinds, location=report.lat is not None
+    )
+
+
+def screen_out(session: Session, report: Report, screening: Screening) -> None:
+    """Mark the report "not a report" (kept, never deleted). If it was in an incident, it
+    leaves it, the incident's rollup is recomputed and the grouping audit says why."""
+    report.status = STATUS_NOT_A_REPORT
+    report.screening = screening.as_dict()
+    report.hold_reason = None
+    old = report.incident_id
+    report.incident_id = None
+    report.grouping_fingerprint = report.grouping_error = None
+    report.grouping_needs_officer = False
+    session.add(report)
+    session.flush()
+    if old is not None:
+        session.add(
+            AgentDecision(
+                kind="screened_out",
+                report_id=report.id,
+                incident_id=old,
+                judge_model=screening.model,
+                decision="not_a_report",
+                reason=f"Screened out as not a disaster report: {screening.reason}.",
+            )
+        )
+        refresh_incidents(session, {old})
+
+
+def rule_screened(session: Session, report: Report) -> Screening | None:
+    """The free rule's verdict on a stored report; None keeps it (or an officer vouched)."""
+    if officer_vouched(report):
+        return None
+    return rule_screen(
+        "\n".join(t for t in (report.text, report.transcript) if t), attachments(session, report)
+    )
 
 
 @dataclass
@@ -208,6 +277,11 @@ class AssessmentService:
                     return None
                 if only_if is not None and report.status not in only_if:
                     return report
+                # The free rule first: a message it drops never reaches a model.
+                if (dropped := rule_screened(session, report)) is not None:
+                    screen_out(session, report, dropped)
+                    session.commit()
+                    return report
                 reason = hold_reason(session, report, self.settings)
                 if reason:
                     if report.status == STATUS_ASSESSED:
@@ -275,6 +349,7 @@ class AssessmentService:
                 ).first()
                 is not None
             )
+            found = attachments(session, report)
             report.status = STATUS_ASSESSING
             report.assessing_started_at = utcnow()
             report.hold_reason = None
@@ -345,8 +420,57 @@ class AssessmentService:
             errors.append("raw media expired while held")
         if untranscribed_voice:  # part of the report is missing: not "assessed"
             errors.insert(0, "voice note not transcribed")
+        screening = None
+        if not errors:
+            screening = await self._screen(report, text, facts, found, outcomes)
         inputs = (report.text, report.lat, report.lon, photo_ids)
-        return self._save(report_id, transcript, facts, geo, outcomes, errors, inputs)
+        return self._save(report_id, transcript, facts, geo, outcomes, errors, inputs, screening)
+
+    async def _screen(
+        self,
+        report: Report,
+        text: str,
+        facts: dict[str, Any] | None,
+        found: Attachments,
+        outcomes: list["_PhotoOutcome"],
+    ) -> Screening | None:
+        """The model stage of screening (app.screening). It asks the model only when the facts
+        state nothing a report states and no photo shows damage, and never once an officer
+        vouched for the report."""
+        if officer_vouched(report):
+            return vouched()
+        if not text.strip():
+            return no_words()
+        judgments = self._photo_judgments(report.id, outcomes)
+        found = Attachments(
+            photos=len(judgments) or found.photos,
+            photo_cues=photo_cues(list(judgments.values())) if judgments else None,
+            voice=found.voice,
+            location=found.location,
+        )
+        kept = kept_without_model(facts, found, correction=report.corrects_report_id is not None)
+        if kept is not None:
+            return kept
+        with traced(step=Step.SCREEN):
+            return await screen_with_model(self.llm, text, found)
+
+    def _photo_judgments(
+        self, report_id: int, outcomes: list["_PhotoOutcome"]
+    ) -> dict[int, dict[str, Any] | None]:
+        """Each photo's judgment: this pass's, else the stored one (a purged photo keeps its
+        earlier judgment); None for a photo without one."""
+        with self._session() as session:
+            media = session.exec(
+                select(Media.id).where(Media.report_id == report_id, Media.kind == "photo")
+            ).all()
+            stored = {
+                p.media_id: p.judgment
+                for p in session.exec(
+                    select(PhotoAssessment).where(PhotoAssessment.report_id == report_id)
+                ).all()
+            }
+        fresh = {o.media_id: o.judgment for o in outcomes}
+        return {m: fresh[m] if m in fresh else stored.get(m) for m in media}
 
     async def _facts(self, text: str) -> tuple[dict[str, Any] | None, str | None]:
         try:
@@ -385,10 +509,12 @@ class AssessmentService:
         outcomes: list[_PhotoOutcome],
         errors: list[str],
         inputs: tuple[str | None, float | None, float | None, tuple[int, ...]],
+        screening: Screening | None = None,
     ) -> Report:
         """Store the results. `inputs` are the report's text, pin and photos this pass read: if
         a late caption, pin or album photo changed them meanwhile, the report stays "new" (not
-        grouped) and the re-assessment queued with that change finishes it."""
+        grouped) and the re-assessment queued with that change finishes it. A `screening` of
+        "no" screens the report out instead of marking it assessed; "unsure" flags it."""
         # Legacy hashing reads files/decodes images, so finish it before any SQLite write.
         hashes = pending_photo_hashes(self.engine, self.settings)
         with self._session() as session:
@@ -415,12 +541,20 @@ class AssessmentService:
             assessment.signals = compute_signals(
                 session, report, self.settings, transcript=transcript
             )
+            if screening is not None and screening.verdict == "unsure":
+                assessment.signals.append(unsure_signal(screening))
             session.add(assessment)
             if report.officer_barangay is None:
                 report.barangay = geo.barangay.name if geo.barangay else None
+            if screening is not None:
+                report.screening = screening.as_dict()
             current = (report.text, report.lat, report.lon, self._photo_ids(session, report_id))
             if current != inputs:
                 report.status = STATUS_NEW
+            elif screening is not None and screening.filtered:
+                screen_out(session, report, screening)
+                session.commit()
+                return report
             else:
                 report.status = STATUS_ASSESSMENT_FAILED if errors else STATUS_ASSESSED
             session.add(report)
@@ -540,6 +674,23 @@ def resumable_report_ids(engine: Engine, limit: int) -> tuple[list[int], int]:
     return list(reversed(newest)), total
 
 
+def screen_existing(engine: Engine) -> list[int]:
+    """Apply the free screening rule to every stored report (no model call): the messages
+    sent before the filter existed ("test", "hahaha") leave their incidents and counts. A report
+    being assessed right now is skipped; its own assessment applies the rule. Idempotent."""
+    with Session(engine, expire_on_commit=False) as session:
+        session.connection().exec_driver_sql("BEGIN IMMEDIATE")
+        dropped = []
+        for report in session.exec(
+            select(Report).where(counted(), Report.status != STATUS_ASSESSING).order_by(Report.id)
+        ).all():
+            if (screening := rule_screened(session, report)) is not None:
+                screen_out(session, report, screening)
+                dropped.append(report.id)
+        session.commit()
+    return dropped
+
+
 async def _none() -> tuple[None, None]:
     return None, None
 
@@ -566,6 +717,10 @@ async def _cli(args: argparse.Namespace) -> int:
         settings = settings.model_copy(update={"agent_llm": args.llm})
     engine = make_engine(settings)
     init_db(engine)
+    if getattr(args, "screen", False):
+        dropped = screen_existing(engine)
+        print(f"screened out {len(dropped)} report(s) as not reports: {dropped or '-'}")
+        return 0
     recorder = make_recorder(engine)
     transcriber = make_transcriber(settings, recorder)
     assessor = make_assessor(settings, engine, recorder, transcriber=transcriber)
@@ -594,6 +749,9 @@ def main(argv: list[str] | None = None) -> int:
         "--pending", action="store_true", help="new, failed or eligible held reports"
     )
     which.add_argument("--all", action="store_true", help="every report")
+    which.add_argument(
+        "--screen", action="store_true", help="the free screening rule on every report, no model"
+    )
     parser.add_argument("--llm", choices=list(LLM_BACKENDS), help="override AGENT_LLM")
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s %(message)s")
     return asyncio.run(_cli(parser.parse_args(argv)))

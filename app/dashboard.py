@@ -10,8 +10,18 @@ from sqlmodel import Session, col, func, select
 
 from app.deadlines import Countdown
 from app.drafts import DraftService
-from app.models import DRAFT_OPEN, STATUS_HELD, Assessment, Incident, ModelCall, Report, utcnow
+from app.models import (
+    DRAFT_OPEN,
+    STATUS_HELD,
+    STATUS_NOT_A_REPORT,
+    Assessment,
+    Incident,
+    ModelCall,
+    Report,
+    utcnow,
+)
 from app.review import queue
+from app.screening import counted
 from app.trace import ModelFamily, model_family
 from app.trust import SPEND_WINDOW, model_spend
 
@@ -142,7 +152,9 @@ def overview(session: Session, drafts: DraftService, now: datetime) -> dict[str,
         session.exec(select(Report.status, func.count()).group_by(Report.status)).all()
     )
     recent = session.exec(
-        select(func.count()).select_from(Report).where(Report.received_at > now - REPORT_WINDOW)
+        select(func.count())
+        .select_from(Report)
+        .where(Report.received_at > now - REPORT_WINDOW, counted())
     ).one()
     attention = sorted(
         (i for i in incidents if needs_attention(i)),
@@ -152,6 +164,7 @@ def overview(session: Session, drafts: DraftService, now: datetime) -> dict[str,
         session.exec(
             select(Report, Assessment)
             .join(Assessment, col(Assessment.report_id) == Report.id, isouter=True)
+            .where(counted())
             .order_by(col(Report.received_at).desc(), col(Report.id).desc())
             .limit(LATEST_REPORTS)
         ).all()
@@ -163,7 +176,9 @@ def overview(session: Session, drafts: DraftService, now: datetime) -> dict[str,
         # The /review queue, counted by the same helper as that page.
         "review_total": len(waiting),
         "review_grouping": sum(1 for card in waiting if card.grouping),
-        "reports_total": sum(report_counts.values()),
+        # Messages screened out as not reports are not reports (app.screening).
+        "reports_total": sum(report_counts.values()) - report_counts.get(STATUS_NOT_A_REPORT, 0),
+        "not_reports": report_counts.get(STATUS_NOT_A_REPORT, 0),
         "reports_recent": recent,
         "reports_held": report_counts.get(STATUS_HELD, 0),
         "drafts_open": sum(1 for d in history if d.status == DRAFT_OPEN),

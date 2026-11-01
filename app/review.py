@@ -7,7 +7,9 @@ flags trust evidence and cannot see fallen trees. The officer resolves each of t
   one when its incident has other reports, which undoes a wrong merge);
 - set or correct its barangay (with a reason), after which it is grouped again;
 - review a trust signal (genuine or a problem) and confirm or rule out a fallen tree;
-- block or unblock the reporter, with the same function as `python -m app.trust`.
+- block or unblock the reporter, with the same function as `python -m app.trust`;
+- restore a message the agent screened out as not a report (app.screening): it goes through
+  the normal pipeline again, and screening never overrules the officer afterwards.
 
 Every override is one append-only `OfficerAction` row (triggers reject updates and deletes),
 written in the same transaction as the state it changes, so the audit and the state never
@@ -23,7 +25,7 @@ dashboard sees the new audit row: nothing here notifies anyone.
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Protocol
 
 from sqlalchemy import Engine, func
 from sqlmodel import Session, col, select
@@ -42,11 +44,13 @@ from app.models import (
     OFFICER_FALLEN_TREE,
     OFFICER_KEPT_SEPARATE,
     OFFICER_MERGED,
+    OFFICER_RESTORED,
     OFFICER_SET_PLACE,
     OFFICER_SIGNAL_REVIEWED,
     OFFICER_SPLIT,
     OFFICER_UNBLOCKED,
     STATUS_ASSESSED,
+    STATUS_NEW,
     AgentDecision,
     Assessment,
     Incident,
@@ -55,6 +59,7 @@ from app.models import (
     Report,
     Reporter,
 )
+from app.screening import counted, is_not_a_report
 from app.trust import flagging, set_blocked, signal_key
 
 OFFICER_MAX = 40  # initials or a short designation
@@ -74,6 +79,7 @@ ACTION_LABELS = {
     OFFICER_FALLEN_TREE: "fallen tree reviewed",
     OFFICER_BLOCKED: "reporter blocked",
     OFFICER_UNBLOCKED: "reporter unblocked",
+    OFFICER_RESTORED: "restored as a report by the officer",
 }
 
 
@@ -275,7 +281,7 @@ def queue(session: Session) -> list[ReviewCard]:
             candidates.add(report_id)
     ordered = session.exec(
         select(Report.id)
-        .where(col(Report.id).in_(candidates))
+        .where(col(Report.id).in_(candidates), counted())
         .order_by(col(Report.received_at).desc(), col(Report.id).desc())
     ).all()
     cards = [c for c in review_cards(session, list(ordered)) if c.needs_review]
@@ -303,12 +309,20 @@ def timeline(session: Session, incident_id: int) -> list[dict[str, Any]]:
     return sorted(entries, key=lambda e: (e["at"], e["order"]))
 
 
-class ReviewService:
-    """The officer's overrides. `incidents` re-groups a report after its place is set."""
+class Assessor(Protocol):
+    async def assess(self, report_id: int) -> Report | None: ...
 
-    def __init__(self, engine: Engine, incidents: IncidentService) -> None:
+
+class ReviewService:
+    """The officer's overrides. `incidents` re-groups a report after its place is set;
+    `assessor` (the bot's, when the web app runs it) assesses a restored message at once."""
+
+    def __init__(
+        self, engine: Engine, incidents: IncidentService, assessor: Assessor | None = None
+    ) -> None:
         self.engine = engine
         self.incidents = incidents
+        self.assessor = assessor
 
     @contextmanager
     def _write(self) -> Iterator[Session]:
@@ -538,3 +552,37 @@ class ReviewService:
             except ValueError as exc:
                 raise ReviewError(str(exc)) from exc
         return report.incident_id
+
+    async def restore(
+        self, report_id: int, *, officer: str | None, note: str | None = None
+    ) -> int | None:
+        """Put back a message screened out as not a report. It becomes "new" and goes through
+        the normal pipeline (screening, facts, photos, place, grouping), and screening never
+        drops it again (`Report.officer_restored`). Without an assessor here (the bot runs as
+        its own process) it waits as "new": the bot resumes it at its next start, or run
+        `python -m app.assessment --pending`. Returns its incident once grouped."""
+        officer = officer_name(officer)
+        note = clean(note, label="Note", max_length=NOTE_MAX)
+        with self._write() as session:
+            report = self._report(session, report_id)
+            if not is_not_a_report(report):
+                raise ReviewError(
+                    f"Report #{report_id} was not screened out, so there is nothing to restore."
+                )
+            screening = report.screening or {}
+            report.officer_restored = True
+            report.status = STATUS_NEW
+            session.add(report)
+            session.add(
+                OfficerAction(
+                    kind=OFFICER_RESTORED,
+                    report_id=report_id,
+                    officer=officer,
+                    note=note,
+                    detail={k: screening.get(k) for k in ("source", "code", "model")},
+                )
+            )
+        if self.assessor is None:
+            return None
+        assessed = await self.assessor.assess(report_id)
+        return assessed.incident_id if assessed is not None else None

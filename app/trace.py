@@ -28,12 +28,14 @@ from app.meta.transcribe import MODEL as TRANSCRIBE_MODEL
 class Step(StrEnum):
     """Pipeline steps in the order the agent runs them for one report (drafts last)."""
 
+    SCREEN_RULE = "screen_rule"
     TRANSCRIBE = "transcribe"
     CLEANUP = "cleanup"
     FACTS = "facts"
     PHOTO_JUDGE = "photo_judge"
     SAM_ROOF = "sam_roof"
     SAM_FLOODWATER = "sam_floodwater"
+    SCREEN = "screen"
     GEOLOCATE = "geolocate"
     TRUST = "trust"
     GROUPING_RULE = "grouping_rule"
@@ -51,12 +53,16 @@ class StepInfo:
 
 
 STEPS: dict[Step, StepInfo] = {
+    # Screening (app.screening): the free rule, and the model verdict asked only when the facts
+    # state nothing a report states. Same label, so a report shows one "Screen the message".
+    Step.SCREEN_RULE: StepInfo("Screen the message", "rule"),
     Step.TRANSCRIBE: StepInfo("Transcribe the voice note", "model"),
     Step.CLEANUP: StepInfo("Clean the transcript", "rule"),
     Step.FACTS: StepInfo("Read the facts", "model"),
     Step.PHOTO_JUDGE: StepInfo("Judge photo damage", "model"),
     Step.SAM_ROOF: StepInfo("Find roofs (SAM)", "model"),
     Step.SAM_FLOODWATER: StepInfo("Find floodwater (SAM)", "model"),
+    Step.SCREEN: StepInfo("Screen the message", "model"),
     Step.GEOLOCATE: StepInfo("Find the barangay", "rule"),
     Step.TRUST: StepInfo("Check trust signals", "rule"),
     Step.GROUPING_RULE: StepInfo("Group into an incident", "rule"),

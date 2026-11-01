@@ -39,6 +39,7 @@ from app.models import (
     Report,
 )
 from app.pair_judge import judge_pair, redacted_place, report_context
+from app.screening import is_not_a_report
 from app.trace import Step, traced
 from app.trust import flagging, signal_key
 
@@ -372,6 +373,8 @@ def is_flagged(report_id: int, signals: list[dict] | None, reviews: dict) -> boo
 
 
 def observations(session: Session) -> dict[int, Observation]:
+    """Every assessed report as grouping, counting and the map see it. A message screened out
+    as not a report is never one of them (app.screening)."""
     signal_reviews, tree_reviews = officer_reviews(session)
     assessments = {a.report_id: a for a in session.exec(select(Assessment)).all()}
     photos: defaultdict[int, list[PhotoAssessment]] = defaultdict(list)
@@ -379,7 +382,7 @@ def observations(session: Session) -> dict[int, Observation]:
         photos[photo.report_id].append(photo)
     result = {}
     for report in session.exec(select(Report).order_by(Report.received_at, Report.id)).all():
-        if report.id not in assessments:
+        if report.id not in assessments or is_not_a_report(report):
             continue
         facts = assessments[report.id].facts or {}
         point = None

@@ -14,6 +14,9 @@ STATUS_ASSESSING = "assessing"
 STATUS_ASSESSED = "assessed"
 STATUS_ASSESSMENT_FAILED = "assessment_failed"  # partial results are still saved
 STATUS_HELD = "held"
+# Screened out as not a disaster report (keyboard mash, "test", "hahaha", spam): kept for the
+# officer, who can restore it, but never grouped, counted, drafted or mapped (app.screening).
+STATUS_NOT_A_REPORT = "not_a_report"
 
 # Report.channel of the synthetic demo scenario (app.demo): generated reports, photos and
 # reporters, no real person's data. Retention keeps its media; real channels are purged.
@@ -66,6 +69,10 @@ class Report(SQLModel, table=True):
     # The same reporter's earlier report this one corrects: they replied to the bot's summary of
     # it ("Mali? I-reply ang tamang detalye."). Grouping routes it there by rule.
     corrects_report_id: int | None = Field(default=None, foreign_key="report.id")
+    # Why the message was or was not screened out as not a report (app.screening.Screening),
+    # and the officer's restore, which screening then always obeys (an OfficerAction records it).
+    screening: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON))
+    officer_restored: bool = False
 
 
 class Media(SQLModel, table=True):
@@ -169,6 +176,7 @@ OFFICER_SIGNAL_REVIEWED = "officer_signal_reviewed"
 OFFICER_FALLEN_TREE = "officer_fallen_tree"
 OFFICER_BLOCKED = "officer_blocked"
 OFFICER_UNBLOCKED = "officer_unblocked"
+OFFICER_RESTORED = "officer_restored"  # a message screened out as not a report, put back
 
 
 class OfficerAction(SQLModel, table=True):

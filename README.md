@@ -40,7 +40,7 @@ prototype for that gap; the city has not adopted it.
 4. The agent drafts each barangay's RDANA form and the city's damaged-houses table from that evidence; the officer checks every value against its linked reports, then approves or rejects the draft (see [Officer outputs](#officer-outputs)).
 5. For each incident of fish cage, fish pen or fishpond damage, the agent drafts the fisherfolk's PCIC Notice of Loss with an evidence annex for the adjuster and counts down its 2-day filing deadline; the officer approves it for filing, and the assured files it (see [Insurance: fisheries Notice of Loss](#insurance-fisheries-notice-of-loss)). Crop insurance is later work.
 
-Every report on `/reports` and on its incident timeline has an expandable **agent trace**: each pipeline step in order (transcribe, read the facts, judge each photo, SAM roofs and floodwater, find the barangay, check trust signals, group into an incident) with the Meta model that ran it, its latency, whether it came from the cache and its estimated cost, next to the one-line result it produced ("roof damage: partial", "2 roofs found", "barangay Malaban (photo GPS)", "different from incident #2, 96% → kept apart, in incident #3"). Deterministic steps are labelled "Rule, no model", officer overrides follow as "Officer" steps, and the totals give the report's model time and cost. The trace shows only derived results the dashboard already shows, never prompts, replies or the officer's notes. An RDANA draft page lists the model calls that wrote its summary. Reports assessed before 2026-10-30 say "trace not recorded". How often each model is right is on the dashboard's `/accuracy` page (see [How well it works](#how-well-it-works)).
+Every report on `/reports` and on its incident timeline has an expandable **agent trace**: each pipeline step in order (transcribe, read the facts, judge each photo, SAM roofs and floodwater, screen the message, find the barangay, check trust signals, group into an incident) with the Meta model that ran it, its latency, whether it came from the cache and its estimated cost, next to the one-line result it produced ("roof damage: partial", "2 roofs found", "barangay Malaban (photo GPS)", "different from incident #2, 96% → kept apart, in incident #3"). Deterministic steps are labelled "Rule, no model", officer overrides follow as "Officer" steps, and the totals give the report's model time and cost. The trace shows only derived results the dashboard already shows, never prompts, replies or the officer's notes. An RDANA draft page lists the model calls that wrote its summary. Reports assessed before 2026-10-30 say "trace not recorded". How often each model is right is on the dashboard's `/accuracy` page (see [How well it works](#how-well-it-works)).
 
 ## Meta models used
 
@@ -88,6 +88,34 @@ joins its incident by rule, even when it names no place ("dalawa lang po"). **Pr
 it lives only in the bot process's memory (inside the message being answered), so after a restart pending summaries
 are skipped and replies to older summaries are ordinary reports. Rate limits are unchanged.
 
+**Not a report? A kind nudge, not a report.** Weekend tests of the live bot showed "test", "hahaha", keyboard mash,
+emoji and stickers becoming reports on the dashboard. Every message is now screened before it can become one
+([app/screening.py](app/screening.py)), precision first, because dropping one real "baha dito, tulong" is worse than
+a dashboard full of "hahaha":
+
+1. **A free rule, no model call.** A text made only of emoji, punctuation, keyboard mash ("asdfghjkl", "jsjsjs"),
+   laughter, a greeting, thanks or "test" is stored as `not_a_report` and never reaches a model. The rule never drops
+   a message with a photo, a voice note or a location pin, any digit ("3" in a reply), a distress emoji (🆘, 🌊) or
+   any word outside that short list, however short or misspelled ("baha", "lubog n bhay nmin", "SOS").
+2. **A Meta model verdict, only when nothing says "report".** The facts call already reads every text and
+   transcript. When it finds nothing a report states (no hazard, flood, count, need, crop or livelihood loss,
+   place or correction) and no photo shows damage, Muse Spark is asked one small question: is this a disaster
+   report, yes, no or unsure? Only a certain "no" screens the message out; "unsure" stays a report with an amber
+   "maybe not a report" trust signal for the officer. Real reports state facts, so they never pay for this call, and
+   the photo judge's "nothing seen" is only supporting evidence, never a verdict on its own. A reply to the bot's
+   summary is a correction by intent and is never screened out by the model.
+
+A screened-out message is **kept, not deleted, and not counted**: it is out of incidents, counts, RDANA drafts, the
+damaged-houses table, Notices of Loss, the map, the overview tiles and the bot summary (one predicate,
+`app.screening.counted`, used everywhere), shows on `/reports` as "not a report", and follows the same retention
+purge as every report. Its agent trace says why ("Screen the message · Rule, no model · not a report (keyboard
+mashing)"). The officer can restore it (see [Officer review](#officer-review)). The reporter gets, at most once per
+15 minutes, "Salamat sa mensahe! Para maging report ito, sabihin po kung saan … at ano ang nangyari …, o magpadala
+ng larawan o voice note. / Thanks for your message! To make it a report, tell us where … and what happened …, or send
+a photo or a voice note." Stickers and GIFs get the same nudge and are not stored. Messages sent before the screen
+existed are screened by the free rule with `uv run python -m app.assessment --screen` (no model call; a
+screened-out report leaves its incident with a logged reason).
+
 ## How well it works
 
 Measured on labelled sets with real (cached) model calls, not mocks. Every number below is generated from [data/eval/results.json](data/eval/results.json), which also stores each run's dataset provenance, model id and backend, date, spend and code commit; a test keeps this table identical to the file. Re-run with the commands under "Getting started". The officer dashboard renders the same file at `/accuracy` ("How accurate is the agent?", in the header and linked from the overview): one table per task and data set with Spark 1.3 and Spark Open side by side, n, data provenance, run date, code commit and spend, weak scores marked, and a plain-language caption on every score saying what it means and what it does not (SAM's outlines are evidence, not the loss figure; fallen trees need confirmation); a missing or broken file shows an empty state.
@@ -126,11 +154,12 @@ Read these numbers with their caveats:
 
 Ulat never sends aid or files a claim by itself: every output is a draft an officer approves, and PCIC
 adjusters validate losses in the field. So the risks are **credit drain**, **officer overload**,
-**poisoned incident numbers** and **insurance fraud**. The agent handles them in layers, without extra
-model calls:
+**poisoned incident numbers** and **insurance fraud**. The agent handles them in layers; only the
+not-a-report screen's verdict, asked for messages that state nothing, costs a model call:
 
 | Layer | What happens | Default |
 |---|---|---|
+| Not-a-report screen | Greetings, tests, laughter, emoji and keyboard mash are kept as `not_a_report` by a free rule, before any model; a message whose facts state nothing gets a yes / no / unsure verdict from Muse Spark and only "no" screens it out. Never counted; the officer can restore it ([details](#the-reporters-side-telegram-bot)) | One nudge per reporter per 15 min |
 | Rate limit | Each pseudonymous reporter is checked *before* a file is downloaded. Over the limit, the bot replies (Tagalog / English) to try later and to call 911 for emergencies. A late pin or caption that joins the sender's last report is not a new report and is not limited | 20 reports per hour, 60 per 24 h (`REPORTS_PER_HOUR`, `REPORTS_PER_DAY`) |
 | Spend cap | Model costs logged in the last 24 h are checked before every assessment. Over the cap, new reports are stored as `held` and assessed later by `python -m app.assessment --pending` | $10 (`DAILY_SPEND_CAP_USD`) |
 | Block list | `python -m app.trust block <pseudonym-prefix>` (and `unblock`). Messages are still stored as `held` for the officer but never reach a model | — |
@@ -328,7 +357,12 @@ officer can:
 - mark a **trust signal** checked, genuine (it no longer flags the report or its incident) or a problem, with a note
   ("photo reuse checked: same family, two phones");
 - **confirm or rule out a fallen tree**, which the RDANA hazard list then follows;
-- **block or unblock the reporter**, with the same function as `python -m app.trust block`.
+- **block or unblock the reporter**, with the same function as `python -m app.trust block`;
+- **restore a message screened out as not a report** (`POST /reports/<id>/review/restore`, the same login,
+  same-origin check and initials as the other actions): it goes through the normal pipeline again at once when the
+  web app runs the bot (otherwise at the bot's next start or with `python -m app.assessment --pending`), and
+  screening never drops it again. The list of screened-out messages (`app.screening.not_reports`) gets its page in
+  the dashboard redesign; until then they show on `/reports` with the status "not a report".
 
 Every override is an append-only `OfficerAction` row (database triggers refuse updates and deletes) with the officer's
 initials (required, at most 40 characters; prefilled from the initials typed at login, and self-declared, since the
@@ -566,6 +600,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-10-30 | Fix found in the staging restart check: a restart that cuts off grouping after the facts were saved left the report assessed but never grouped; startup now also groups such reports (no new facts call) |
 | 2026-10-30 | Production deploy and license: Ulat went live on Modal at 13:30 Manila (app `ulat`, commit `8510536`, seeded with the synthetic scenario through the real pipeline), with @UlatPH_bot moved from local polling to the webhook and checked with a phone message; the project is released under the MIT License (`LICENSE`, `pyproject.toml` metadata) with third-party code and data keeping their own terms; the README gains the live URL, a 2-minute "try it" path for judges and corrections of lines the deploy made stale (login, local bot, retention, loss window) |
 | 2026-10-30 | README "The problem" section: the national, Laguna de Bay and Biñan picture and the 72-hour RDANA and 2-day PCIC deadlines, each figure linked to the primary source it was checked against (WorldRiskReport 2026, PAGASA, UN OCHA, NIED report No. 45, DSWD DROMIC reports #20, #40 and #68 on Paeng, NDRRMC Memo 107 s. 2021, the PCIC fisheries brochure) |
+| 2026-11-02 | Not-a-report screen (`app/screening.py`): a free rule stores greetings, tests, laughter, emoji and keyboard mash as `not_a_report` before any model call (never a message with a photo, voice note, pin, digit or distress emoji); a Muse Spark yes / no / unsure verdict only for messages whose facts state nothing, where only "no" screens out and "unsure" is flagged for the officer; screened-out messages are kept but out of incidents, counts, drafts, the map and the overview (one shared predicate), with a "Screen the message" trace step, an audited officer restore (`officer_restored`) that re-runs the pipeline, a kind bilingual nudge to the reporter (one per 15 min, also for stickers and GIFs) and `python -m app.assessment --screen` for messages sent before it |
 
 ### Third-party code and assets
 

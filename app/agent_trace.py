@@ -27,6 +27,7 @@ from app.models import (
     Report,
 )
 from app.review import ACTION_LABELS, GROUPING_ACTIONS, SIGNAL_VERDICTS, TREE_VERDICTS
+from app.screening import Screening
 from app.trace import STEP_ORDER, STEPS, ModelFamily, Step, model_family
 
 TRACE_SINCE = "2026-10-30"  # the day calls started to be linked to reports
@@ -149,6 +150,18 @@ def _trust_output(signals: list[dict[str, Any]]) -> str:
     return f"{_plural(len(signals), 'signal')}: {codes}"
 
 
+SCREEN_OUTPUTS = {
+    "yes": "a report",
+    "no": "not a report",
+    "unsure": "unsure: kept, flagged for the officer",
+    "error": "kept: screening failed",
+}
+
+
+def _screen_output(screening: Screening) -> str:
+    return f"{SCREEN_OUTPUTS.get(screening.verdict, screening.verdict)} ({screening.reason})"
+
+
 def _decision_output(d: AgentDecision) -> str:
     target = f"incident #{d.incident_id}"
     action = {
@@ -157,6 +170,7 @@ def _decision_output(d: AgentDecision) -> str:
         "kept_separate": f"kept apart, in {target}",
         "needs_officer": f"asked the officer ({target})",
         "re-linked": f"moved to {target}",
+        "screened_out": f"left {target}: not a report",
     }.get(d.kind, f"{d.kind.replace('_', ' ')}: {target}")
     if d.judge_model is None or d.compared_incident_id is None:
         return action
@@ -227,6 +241,11 @@ def build_trace(
     )
     pending = _Calls(calls)
     steps = trace.steps
+    screening = Screening.from_dict(report.screening)
+    # The free rule runs before anything else; a message it drops has no other agent step.
+    ruled_out = screening is not None and screening.source == "rule" and screening.filtered
+    if ruled_out:
+        steps.append(_step(Step.SCREEN_RULE, _screen_output(screening)))
     words = len(report.transcript.split()) if report.transcript else 0
     transcribed = sorted(
         (subject for step, subject in pending.groups if step == Step.TRANSCRIBE),
@@ -265,6 +284,11 @@ def build_trace(
                 continue  # a failed photo: the error is on the report
             info = STEPS[step]
             steps.append(TraceStep(info.label + suffix, info.actor, output, stats, model=model))
+    if screening is not None and not ruled_out:
+        step = Step.SCREEN if screening.source == "model" else Step.SCREEN_RULE
+        steps.append(
+            _step(step, _screen_output(screening), pending.take(step), model=screening.model)
+        )
     if assessment is not None:
         steps.append(_step(Step.GEOLOCATE, _geo_output(report, assessment)))
         if assessment.signals is not None:

@@ -27,6 +27,7 @@ from sqlmodel import Session, col, select
 
 from app.incidents import Observation, counted_facts, observations, rollup
 from app.models import STATUS_ASSESSED, Incident, Report
+from app.screening import counted
 
 COUNT_FIELDS = (
     "houses_totally_damaged",
@@ -315,7 +316,7 @@ def collect(session: Session) -> CityEvidence:
     pending: defaultdict[str, list[int]] = defaultdict(list)
     for report_id, barangay in session.exec(
         select(Report.id, Report.barangay).where(
-            Report.status != STATUS_ASSESSED, col(Report.barangay).is_not(None)
+            Report.status != STATUS_ASSESSED, counted(), col(Report.barangay).is_not(None)
         )
     ).all():
         pending[barangay].append(report_id)

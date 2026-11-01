@@ -64,6 +64,8 @@ def init_db(engine: Engine) -> None:
                 "officer_incident_id": "INTEGER REFERENCES incident(id)",
                 "officer_barangay": "VARCHAR",
                 "corrects_report_id": "INTEGER REFERENCES report(id)",
+                "screening": "JSON",
+                "officer_restored": "BOOLEAN NOT NULL DEFAULT 0",
             },
             "reporter": {"blocked": "BOOLEAN NOT NULL DEFAULT 0"},
             "media": {"phash": "VARCHAR"},
