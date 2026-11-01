@@ -414,7 +414,8 @@ class IntakeService:
                 self.transcriber,
                 audio_path,
                 language_bias=LANGUAGE_BIAS,
-                # barangay names: 4/9 -> 9/9 place names in tests
+                # Biñan's barangay names: keywords help only for places on the list (voice-notes-8
+                # in data/eval/results.json: 3/10 -> 10/10 with them listed, 3/10 without)
                 keywords=transcription_keywords(),
                 convert=self.convert,
             )
