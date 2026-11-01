@@ -190,13 +190,14 @@ img { max-width: 100%; }
   position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
 }
 
-/* State layer: hover, focus and press tint the element with its own content colour (M3). */
+/* State layer: hover, focus and press tint the element with its own content colour (M3). Hover
+   only where a pointer can hover, so a tapped item on a phone does not stay tinted. */
 .state-layer, button, .button, .nav__item, .menu__item, .kpi, .icon-button, summary { position: relative; }
 button::after, .button::after, .menu__item::after, .kpi::after, .icon-button::after {
   content: ""; position: absolute; inset: 0; border-radius: inherit; background: currentColor;
   opacity: 0; pointer-events: none; transition: opacity 150ms linear;
 }
-button:hover::after, .button:hover::after, .menu__item:hover::after, .kpi:hover::after, .icon-button:hover::after { opacity: var(--md-sys-state-hover); }
+@media (hover: hover) { button:hover::after, .button:hover::after, .menu__item:hover::after, .kpi:hover::after, .icon-button:hover::after { opacity: var(--md-sys-state-hover); } }
 button:focus-visible::after, .button:focus-visible::after, .menu__item:focus-visible::after, .kpi:focus-visible::after { opacity: var(--md-sys-state-focus); }
 button:active::after, .button:active::after, .menu__item:active::after, .kpi:active::after, .icon-button:active::after { opacity: var(--md-sys-state-pressed); }
 
@@ -302,7 +303,7 @@ button:active::after, .button:active::after, .menu__item:active::after, .kpi:act
   box-sizing: content-box; width: 1.5rem; height: 1.5rem; padding: .25rem 1.25rem;
   border-radius: var(--md-sys-shape-corner-full); transition: background-color 200ms var(--md-sys-motion-standard);
 }
-.nav__item:hover .nav__icon { background: color-mix(in srgb, currentColor 8%, transparent); }
+@media (hover: hover) { .nav__item:hover .nav__icon { background: color-mix(in srgb, currentColor 8%, transparent); } }
 .nav__item:active .nav__icon { background: color-mix(in srgb, currentColor 12%, transparent); }
 .nav__item[aria-current="page"], .nav__item.is-current { color: var(--md-sys-color-on-surface); font-weight: 700; }
 .nav__item[aria-current="page"] .nav__icon, .nav__item.is-current .nav__icon {
@@ -318,7 +319,7 @@ button:active::after, .button:active::after, .menu__item:active::after, .kpi:act
   padding: 0 var(--space-4); font: var(--md-sys-typescale-label-large);
 }
 .nav__list--more .nav__item .nav__icon { padding: 0; background: none; }
-.nav__list--more .nav__item:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
+@media (hover: hover) { .nav__list--more .nav__item:hover { background: color-mix(in srgb, currentColor 8%, transparent); } }
 .nav__list--more .nav__item[aria-current="page"] { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
 
 /* "More" opens as a modal bottom sheet on phones, a side sheet next to the rail. */
@@ -369,7 +370,7 @@ button:active::after, .button:active::after, .menu__item:active::after, .kpi:act
     min-height: 3.5rem; padding: 0 var(--space-4); font: var(--md-sys-typescale-label-large);
   }
   .nav > .nav__list .nav__icon { padding: 0; background: none !important; }
-  .nav > .nav__list .nav__item:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
+  .nav > .nav__list .nav__item:hover:not([aria-current]) { background: color-mix(in srgb, currentColor 8%, transparent); }
   .nav > .nav__list .nav__item[aria-current="page"] { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
   .nav__more-slot { display: none !important; }
   .nav__sheet {
