@@ -5,7 +5,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from app.accuracy import accuracy_page
+from app.accuracy import ROWS, accuracy_page
 from app.eval_results import RESULTS_PATH, load
 from app.main import create_app
 from tests.test_auth import HOST, HTML, public_settings, sign_in  # noqa: F401 (a fixture)
@@ -183,13 +183,15 @@ def test_a_missing_empty_or_broken_file_is_a_friendly_empty_state(
 
 def test_the_committed_results_file_renders_every_entry(client):
     results = load(RESULTS_PATH)
+    shown = [e for e in results.entries if e.task in ROWS]  # tasks the page has a table for
     view = accuracy_page(RESULTS_PATH)
     assert view.problem is None
-    assert sum(len(t.columns) for t in view.tables) == len(results.entries)
+    assert sum(len(t.columns) for t in view.tables) == len(shown)
+    assert {"photo_judge", "pair_judge", "screen"} <= {e.task for e in shown}
 
     html = page(client, RESULTS_PATH)
 
-    for e in results.entries:
+    for e in shown:
         assert f'id="{e.task}-{e.dataset.id}"' in html and f"commit {e.commit[:12]}" in html
 
 
@@ -206,6 +208,18 @@ def test_accuracy_is_private_behind_the_officer_login(public_settings):  # noqa:
         assert response.headers["location"] == "/login?next=/accuracy"
         sign_in(officer)
         assert officer.get("/accuracy").status_code == 200
+
+
+def test_a_task_without_a_table_is_left_out_not_an_error(client, tmp_path):
+    from tests.test_eval_results import VOICE_DATASET, transcribe_entry
+
+    raw = {**FIXTURE, "datasets": {**FIXTURE["datasets"], "voice-test-8": VOICE_DATASET}}
+    raw["entries"] = [*FIXTURE["entries"], transcribe_entry()]
+    path = tmp_path / "with-voice.json"
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    view = accuracy_page(path)
+    assert view.problem is None and len(view.tables) == 3
+    assert 'id="transcribe-' not in page(client, path)
 
 
 def test_the_fixture_is_a_valid_results_file(results_file):

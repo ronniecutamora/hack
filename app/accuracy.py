@@ -244,7 +244,8 @@ def _run_rows(entries: list[Entry]) -> list[Row]:
 def build_tables(results: Results) -> list[Table]:
     groups: dict[tuple[str, str], list[Entry]] = {}
     for entry in results.entries:
-        groups.setdefault((entry.task, entry.dataset.id), []).append(entry)
+        if entry.task in ROWS:  # a task this page has no table for yet is left out, not a 500
+            groups.setdefault((entry.task, entry.dataset.id), []).append(entry)
 
     def table_key(key: tuple[str, str]) -> tuple[int, int, str]:
         task, dataset = key
