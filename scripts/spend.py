@@ -150,3 +150,16 @@ def probe_ready(*clients: object) -> bool:
 
 def misses(client: object) -> int:
     return len(getattr(client, "uncached", []))
+
+
+def script_spend(data_dir: Path, script: str) -> float:
+    """USD logged by every finished run of `script` in this data dir (DATA_DIR/eval-spend.log)."""
+    log = data_dir / LOG_NAME
+    if not log.is_file():
+        return 0.0
+    total = 0.0
+    for line in log.read_text(encoding="utf-8").splitlines():
+        entry = json.loads(line)
+        if entry.get("script") == script and "run_spend_usd" in entry:
+            total += entry["run_spend_usd"]
+    return round(total, 4)

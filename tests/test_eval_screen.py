@@ -37,13 +37,35 @@ async def test_the_metrics_count_the_real_report_class_and_every_miss():
         {"id": "n2", "label": "not_report", "text": "Bili na kayo"},
     ]
     llm = ScreenLLM(screen_reply=verdict("no"))  # every message states nothing: r2 is dropped
-    code, metrics = await eval_screen.evaluate_metrics(messages, llm)
-    assert code == 0
+    code, metrics, skipped = await eval_screen.evaluate_metrics(messages, llm)
+    assert (code, skipped) == (0, 0)
     assert (metrics["tp"], metrics["fn"], metrics["tn"], metrics["fp"]) == (0, 2, 2, 0)
     assert metrics["wrongly_filtered"] == 2 and metrics["rule_filtered"] == 1
     assert metrics["model_calls"] == 3 and metrics["miss_ids"] == ["r1", "r2"]
-    stopped, _ = await eval_screen.evaluate_metrics(messages, llm, stop=lambda: True)
-    assert stopped == 1  # the spend cap: nothing recordable
+    # At the spend cap only the free rule's message is still scored; the rest are skipped.
+    code, metrics, skipped = await eval_screen.evaluate_metrics(messages, llm, stop=lambda: True)
+    assert (code, skipped, metrics["tn"]) == (0, 3, 1)
+    # Cache-only: a message whose call missed the cache is skipped, not scored as kept.
+    misses = iter([0, 0, 0, 1, 1, 1, 1, 1])
+    _, metrics, skipped = await eval_screen.evaluate_metrics(
+        messages, llm, misses=lambda: next(misses)
+    )
+    assert skipped == 1 and metrics["tp"] + metrics["fn"] + metrics["tn"] + metrics["fp"] == 3
+
+
+def test_the_recorded_spend_counts_every_logged_run_of_the_script(tmp_path):
+    from scripts import spend
+
+    log = tmp_path / spend.LOG_NAME
+    lines = [
+        {"script": "eval_screen", "run_spend_usd": 0.017},
+        {"script": "eval_screen", "estimate_usd": 0.2},
+        {"script": "eval_dedupe", "run_spend_usd": 0.5},
+        {"script": "eval_screen", "run_spend_usd": 0.2913},
+    ]
+    log.write_text("".join(json.dumps(line) + "\n" for line in lines))
+    assert spend.script_spend(tmp_path, "eval_screen") == 0.3083
+    assert spend.script_spend(tmp_path / "none", "eval_screen") == 0.0
 
 
 def test_the_screen_eval_entry_is_validated_and_rendered(tmp_path):

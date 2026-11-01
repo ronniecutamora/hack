@@ -1,7 +1,7 @@
 """Score the not-a-report screen (app.screening) on labelled messages, with real cached calls.
 
     uv run python -m scripts.eval_screen [messages.json] [--llm muse-spark-1.3] [--yes]
-        [--record data/eval/results.json [--dataset ID]] [--spend-cap USD]
+        [--record data/eval/results.json [--dataset ID]] [--spend-cap USD] [--cached-only]
 
 Each message goes through the pipeline's own screen in its order (`screening.screen_text`):
 the free rule, the facts call, then the screening call only when the facts state nothing. The
@@ -9,7 +9,10 @@ the free rule, the facts call, then the screening call only when the facts state
 reports, recall the share of real reports kept, and "wrongly filtered" counts real reports the
 screen dropped (the target is 0). Only the bundled synthetic set may live in this repository.
 After confirmation, a free cache-only dry run counts the uncached messages; their estimated cost
-is checked against the spend cap (scripts/spend.py) before any paid call.
+is checked against the spend cap (scripts/spend.py) before any paid call; a run stops paying
+at the cap, and `--cached-only` scores what the cache holds without paying at all. Messages left
+unscored for either reason are recorded as `errors` (n counts the scored ones). The recorded
+spend is every run of this script logged in the data dir, so a cap-stopped run still counts.
 """
 
 import argparse
@@ -26,12 +29,13 @@ from app.config import get_settings
 from app.evaluation import binary_scores, outside_repo
 from app.meta.factory import LLM_BACKENDS, make_agent_llm
 from app.meta.llm import AgentLLM
-from app.screening import screen_text
+from app.screening import Attachments, rule_screen, screen_text
 from scripts import spend
 
 DEFAULT_MESSAGES = Path(__file__).resolve().parents[1] / "data/eval/screen_messages.json"
 DEFAULT_DATASET = "screen-messages-60"  # the bundled set's id in the results file
 LABELS = ("report", "not_report")
+SCRIPT = "eval_screen"
 # Estimate per uncached call, measured on Spark 1.3 on 2026-11-02 (reasoning tokens dominate):
 # a facts call logged $0.0057 and a screening call $0.0046. The dry run sees only the facts
 # calls (a screening call depends on their reply), so the run also stops at the spend cap.
@@ -45,6 +49,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--yes", action="store_true", help="skip the paid-call confirmation")
     parser.add_argument("--record", type=Path, metavar="RESULTS", help="upsert into this file")
     parser.add_argument("--dataset", help=f"dataset id for --record (default {DEFAULT_DATASET})")
+    parser.add_argument(
+        "--cached-only", action="store_true", help="score only what is cached; never pay"
+    )
     spend.add_cap_argument(parser)
     return parser.parse_args(argv)
 
@@ -69,23 +76,37 @@ def load_messages(path: Path) -> list[dict[str, Any]]:
 
 
 async def evaluate_metrics(
-    messages: list[dict[str, Any]], llm: AgentLLM, stop: Callable[[], bool] = lambda: False
-) -> tuple[int, dict[str, Any]]:
-    """Screen every message, print each miss and the summary; return the exit code and metrics.
-    `stop` (the spend cap) ends the run early; the skipped messages count as failed."""
+    messages: list[dict[str, Any]],
+    llm: AgentLLM,
+    stop: Callable[[], bool] = lambda: False,
+    misses: Callable[[], int] = lambda: 0,
+) -> tuple[int, dict[str, Any], int]:
+    """Screen every message, print each miss and the summary; return the exit code, the metrics
+    and how many messages were left unscored. A message that needs a model call is skipped once
+    `stop` (the spend cap) says so, or when one of its calls was not cached (`misses` grows in a
+    cache-only run); messages the free rule decides are always scored."""
     labels, kept, miss_ids = [], [], []
-    rule_filtered = model_calls = unsure = errors = 0
+    rule_filtered = model_calls = unsure = errors = skipped = 0
     for message in messages:
-        if stop():
-            errors += 1
+        report = message["label"] == "report"
+        if rule_screen(message["text"], Attachments()) is None and stop():
+            skipped += 1
             print(f"skipped {message['id']}: the spend cap was reached")
             continue
-        report = message["label"] == "report"
+        before = misses()
         try:
             screening = await screen_text(llm, message["text"])
         except Exception as exc:  # the pipeline keeps a report whose facts call failed
-            errors += 1
-            print(f"error {message['id']}: {exc}")
+            if misses() > before:
+                skipped += 1
+                print(f"skipped {message['id']}: not cached")
+            else:
+                errors += 1
+                print(f"error {message['id']}: {exc}")
+            continue
+        if misses() > before:  # its screening call was not cached
+            skipped += 1
+            print(f"skipped {message['id']}: not cached")
             continue
         labels.append(report)
         kept.append(not screening.filtered)
@@ -100,7 +121,7 @@ async def evaluate_metrics(
                 f"{screening.reason}"
             )
     scores = binary_scores(labels, kept)
-    print(f"\n{llm.model}: {len(labels)} messages scored, {errors} failed")
+    print(f"\n{llm.model}: {len(labels)} messages scored, {errors} failed, {skipped} skipped")
     print(f"Real reports: precision {scores.precision:.3f}, recall {scores.recall:.3f}")
     print(
         f"Real reports wrongly filtered: {scores.fn}. Non-reports filtered: {scores.tn} of "
@@ -116,7 +137,7 @@ async def evaluate_metrics(
         "unsure": unsure,
         "miss_ids": miss_ids,
     }
-    return (1 if errors else 0), metrics
+    return (1 if errors else 0), metrics, skipped
 
 
 async def estimate_cost(messages: list[dict[str, Any]], llm: AgentLLM) -> tuple[float, str]:
@@ -159,13 +180,21 @@ async def run(args: argparse.Namespace) -> int:
         if not args.yes and input("Spend credits on uncached calls? [y/N] ").strip().lower() != "y":
             return 1
         llm = make_agent_llm(settings)
-        ledger = spend.SpendLedger(settings.data_dir, args.spend_cap, script="eval_screen")
+        ledger = spend.SpendLedger(settings.data_dir, args.spend_cap, script=SCRIPT)
         spend.attach(ledger, llm)
         try:
-            estimate, detail = await estimate_cost(messages, llm)
-            if not ledger.approve(estimate, detail):
-                return 1
-            code, metrics = await evaluate_metrics(messages, llm, ledger.over_cap)
+            if args.cached_only:
+                with spend.probe(llm):
+                    code, metrics, skipped = await evaluate_metrics(
+                        messages, llm, misses=lambda: spend.misses(llm)
+                    )
+            else:
+                estimate, detail = await estimate_cost(messages, llm)
+                if not ledger.approve(estimate, detail):
+                    return 1
+                code, metrics, skipped = await evaluate_metrics(
+                    messages, llm, lambda: ledger.spent() >= ledger.cap
+                )
         finally:
             await llm.aclose()
             ledger.close()
@@ -174,6 +203,10 @@ async def run(args: argparse.Namespace) -> int:
             if code:
                 print("not recorded: some messages failed; re-run when the provider answers")
                 return code
+            key = ("screen", dataset, settings.agent_llm)
+            recorded = next(
+                (e.spend_usd for e in eval_results.load(args.record).entries if e.key == key), 0.0
+            )
             entry = eval_results.upsert(
                 args.record,
                 {
@@ -185,9 +218,10 @@ async def run(args: argparse.Namespace) -> int:
                     "sam": None,
                     "date": eval_results.manila_today(),
                     "commit": eval_results.git_commit(),
-                    "n": len(messages),
-                    "errors": 0,
-                    "spend_usd": ledger.run_spend,
+                    "n": len(messages) - skipped,
+                    "errors": skipped,
+                    # Every logged run of this script, minus what an earlier record holds.
+                    "spend_usd": max(spend.script_spend(settings.data_dir, SCRIPT) - recorded, 0),
                     "metrics": metrics,
                 },
             )
