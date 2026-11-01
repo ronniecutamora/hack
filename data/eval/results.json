@@ -24,6 +24,14 @@
       "label_source": "labels designed per scene, then checked against every image by eye on 2026-10-30: 3 labels changed (a roof is visible on the far shore of three fish-pen photos) and 4 borderline labels kept, all noted in label_notes",
       "n": 40,
       "location": "outside this repo (regenerate with scripts.make_vision_set)"
+    },
+    "screen-messages-60": {
+      "title": "Synthetic bot messages",
+      "provenance": "synthetic",
+      "source": "60 hand-written Telegram-style messages: 30 disaster reports in Tagalog, Taglish and English (very short, typo-heavy, corrections) and 30 non-reports (greetings, tests, laughter, emoji, keyboard mash, ads, spam, a chain message, a joke, unrelated questions); in this repo at data/eval/screen_messages.json",
+      "label_source": "report / not_report labels written with each message by the builder, 2026-11-02",
+      "n": 60,
+      "location": "data/eval/screen_messages.json (text only, synthetic, no real people)"
     }
   },
   "entries": [

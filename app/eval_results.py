@@ -17,7 +17,7 @@ else edits the numbers by hand. Its shape (``schema`` 1)::
       },
       "entries": [                       # one per (task, dataset, model)
         {
-          "task": "photo_judge" | "pair_judge",
+          "task": "photo_judge" | "pair_judge" | "screen",
           "dataset": "<id>",
           "model": str,                  # backend name, e.g. "muse-spark-1.3"
           "model_id": str,               # the provider's model id
@@ -36,8 +36,11 @@ else edits the numbers by hand. Its shape (``schema`` 1)::
 ``photo_judge`` metrics: ``roof_damage`` {kappa, agreement, confusion{label{predicted: count}}},
 ``flags`` {name: scores} for floodwater, debris, fallen_tree and tarpaulin (the LLM's
 judgment), and ``sam`` {roof, floodwater: scores} or null. ``pair_judge`` metrics: scores plus
-threshold, review_rate, reviews and miss_ids. ``scores`` are precision, recall, f1 and the
-tp/fp/fn/tn counts.
+threshold, review_rate, reviews and miss_ids. ``screen`` metrics (the not-a-report screen,
+app.screening): scores for the "real report" class (a kept message is a positive), plus
+wrongly_filtered (real reports screened out), non_reports_filtered, rule_filtered (dropped by
+the free rule), model_calls (screening calls made), unsure and miss_ids. ``scores`` are
+precision, recall, f1 and the tp/fp/fn/tn counts.
 """
 
 import json
@@ -53,7 +56,7 @@ from app.models import MANILA
 
 RESULTS_PATH = REPO_ROOT / "data" / "eval" / "results.json"
 SCHEMA_VERSION = 1
-TASKS = ("photo_judge", "pair_judge")
+TASKS = ("photo_judge", "pair_judge", "screen")
 PROVENANCES = ("real", "synthetic")
 FLAGS = ("floodwater", "debris", "tarpaulin", "fallen_tree")
 SAM_CONCEPTS = ("roof", "floodwater")
@@ -64,7 +67,11 @@ _ENTRY_KEYS = (
     "spend_usd", "metrics",
 )  # fmt: skip
 
-Task = Literal["photo_judge", "pair_judge"]
+Task = Literal["photo_judge", "pair_judge", "screen"]
+SCREEN_KEYS = (
+    "wrongly_filtered", "non_reports_filtered", "rule_filtered", "model_calls", "unsure",
+    "miss_ids",
+)  # fmt: skip
 
 
 @dataclass(frozen=True)
@@ -190,6 +197,9 @@ def _metric_errors(task: str, metrics: Any) -> list[str]:
         missing = [k for k in (*_SCORE_KEYS, "threshold", "review_rate", "reviews", "miss_ids")
                    if k not in metrics]  # fmt: skip
         return [f"metrics miss {', '.join(missing)}"] if missing else []
+    if task == "screen":
+        missing = [k for k in (*_SCORE_KEYS, *SCREEN_KEYS) if k not in metrics]
+        return [f"metrics miss {', '.join(missing)}"] if missing else []
     errors = []
     roof = metrics.get("roof_damage")
     if not isinstance(roof, dict) or not {"kappa", "agreement", "confusion"} <= set(roof):
@@ -286,7 +296,7 @@ def manila_today() -> str:
 # The code an eval result depends on: a local change here marks the recorded commit "-dirty".
 EVAL_CODE = (
     "scripts", "app/meta", "app/photo.py", "app/pair_judge.py", "app/facts.py",
-    "app/gazetteer.py", "app/evaluation.py", "app/eval_results.py",
+    "app/gazetteer.py", "app/evaluation.py", "app/eval_results.py", "app/screening.py",
 )  # fmt: skip
 
 
@@ -357,6 +367,26 @@ def render_markdown(results: Results) -> str:
             lines.append(
                 f"| {e.model} | {_dataset_cell(e.dataset)} | {e.n} | {_f(m['precision'])} "
                 f"| {_f(m['recall'])} | {_f(m['f1'])} | {m['review_rate']:.0%} | {e.date} |"
+            )
+        lines.append("")
+    screens = results.for_task("screen")
+    if screens:
+        lines += [
+            '**Not-a-report screen** (keeps real reports, screens out "test", "hahaha", mash and '
+            "spam; a kept real report is a positive):",
+            "",
+            "| Model | Dataset | n | Precision | Recall | Real reports wrongly filtered "
+            "| Non-reports filtered | By the free rule | Screening calls | Date |",
+            "|---|---|---|---|---|---|---|---|---|---|",
+        ]
+        for e in screens:
+            m = e.metrics
+            non_reports = m["tn"] + m["fp"]
+            lines.append(
+                f"| {e.model} | {_dataset_cell(e.dataset)} | {e.n} | {_f(m['precision'])} "
+                f"| {_f(m['recall'])} | {m['wrongly_filtered']} "
+                f"| {m['non_reports_filtered']} of {non_reports} | {m['rule_filtered']} "
+                f"| {m['model_calls']} | {e.date} |"
             )
         lines.append("")
     return "\n".join([*lines, README_END])

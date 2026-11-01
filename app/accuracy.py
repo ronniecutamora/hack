@@ -17,7 +17,7 @@ from app.trace import ModelFamily, model_family
 # Below this a score is shown as weak: kappa 0.6 is the usual floor of "substantial" agreement.
 WEAK_BELOW = 0.6
 MODEL_ORDER = ("muse-spark-1.3", "muse-spark-open")  # Spark 1.3 first, then the open weights
-TASK_ORDER = ("photo_judge", "pair_judge")
+TASK_ORDER = ("photo_judge", "pair_judge", "screen")
 PROVENANCE_ORDER = ("real", "synthetic")
 
 TASKS = {
@@ -32,6 +32,13 @@ TASKS = {
         "The agent LLM reads two reports' facts and says whether they describe the same "
         "situation. Only a confident 'same' merges them; anything less goes to the officer.",
     ),
+    "screen": (
+        "Not-a-report screen",
+        "Before a message becomes a report, a free rule drops only greetings, tests, laughter, "
+        "emoji and keyboard mash; when the agent finds nothing a report states in the rest, the "
+        "agent LLM says whether it is a disaster report. Only a certain 'no' screens a message "
+        "out. Scores compare that with labels a person set by hand.",
+    ),
 }
 PROVENANCE = {
     "real": "Real photos, but not from Biñan: past Philippine typhoons, mostly severe damage.",
@@ -45,6 +52,9 @@ NOT_MEANING = {
     "pair_judge": "A merge means two reports describe one situation, so their figures are "
     "counted once instead of added. The officer can split any merged report back out from its "
     "incident page, and its figures then count on their own again.",
+    "screen": "A screened-out message is not deleted: the officer can see it and restore it, and "
+    "the reporter is asked for the place and what happened. These are short synthetic messages; "
+    "residents' real messages will be messier.",
 }
 
 
@@ -169,7 +179,40 @@ PAIR_ROWS: list[tuple[str, str, Callable[[Entry], Cell | None]]] = [
         lambda e: Cell(f"{e.metrics['review_rate']:.0%}", f"{e.metrics['reviews']} of {e.n}"),
     ),
 ]
-ROWS = {"photo_judge": PHOTO_ROWS, "pair_judge": PAIR_ROWS}
+SCREEN_ROWS: list[tuple[str, str, Callable[[Entry], Cell | None]]] = [
+    (
+        "Real reports wrongly screened out",
+        "Real reports the screen dropped. A dropped report could hide an emergency, so the "
+        "target is 0.",
+        lambda e: Cell(
+            str(e.metrics["wrongly_filtered"]),
+            f"of {e.metrics['tp'] + e.metrics['fn']} real reports",
+            e.metrics["wrongly_filtered"] > 0,
+        ),
+    ),
+    (
+        "Real reports kept (recall)",
+        "Of the real reports, the share that stayed reports.",
+        lambda e: Cell(f"{e.metrics['recall']:.2f}", None, e.metrics["recall"] < WEAK_BELOW),
+    ),
+    (
+        "Kept messages that are reports (precision)",
+        "Of the messages kept as reports, the share that truly are. Below 1.00, some noise "
+        "still reaches the dashboard, where the officer can see it.",
+        lambda e: Cell(f"{e.metrics['precision']:.2f}", None, e.metrics["precision"] < WEAK_BELOW),
+    ),
+    (
+        "Non-reports screened out",
+        "Of the messages that are not reports, how many the screen dropped, and how many of "
+        "those the free rule dropped with no model call.",
+        lambda e: Cell(
+            f"{e.metrics['non_reports_filtered']} of {e.metrics['tn'] + e.metrics['fp']}",
+            f"{e.metrics['rule_filtered']} by the free rule; "
+            f"screening calls: {e.metrics['model_calls']}",
+        ),
+    ),
+]
+ROWS = {"photo_judge": PHOTO_ROWS, "pair_judge": PAIR_ROWS, "screen": SCREEN_ROWS}
 
 
 def _model_key(entry: Entry) -> tuple[int, str]:

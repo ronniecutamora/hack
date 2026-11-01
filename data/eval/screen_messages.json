@@ -1,0 +1,365 @@
+{
+  "about": "Synthetic messages to a typhoon and flood reporting bot, written by the builder on 2026-11-02 to score the not-a-report screen (app.screening). No real people, places are Biñan barangays. label: report = a real disaster report the filter must keep; not_report = a message it may screen out.",
+  "messages": [
+    {
+      "id": "r01",
+      "label": "report",
+      "text": "baha dito",
+      "note": "two words"
+    },
+    {
+      "id": "r02",
+      "label": "report",
+      "text": "tulong po purok 3",
+      "note": "help request with a purok"
+    },
+    {
+      "id": "r03",
+      "label": "report",
+      "text": "lubog n bhay nmin",
+      "note": "typo-heavy: our house is underwater"
+    },
+    {
+      "id": "r04",
+      "label": "report",
+      "text": "mali po, tatlo lang",
+      "note": "correction without context"
+    },
+    {
+      "id": "r05",
+      "label": "report",
+      "text": "Baha na po sa San Antonio, hanggang tuhod na",
+      "note": "flood with depth and barangay"
+    },
+    {
+      "id": "r06",
+      "label": "report",
+      "text": "wala pa kuryente dito sa Malaban since kagabi",
+      "note": "power outage"
+    },
+    {
+      "id": "r07",
+      "label": "report",
+      "text": "Pls help, stranded kami sa 2nd floor, Brgy Dela Paz",
+      "note": "rescue request, English-Tagalog"
+    },
+    {
+      "id": "r08",
+      "label": "report",
+      "text": "nasira bubong nmin s hangin",
+      "note": "typo-heavy roof damage"
+    },
+    {
+      "id": "r09",
+      "label": "report",
+      "text": "flood waist deep na sa Purok 5 Canlalay",
+      "note": "English depth"
+    },
+    {
+      "id": "r10",
+      "label": "report",
+      "text": "may natumbang puno sa kalsada, di madaanan",
+      "note": "fallen tree blocking a road"
+    },
+    {
+      "id": "r11",
+      "label": "report",
+      "text": "sira lahat ng fish cage namin sa lawa",
+      "note": "fish cages destroyed"
+    },
+    {
+      "id": "r12",
+      "label": "report",
+      "text": "Lumikas na kami sa covered court, mga 20 pamilya",
+      "note": "evacuation with a count"
+    },
+    {
+      "id": "r13",
+      "label": "report",
+      "text": "need namin ng tubig at pagkain dito sa evacuation center",
+      "note": "needs"
+    },
+    {
+      "id": "r14",
+      "label": "report",
+      "text": "hanggang dibdib na tubig sa amin",
+      "note": "chest-deep"
+    },
+    {
+      "id": "r15",
+      "label": "report",
+      "text": "update: humupa na ang baha pero putik pa rin",
+      "note": "receding flood update"
+    },
+    {
+      "id": "r16",
+      "label": "report",
+      "text": "baha",
+      "note": "one word"
+    },
+    {
+      "id": "r17",
+      "label": "report",
+      "text": "tulong!!!",
+      "note": "one word with punctuation"
+    },
+    {
+      "id": "r18",
+      "label": "report",
+      "text": "SOS",
+      "note": "distress acronym"
+    },
+    {
+      "id": "r19",
+      "label": "report",
+      "text": "Our street in Sto. Tomas is flooded, cars stuck",
+      "note": "English"
+    },
+    {
+      "id": "r20",
+      "label": "report",
+      "text": "may bata pong nawawala dito sa tabing ilog",
+      "note": "missing child"
+    },
+    {
+      "id": "r21",
+      "label": "report",
+      "text": "Landslide sa likod ng school",
+      "note": "landslide"
+    },
+    {
+      "id": "r22",
+      "label": "report",
+      "text": "dalawang bahay po pala ang nasira, hindi tatlo",
+      "note": "correction with counts"
+    },
+    {
+      "id": "r23",
+      "label": "report",
+      "text": "nalunod ang palay namin, 2 ektarya",
+      "note": "rice crop with hectares"
+    },
+    {
+      "id": "r24",
+      "label": "report",
+      "text": "Grabe ang hangin, natuklap yero ng kapitbahay",
+      "note": "wind damage to a roof"
+    },
+    {
+      "id": "r25",
+      "label": "report",
+      "text": "pasok na tubig sa bahay, ankle deep",
+      "note": "water inside a house"
+    },
+    {
+      "id": "r26",
+      "label": "report",
+      "text": "rescue po sa Purok 1, may matanda di makalabas",
+      "note": "rescue of an elderly person"
+    },
+    {
+      "id": "r27",
+      "label": "report",
+      "text": "Brgy Malaban po, baha ulit",
+      "note": "short with barangay"
+    },
+    {
+      "id": "r28",
+      "label": "report",
+      "text": "tumataas pa rin tubig d2",
+      "note": "typo-heavy: water still rising here"
+    },
+    {
+      "id": "r29",
+      "label": "report",
+      "text": "nawala bangka namin s bagyo",
+      "note": "boat lost in the typhoon"
+    },
+    {
+      "id": "r30",
+      "label": "report",
+      "text": "wala na po kaming makain, tulong",
+      "note": "no food left"
+    },
+    {
+      "id": "n01",
+      "label": "not_report",
+      "text": "test",
+      "note": "test"
+    },
+    {
+      "id": "n02",
+      "label": "not_report",
+      "text": "hello po",
+      "note": "greeting"
+    },
+    {
+      "id": "n03",
+      "label": "not_report",
+      "text": "hahahaha",
+      "note": "laughter"
+    },
+    {
+      "id": "n04",
+      "label": "not_report",
+      "text": "asdfghjkl",
+      "note": "keyboard mash"
+    },
+    {
+      "id": "n05",
+      "label": "not_report",
+      "text": "😂😂😂",
+      "note": "emoji"
+    },
+    {
+      "id": "n06",
+      "label": "not_report",
+      "text": "Good morning po!",
+      "note": "greeting"
+    },
+    {
+      "id": "n07",
+      "label": "not_report",
+      "text": "testing testing",
+      "note": "test"
+    },
+    {
+      "id": "n08",
+      "label": "not_report",
+      "text": "hi",
+      "note": "greeting"
+    },
+    {
+      "id": "n09",
+      "label": "not_report",
+      "text": "jsjsjsjs",
+      "note": "keyboard mash"
+    },
+    {
+      "id": "n10",
+      "label": "not_report",
+      "text": "salamat po",
+      "note": "thanks"
+    },
+    {
+      "id": "n11",
+      "label": "not_report",
+      "text": "ok",
+      "note": "acknowledgement"
+    },
+    {
+      "id": "n12",
+      "label": "not_report",
+      "text": "👍",
+      "note": "emoji"
+    },
+    {
+      "id": "n13",
+      "label": "not_report",
+      "text": "lol",
+      "note": "laughter"
+    },
+    {
+      "id": "n14",
+      "label": "not_report",
+      "text": "???",
+      "note": "punctuation"
+    },
+    {
+      "id": "n15",
+      "label": "not_report",
+      "text": "kdkdkdkdk",
+      "note": "keyboard mash"
+    },
+    {
+      "id": "n16",
+      "label": "not_report",
+      "text": "Bili na kayo ng longganisa, 150 per pack, PM lang",
+      "note": "advertisement"
+    },
+    {
+      "id": "n17",
+      "label": "not_report",
+      "text": "Earn 5,000 pesos daily from home! Click example.com/join",
+      "note": "spam"
+    },
+    {
+      "id": "n18",
+      "label": "not_report",
+      "text": "Anong oras magsasara ang mall mamaya?",
+      "note": "unrelated question"
+    },
+    {
+      "id": "n19",
+      "label": "not_report",
+      "text": "Sino may charger ng Samsung dyan?",
+      "note": "unrelated question"
+    },
+    {
+      "id": "n20",
+      "label": "not_report",
+      "text": "I-forward mo ito sa 10 tao para swertehin ka",
+      "note": "chain message"
+    },
+    {
+      "id": "n21",
+      "label": "not_report",
+      "text": "Bakit malungkot ang kalendaryo? Kasi bilang na ang araw niya",
+      "note": "joke"
+    },
+    {
+      "id": "n22",
+      "label": "not_report",
+      "text": "bot ka ba?",
+      "note": "question about the bot"
+    },
+    {
+      "id": "n23",
+      "label": "not_report",
+      "text": "ok po salamat",
+      "note": "thanks"
+    },
+    {
+      "id": "n24",
+      "label": "not_report",
+      "text": "pa-load naman po 50",
+      "note": "asking for phone load"
+    },
+    {
+      "id": "n25",
+      "label": "not_report",
+      "text": "gm po",
+      "note": "greeting"
+    },
+    {
+      "id": "n26",
+      "label": "not_report",
+      "text": "Ano pong password ng wifi?",
+      "note": "unrelated question"
+    },
+    {
+      "id": "n27",
+      "label": "not_report",
+      "text": "Ma-try ko lang kung gumagana to",
+      "note": "test in a sentence"
+    },
+    {
+      "id": "n28",
+      "label": "not_report",
+      "text": "hahaha ok",
+      "note": "laughter"
+    },
+    {
+      "id": "n29",
+      "label": "not_report",
+      "text": "🙂",
+      "note": "emoji"
+    },
+    {
+      "id": "n30",
+      "label": "not_report",
+      "text": "heyyy",
+      "note": "greeting"
+    }
+  ]
+}
