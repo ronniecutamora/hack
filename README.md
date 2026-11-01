@@ -138,6 +138,12 @@ Measured on labelled sets with real (cached) model calls, not mocks. Every numbe
 | muse-spark-1.3 | Synthetic report pairs (synthetic) | 64 | 1.00 | 1.00 | 1.00 | 0% | 2026-10-30 |
 | muse-spark-open | Synthetic report pairs (synthetic) | 64 | 1.00 | 1.00 | 1.00 | 0% | 2026-10-30 |
 
+**Not-a-report screen** (keeps real reports, screens out "test", "hahaha", mash and spam; a kept real report is a positive):
+
+| Model | Dataset | n | Precision | Recall | Real reports wrongly filtered | Non-reports filtered | By the free rule | Screening calls | Date |
+|---|---|---|---|---|---|---|---|---|---|
+| muse-spark-1.3 | Synthetic bot messages (synthetic) | 56 | 0.97 | 1.00 | 0 | 25 of 26 | 20 | 5 | 2026-11-02 |
+
 <!-- eval-results:end -->
 
 Read these numbers with their caveats:
@@ -148,7 +154,15 @@ Read these numbers with their caveats:
 - **Fallen trees are the weak spot on real photos** (F1 0.57 on Spark 1.3, 0.33 on Spark Open), as the 2026-10-27 kill test found. The dashboard therefore asks for confirmation of fallen trees.
 - **SAM calls the lake "floodwater".** On the synthetic lakeshore scenes, SAM's floodwater precision is 0.28: Laguna de Bay itself, fish-pen water and an irrigated paddy are masked as floodwater. For a lakeshore city, the SAM floodwater mask is evidence for the officer; the LLM's judgment (floodwater F1 0.90 / 0.95 there) decides.
 - **Spark Open is close to Spark 1.3** on photos and equal on pairs, which is what the open-weight mode needs.
-- Spend for all of these runs, including the 40 generated images: $1.93 at list prices, from the eval call log.
+- **The screen kept every real report** on 60 synthetic Telegram-style messages (30 reports, many very short or
+  typo-heavy, and 30 non-reports): 0 real reports wrongly filtered, recall 1.00, precision 0.97. The free rule
+  dropped 20 non-reports with no model call; 5 more were screened out by Muse Spark after the facts call found
+  nothing; one ("Sino may charger ng Samsung dyan?") was kept because the facts call read it as a request for help
+  ("needs: other"), which the precision-first policy keeps on purpose. 4 of the 30 non-reports (n22, n24, n26, n27)
+  are not scored: the run reached its $0.30 spend cap first. The messages are synthetic; residents' own will be
+  messier.
+- Spend for the photo and pair runs, including the 40 generated images: $1.93 at list prices, from the eval call
+  log; the screen run added $0.31.
 
 ## Spam and fake reports
 
@@ -442,6 +456,8 @@ Other commands:
 ```bash
 # Assess reports again (the bot does this in the background); --llm compares backends
 uv run python -m app.assessment --report 12 | --pending | --all [--llm muse-spark-open]
+# Screen stored messages with the free not-a-report rule only (no model call; idempotent)
+uv run python -m app.assessment --screen
 # Group existing assessed reports; unchanged inputs are a no-op
 uv run python -m app.incidents --all
 uv run python -m app.incidents --report 12 --retry-failed
@@ -466,6 +482,7 @@ uv run python -m scripts.make_vision_set /path/to/vision-synthetic   # 40 labell
 # Record a full run in data/eval/results.json (README tables: uv run python -m app.eval_results)
 uv run python -m scripts.eval_vision /path/to/vision-synthetic --sam --record data/eval/results.json --dataset synthetic-40
 uv run python -m scripts.eval_dedupe --judge muse-spark-open --record data/eval/results.json
+uv run python -m scripts.eval_screen --spend-cap 0.30 --record data/eval/results.json   # 60 synthetic messages; --cached-only never pays
 # Paid eval scripts log every call to DATA_DIR/eval-spend.db, print the cost of the uncached calls
 # (a free cache-only dry run) and refuse to pass --spend-cap (default $5.00)
 uv run python -m scripts.eval_facts /path/to/recordings [--llm muse-spark-open]     # facts.json + audio
