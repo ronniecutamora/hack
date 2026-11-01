@@ -1,0 +1,5 @@
+{# Material Symbols from the static sprite (scripts/build_icons.py lists the names). Decorative:
+   the text beside an icon always says what it means. #}
+{% macro icon(name, filled=false, cls="") -%}
+  <svg class="icon{{ ' ' ~ cls if cls }}" aria-hidden="true" focusable="false" width="24" height="24"><use href="{{ static_url('vendor/material-symbols/icons.svg') }}#{{ name }}{{ '-fill' if filled }}"></use></svg>
+{%- endmacro %}

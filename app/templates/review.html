@@ -6,7 +6,7 @@
     <h1>Needs review</h1>
     <p class="muted">What the agent could not settle: uncertain or failed duplicate checks, unknown places, trust signals and fallen trees. Every action is recorded with your initials, and an automatic re-check never undoes it.</p>
   </header>
-  {% if done %}<p class="banner ok" role="status">{{ done }}</p>{% endif %}
+  {% if done %}<p class="banner ok" role="status" data-flash>{{ done }}</p>{% endif %}
   <div id="live-review" data-live="reports incidents">
     {% if not cards %}
       <p class="empty">Nothing waits for review. New uncertain groupings, trust signals and fallen trees appear here as they arrive.</p>

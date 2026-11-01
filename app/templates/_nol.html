@@ -33,11 +33,11 @@
   <p>{{ c.preamble }}</p>
   <p class="muted">Left for the assured: {{ c.preamble_blanks|join(", ") }}.</p>
   <div class="table-wrap">
-  <table>
+  <table class="form-table nol-fields">
     <tbody>
     {% for f in c.fields %}
       <tr class="keep" id="f-{{ f.number }}">
-        <td style="width: 32%"><strong>{{ f.number }}.</strong> {{ f.label }}</td>
+        <td class="field-label"><strong>{{ f.number }}.</strong> {{ f.label }}</td>
         <td>
           {% if f.mode == "assured" %}<div class="gap">{{ c.assured_marker }}</div>
           {% elif f.value is not none %}<div class="value"><strong>{{ f.value }}</strong></div>
@@ -57,17 +57,17 @@
   <h2>Evidence annex for the PCIC adjuster</h2>
   <p class="muted">Every report in incident #{{ c.incident_id }}, oldest first. Photo judgments are by the agent LLM; SAM 3.1 measurements are {{ c.sam_label }}.{% if c.sam_caveat %} {{ c.sam_caveat }}{% endif %} Names and contact details (phone numbers, emails, handles, account names) are removed from the excerpts and the agent's photo notes. Photo links work until raw media are deleted after the retention period; the judgments and measurements stay.</p>
   <div class="table-wrap">
-  <table>
+  <table class="stack">
     <thead><tr><th>Report</th><th>Photo evidence</th><th>What the reporter said</th><th>Trust</th></tr></thead>
     <tbody>
     {% for e in c.annex %}
       <tr class="keep" id="annex-{{ e.report_id }}">
-        <td><a href="{{ report_href(e.report_id, c.incident_id) }}">#{{ e.report_id }}</a><div class="muted">{{ e.at }}</div></td>
-        <td>
+        <td data-label="Report"><a href="{{ report_href(e.report_id, c.incident_id) }}">#{{ e.report_id }}</a><div class="muted">{{ e.at }}</div></td>
+        <td data-label="Photo evidence">
           {% for p in e.photos %}
             <div>
-              {% if p.media_id in available_media %}<a href="/media/{{ p.media_id }}">photo</a>{% else %}<span class="muted">photo deleted (retention)</span>{% endif %}
-              {% if p.overlay_media_id %} · {% if p.overlay_media_id in available_media %}<a href="/media/{{ p.overlay_media_id }}">SAM overlay</a>{% else %}<span class="muted">overlay deleted</span>{% endif %}{% endif %}
+              {% if p.media_id in available_media %}<a href="/media/{{ p.media_id }}" hx-boost="false">photo</a>{% else %}<span class="muted">photo deleted (retention)</span>{% endif %}
+              {% if p.overlay_media_id %} · {% if p.overlay_media_id in available_media %}<a href="/media/{{ p.overlay_media_id }}" hx-boost="false">SAM overlay</a>{% else %}<span class="muted">overlay deleted</span>{% endif %}{% endif %}
               {% set j = p.judgment %}
               {% if j %}
                 <ul class="chips">
@@ -87,8 +87,8 @@
             </div>
           {% else %}<span class="muted">No photo.</span>{% endfor %}
         </td>
-        <td>{% for x in e.excerpts %}<div><span class="muted">{{ x.source }}:</span> “{{ x.text }}”</div>{% else %}<span class="muted">No text.</span>{% endfor %}</td>
-        <td>
+        <td data-label="What the reporter said">{% for x in e.excerpts %}<div><span class="muted">{{ x.source }}:</span> “{{ x.text }}”</div>{% else %}<span class="muted">No text.</span>{% endfor %}</td>
+        <td data-label="Trust">
           {{ signal_chips(e, {}) }}
           {% if c.single_source %}<span class="chip warn">single source</span>{% endif %}
           {% if e.report_id in c.pending_report_ids %}<span class="chip warn">grouping pending officer review</span>{% endif %}

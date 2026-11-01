@@ -1,46 +1,77 @@
+{% from "_icons.html" import icon -%}
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f8f9ff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="rgb(17 20 24)" media="(prefers-color-scheme: dark)">
   <title>{% block title %}Reports{% endblock %} · Ulat</title>
+  <link rel="preload" href="{{ static_url('vendor/roboto/roboto-latin-wght.woff2') }}" as="font" type="font/woff2" crossorigin>
   <link rel="icon" href="{{ static_url('favicon.svg') }}" type="image/svg+xml">
   <link rel="stylesheet" href="{{ static_url('css/app.css') }}">
   {% block head %}{% endblock %}
 </head>
-<body data-live-tokens="{{ live_tokens(request) }}">
+{# Links and forms load the next page into #shell without a full reload (htmx boost); every one is
+   still a plain link or form, so the dashboard works the same with JavaScript off. #}
+<body hx-boost="true" hx-target="#shell" hx-select="#shell" hx-swap="outerHTML transition:true">
   <a class="skip-link" href="#main">Skip to content</a>
-  <header class="site-header">
-    <div class="site-header__inner">
-      <a class="brand" href="/">
-        <span class="brand__mark" aria-hidden="true">U</span>
-        <span class="brand__text"><span class="brand__name">Ulat</span><span class="brand__sub">Biñan City DRRM · typhoon and flood reports</span></span>
-      </a>
-      {% block nav %}
-      <nav class="site-nav" aria-label="Officer dashboard">
-        <ul>
-        {% for href, label in NAV %}
-          <li><a href="{{ href }}"{% if nav_current(request.url.path, href) %} aria-current="page"{% endif %}>{{ label }}</a></li>
-        {% endfor %}
-        </ul>
-      </nav>
-      {% endblock %}
-      <p class="live" data-live-status data-state="connecting" hidden>
-        <span class="live__dot" aria-hidden="true"></span>
-        <span data-live-label role="status">Connecting</span>
-        <span class="live__updated">· updated <time data-live-updated>{{ render_time() }}</time></span>
-      </p>
-      {% if request.state.officer_session %}
-      <form class="signout" method="post" action="/logout">
-        {% if request.state.officer_session.officer %}<span>Signed in as {{ request.state.officer_session.officer }}</span>{% endif %}
-        <button type="submit">Sign out</button>
+  <div class="progress" data-page-progress hidden><span></span></div>
+  <header class="app-bar">
+    <a class="brand" href="/">
+      <span class="brand__mark" aria-hidden="true">U</span>
+      <span class="brand__text"><span class="brand__name">Ulat</span><span class="brand__sub">Biñan City DRRM · typhoon and flood reports</span></span>
+    </a>
+    <p class="live" data-live-status data-state="connecting" hidden>
+      <span class="live__dot" aria-hidden="true"></span>
+      <span data-live-label role="status">Connecting</span>
+      <span class="live__updated">· updated <time data-live-updated>{{ render_time() }}</time></span>
+    </p>
+    {% set session = request.state.officer_session %}
+    {% if session or self.app_bar_menu()|trim %}
+    <button type="button" class="icon-button app-bar__account" popovertarget="account-menu" aria-label="Account{% if session and session.officer %}: {{ session.officer }}{% endif %}">{{ icon("account_circle") }}</button>
+    <div id="account-menu" class="menu" popover>
+      {% if session %}<p class="menu__header">{% if session.officer %}Signed in as {{ session.officer }}{% else %}Signed in{% endif %}</p>{% endif %}
+      {% block app_bar_menu %}{% endblock %}
+      {% if session %}
+      {# A full page load: signing out leaves nothing of the dashboard on screen. #}
+      <form method="post" action="/logout" hx-boost="false">
+        <button type="submit" class="menu__item">{{ icon("logout") }}Sign out</button>
       </form>
       {% endif %}
     </div>
+    {% endif %}
   </header>
-  <main id="main" class="page" tabindex="-1">
-    {% block content %}{% endblock %}
-  </main>
+  {# The part of the page that changes from page to page; the app bar, the live connection and
+     the snackbar outside it stay. #}
+  <div id="shell" class="shell{% block shell_class %}{% endblock %}" hx-history-elt>
+    {% block nav %}
+    <nav class="nav" aria-label="Officer dashboard">
+      <ul class="nav__list">
+      {% for item in NAV_PRIMARY %}{% set current = nav_current(request.url.path, item.href) %}
+        <li><a href="{{ item.href }}"{% if current %} aria-current="page"{% endif %} class="nav__item">{{ icon(item.icon, filled=current, cls="nav__icon") }}<span class="nav__label">{{ item.label }}</span></a></li>
+      {% endfor %}
+        <li class="nav__more-slot"><button type="button" class="nav__item nav__more{% if more_current(request.url.path) %} is-current{% endif %}" popovertarget="nav-more">{{ icon("more_horiz", cls="nav__icon") }}<span class="nav__label">More</span></button></li>
+      </ul>
+      <div id="nav-more" class="nav__sheet" popover>
+        <h2 class="nav__sheet-title">More</h2>
+        <ul class="nav__list nav__list--more">
+        {% for item in NAV_SECONDARY %}{% set current = nav_current(request.url.path, item.href) %}
+          <li><a href="{{ item.href }}"{% if current %} aria-current="page"{% endif %} class="nav__item">{{ icon(item.icon, filled=current, cls="nav__icon") }}<span class="nav__label">{{ item.label }}</span></a></li>
+        {% endfor %}
+        </ul>
+      </div>
+    </nav>
+    {% endblock %}
+    <main id="main" class="page" tabindex="-1" data-live-tokens="{{ live_tokens(request) }}">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+  <div class="snackbar" data-snackbar>
+    <span class="snackbar__text" data-snackbar-text role="status" aria-live="polite" aria-atomic="true"></span>
+    <button type="button" class="icon-button" data-snackbar-close aria-label="Dismiss">{{ icon("close") }}</button>
+  </div>
   <script src="{{ static_url('vendor/htmx-2.0.11/htmx.min.js') }}" defer></script>
   <script src="{{ static_url('js/app.js') }}" defer></script>
   {% block scripts %}{% endblock %}

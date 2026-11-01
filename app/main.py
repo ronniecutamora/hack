@@ -96,6 +96,7 @@ from app.models import (
     manila_time,
     utcnow,
 )
+from app.nav import NAV, PRIMARY, SECONDARY, more_current, nav_current
 from app.nol import deadline_table
 from app.nol_form import COMMODITIES, commodity_for_kind
 from app.rdana import RDANA_DEADLINE, EventInput
@@ -123,23 +124,6 @@ FORM_MAX_BYTES = 16_384
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 STATIC_DIR = Path(__file__).parent / "static"
-
-# The header navigation, in order: (path, label). A page is current for its own path and the
-# paths below it (/incidents/7 is under Incidents).
-NAV = (
-    ("/", "Overview"),
-    ("/review", "Review"),
-    ("/incidents", "Incidents"),
-    ("/reports", "Reports"),
-    ("/map", "Map"),
-    ("/drafts", "Drafts"),
-    ("/damaged-houses", "Damaged houses"),
-    ("/accuracy", "Accuracy"),
-)
-
-
-def nav_current(path: str, href: str) -> bool:
-    return path == href or (href != "/" and path.startswith(href + "/"))
 
 
 @cache
@@ -182,6 +166,9 @@ templates.env.globals["live_tokens"] = live_tokens
 templates.env.globals["render_time"] = lambda: datetime.now(MANILA).strftime("%H:%M:%S")
 templates.env.globals["NAV"] = NAV
 templates.env.globals["nav_current"] = nav_current
+templates.env.globals["NAV_PRIMARY"] = PRIMARY
+templates.env.globals["NAV_SECONDARY"] = SECONDARY
+templates.env.globals["more_current"] = more_current
 templates.env.globals["static_url"] = static_url
 templates.env.globals["current_officer"] = current_officer.get
 

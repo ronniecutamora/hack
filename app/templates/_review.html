@@ -19,12 +19,13 @@
 {% macro review_actions(card, back, form=none) %}
   {% set r = card.report %}
   {% set base = "/reports/" ~ r.id ~ "/review/" %}
+  {# After an action the page returns to this report (data-return-anchor) and confirms it (data-done). #}
   <div class="review-actions">
     {% if r.status == "assessed" %}
     <details class="review-group"{{ _open(card, form, ("merge", "keep", "place"), card.grouping) }}>
       <summary>Grouping and place</summary>
       <div class="decision-forms">
-        <form method="post" action="{{ base }}merge">
+        <form method="post" action="{{ base }}merge" data-return-anchor="report-{{ r.id }}" data-done="Report #{{ r.id }} merged">
           <fieldset><legend>Merge into an incident</legend>
             {% set chosen = (form["values"].get("incident_id") if form and form.report_id == r.id and form.action == "merge" else "")|string %}
             {% if card.targets %}
@@ -39,7 +40,7 @@
             {% endif %}
           </fieldset>
         </form>
-        <form method="post" action="{{ base }}keep">
+        <form method="post" action="{{ base }}keep" data-return-anchor="report-{{ r.id }}" data-done="{{ 'Report #' ~ r.id ~ ' split into its own incident' if card.splits else 'Report #' ~ r.id ~ ' kept as its own incident' }}">
           {% if card.splits %}
           <fieldset><legend>Split into its own incident</legend>
             <p class="muted">It leaves incident #{{ card.incident.id }} for a new incident of its own, and both incidents' figures are recomputed; later re-checks never merge it back.</p>
@@ -54,7 +55,7 @@
           </fieldset>
           {% endif %}
         </form>
-        <form method="post" action="{{ base }}place">
+        <form method="post" action="{{ base }}place" data-return-anchor="report-{{ r.id }}" data-done="Barangay set; report #{{ r.id }} grouped again">
           <fieldset><legend>Set or correct the barangay</legend>
             {% set picked = form["values"].get("barangay") if form and form.report_id == r.id and form.action == "place" else r.barangay %}
             <label>Barangay <select name="barangay" required>
@@ -72,7 +73,7 @@
     <details class="review-group"{{ _open(card, form, ("signal",), card.open_signals|length > 0) }}>
       <summary>Trust signals</summary>
       {% for key, s, verdict in card.signals %}
-        <form method="post" action="{{ base }}signal">
+        <form method="post" action="{{ base }}signal" data-return-anchor="report-{{ r.id }}" data-done="Trust signal check recorded">
           <fieldset><legend><span class="chip{% if s.severity == 'high' %} alert{% else %} warn{% endif %}">{{ s.code|replace('_', ' ') }}</span></legend>
             <p>{{ s.detail }}</p>
             {% if verdict %}<p><span class="chip {{ 'ok' if verdict == 'genuine' else 'alert' }}">{{ SIGNAL_VERDICTS[verdict] }}</span> <span class="muted">You can review it again.</span></p>{% endif %}
@@ -91,7 +92,7 @@
     {% endif %}
     <details class="review-group"{{ _open(card, form, ("tree",), card.tree_suggested and card.tree_verdict is none) }}>
       <summary>Fallen tree{% if card.tree_verdict is not none %} ({{ "confirmed" if card.tree_verdict else "ruled out" }}){% elif card.tree_suggested %} (suggested, not confirmed){% endif %}</summary>
-      <form method="post" action="{{ base }}tree">
+      <form method="post" action="{{ base }}tree" data-return-anchor="report-{{ r.id }}" data-done="Fallen tree answer recorded">
         <fieldset><legend>Is a fallen tree there?</legend>
           <p class="muted">The models do not detect fallen trees reliably; your answer is what the RDANA hazards count.</p>
           {% set v = form["values"].get("verdict") if form and form.report_id == r.id and form.action == "tree" else "" %}
@@ -104,7 +105,7 @@
     <details class="review-group"{{ _open(card, form, ("block", "unblock")) }}>
       <summary>Reporter <code>{{ card.reporter }}</code>{% if card.blocked %} (blocked){% endif %}</summary>
       {% set action = "unblock" if card.blocked else "block" %}
-      <form method="post" action="{{ base }}{{ action }}">
+      <form method="post" action="{{ base }}{{ action }}" data-return-anchor="report-{{ r.id }}" data-done="Reporter {{ card.reporter }} {{ action }}ed">
         <fieldset><legend>{{ "Unblock" if card.blocked else "Block" }} this reporter</legend>
           <p class="muted">{% if card.blocked %}Their new messages will be assessed again.{% else %}Their new messages are stored as held and never reach a model; nothing already counted changes. Same as <code>python -m app.trust block</code>.{% endif %}</p>
           {{ _officer(card, form, action, back) }}

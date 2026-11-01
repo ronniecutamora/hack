@@ -1,6 +1,7 @@
 // Officer map (Leaflet). Barangay boundaries and incident markers come from this app, so they
 // still draw when the OpenStreetMap tiles cannot load (an offline demo). Updates live with the
-// rest of the page: app.js dispatches "ulat:change" with the changed topics.
+// rest of the page: app.js dispatches "ulat:change" with the changed topics. app.js loads Leaflet
+// and this file only when a page shows a map, and calls UlatMap.mount for each map on it.
 (function () {
   "use strict";
   if (!window.L) return;
@@ -132,11 +133,25 @@
       });
     }
     await load();
-    document.addEventListener("ulat:change", (event) => {
+    const onChange = (event) => {
       const topics = event.detail.topics || [];
       if (topics.includes("incidents") || topics.includes("reports")) load();
-    });
+    };
+    document.addEventListener("ulat:change", onChange);
+    mounted.push({ container, map, onChange });
   }
 
-  document.querySelectorAll("[data-live-map]").forEach(init);
+  // A map whose page was replaced by another one (in-app navigation) is taken down with it.
+  const mounted = [];
+  document.addEventListener("ulat:page", () => {
+    for (let i = mounted.length - 1; i >= 0; i--) {
+      const m = mounted[i];
+      if (m.container.isConnected) continue;
+      document.removeEventListener("ulat:change", m.onChange);
+      m.map.remove();
+      mounted.splice(i, 1);
+    }
+  });
+
+  window.UlatMap = { mount: init };
 })();

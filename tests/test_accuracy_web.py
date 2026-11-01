@@ -197,7 +197,9 @@ def test_the_committed_results_file_renders_every_entry(client):
 
 def test_accuracy_is_in_the_navigation_and_linked_from_the_overview(client, results_file):
     client.app.state.results_path = results_file
-    assert '<a href="/accuracy" aria-current="page">Accuracy</a>' in client.get("/accuracy").text
+    assert (
+        '<a href="/accuracy" aria-current="page" class="nav__item">' in client.get("/accuracy").text
+    )
     assert '<a href="/accuracy">How accurate is the agent?</a>' in client.get("/").text
 
 

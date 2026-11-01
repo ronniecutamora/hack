@@ -54,8 +54,8 @@ def events(engine, draft_id=None):
 
 def test_nav_links_to_drafts_and_damaged_houses(client):
     html = client.get("/reports").text
-    assert '<a href="/drafts">Drafts</a>' in html
-    assert '<a href="/damaged-houses">Damaged houses</a>' in html
+    assert '<a href="/drafts" class="nav__item">' in html
+    assert '<a href="/damaged-houses" class="nav__item">' in html
 
 
 def test_drafts_page_lists_barangays_and_unplaced_incidents(client, engine):

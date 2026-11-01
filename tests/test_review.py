@@ -483,7 +483,7 @@ def test_live_topics_change_after_an_officer_action(client, engine, settings, ju
 def test_review_queue_shows_the_judges_comparisons_and_is_linked(client, engine, settings, judge):
     voice, photo = casile_with_uncertain_photo(engine, settings, judge)
     page = client.get("/review").text
-    assert '<a href="/review" aria-current="page">Review</a>' in page
+    assert '<a href="/review" aria-current="page" class="nav__item">' in page
     assert 'id="live-review" data-live="reports incidents"' in page
     assert "grouping uncertain" in page and UNSURE["reason"] in page
     assert ">70%<" in page and "fake-pair-judge" in page

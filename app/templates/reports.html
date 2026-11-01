@@ -58,9 +58,9 @@
               {% set pa = p.assessment %}
               <div class="evidence">
                 {% if p.overlay and p.overlay.purged_at is none %}
-                  <a href="/media/{{ p.overlay.id }}"><img src="/media/{{ p.overlay.id }}" alt="Photo with SAM masks: roofs orange, floodwater blue" loading="lazy"></a>
+                  <a href="/media/{{ p.overlay.id }}" hx-boost="false"><img src="/media/{{ p.overlay.id }}" alt="Photo with SAM masks: roofs orange, floodwater blue" loading="lazy"></a>
                 {% elif p.photo and p.photo.purged_at is none %}
-                  <a href="/media/{{ p.photo.id }}"><img src="/media/{{ p.photo.id }}" alt="Reported photo" loading="lazy"></a>
+                  <a href="/media/{{ p.photo.id }}" hx-boost="false"><img src="/media/{{ p.photo.id }}" alt="Reported photo" loading="lazy"></a>
                 {% else %}
                   <span class="muted">Photo deleted after {{ ttl_hours }} h (privacy); results kept.</span>
                 {% endif %}

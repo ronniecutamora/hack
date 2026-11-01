@@ -52,7 +52,7 @@
       {{ signal_chips(a, related_incidents) }}
       {% if r.status == 'held' %}<p class="chip warn">held{% if r.hold_reason %}: {{ r.hold_reason }}{% endif %}</p>{% endif %}
       <div class="evidence">
-        {% for m in item.media %}<a href="/media/{{ m.id }}"><img src="/media/{{ m.id }}" alt="Report photo evidence{% if m.kind == 'overlay' %} with measurement overlay{% endif %}" loading="lazy"></a>{% endfor %}
+        {% for m in item.media %}<a href="/media/{{ m.id }}" hx-boost="false"><img src="/media/{{ m.id }}" alt="Report photo evidence{% if m.kind == 'overlay' %} with measurement overlay{% endif %}" loading="lazy"></a>{% endfor %}
       </div>
       {% if item.had_photos and not item.media %}<p class="muted">Photo evidence deleted after retention; assessment kept.</p>{% endif %}
       {{ agent_trace(item.trace, r.id) }}

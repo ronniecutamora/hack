@@ -79,7 +79,7 @@ def test_markers_are_exact_approximate_or_left_off_the_map(client, engine):
     assert barangay_at(lat, lon) == BY_NAME["Casile"]
 
     html = client.get("/map").text
-    assert '<a href="/map" aria-current="page">Map</a>' in html
+    assert '<a href="/map" aria-current="page" class="nav__item">' in html
     assert 'id="live-map-list" data-live="incidents reports"' in html
     assert ">approximate</span>" in html and "GPS of 2 reports (mean)" in html
     assert "Not on the map (no GPS and no barangay)" in html and f"/incidents/{nowhere}" in html

@@ -90,7 +90,7 @@ def test_overview_links_every_tile_to_its_page(client, engine):
         assert href in home
     assert re.search(r'href="/drafts#nol-fisheries-\d+"', home)
     assert 'id="live-kpis" data-live="reports incidents drafts spend"' in home
-    assert '<a href="/" aria-current="page">Overview</a>' in home
+    assert '<a href="/" aria-current="page" class="nav__item">' in home
 
 
 def test_overview_lists_attention_and_latest_reports_without_reporter_ids(client, engine):

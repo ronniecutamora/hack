@@ -1,9 +1,11 @@
-{# Status badges: the word is always shown; colour only repeats it. #}
+{# Status badges: the word is always shown; the colour and the icon only repeat it. #}
+{% from "_icons.html" import icon %}
 {% macro incident_status(status) -%}
-  <span class="chip {{ 'warn' if status == 'needs_officer' else 'info' }}">{{ status|replace("_", " ") }}</span>
+  <span class="chip {{ 'warn' if status == 'needs_officer' else 'info' }}">{{ icon('warning' if status == 'needs_officer' else 'info') }}{{ status|replace("_", " ") }}</span>
 {%- endmacro %}
 
 {% macro draft_status(status, nol=false) -%}
   {%- set tone = {"approved": "ok", "rejected": "alert", "superseded": ""}.get(status, "warn") -%}
-  <span class="chip{{ ' ' ~ tone if tone }}">{{ "approved for filing, not filed" if nol and status == "approved" else status }}</span>
+  {%- set symbol = {"approved": "check_circle", "rejected": "error", "superseded": ""}.get(status, "schedule") -%}
+  <span class="chip{{ ' ' ~ tone if tone }}">{% if symbol %}{{ icon(symbol) }}{% endif %}{{ "approved for filing, not filed" if nol and status == "approved" else status }}</span>
 {%- endmacro %}

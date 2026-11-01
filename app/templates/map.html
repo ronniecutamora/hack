@@ -2,7 +2,6 @@
 {% import "_map.html" as m %}
 {% from "_status.html" import incident_status %}
 {% block title %}Map{% endblock %}
-{% block head %}{{ m.head() }}{% endblock %}
 {% block content %}
   <header>
     <h1>Map</h1>
@@ -54,4 +53,3 @@
     {% endif %}
   </div>
 {% endblock %}
-{% block scripts %}{{ m.scripts() }}{% endblock %}

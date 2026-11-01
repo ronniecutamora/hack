@@ -93,6 +93,18 @@ def test_public_routes_stay_open(client):
     assert client.post("/telegram/webhook/abc", json={}).status_code == 404
 
 
+def test_signing_in_and_out_are_full_page_loads(client):
+    # The app bar and the live connection start fresh after either; the sign-in page has no nav.
+    login = client.get("/login").text
+    assert '<form method="post" action="/login" hx-boost="false">' in login
+    assert 'class="shell shell--bare"' in login and 'class="nav"' not in login
+    sign_in(client)
+    assert (
+        '<form method="post" action="/logout" hx-boost="false">'
+        in client.get("/", headers=HTML).text
+    )
+
+
 def test_signed_in_officer_reaches_every_page(client):
     sign_in(client)
     for path in ("/", "/reports", "/incidents", "/review", "/drafts", "/map", "/damaged-houses"):

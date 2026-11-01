@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% from "_evidence.html" import evidence_refs, houses_table %}
 {% from "_links.html" import report_href %}
+{% from "_icons.html" import icon %}
 {% block title %}{% if draft.kind == 'rdana' %}RDANA draft · {{ draft.barangay }} v{{ draft.version }}{% elif nol %}Notice of Loss draft · incident #{{ draft.incident_id }} v{{ draft.version }}{% else %}Damaged houses v{{ draft.version }}{% endif %}{% endblock %}
 {% block content %}
 <div id="live-draft" data-live="drafts reports incidents">
   {% set gap = c.not_in_reports or "— not in reports (for the RDANA team)" %}
-  <p class="no-print toolbar"><a href="/drafts">← Drafts</a> · <button type="button" onclick="window.print()">Print</button>{% if draft.kind == 'damaged_houses' %} · <a href="/drafts/{{ draft.id }}.csv">Download this version as CSV</a>{% endif %}</p>
+  <p class="no-print toolbar"><a class="button button--text" href="/drafts">{{ icon("arrow_back") }}Drafts</a> <button type="button" onclick="window.print()">{{ icon("print") }}Print</button>{% if draft.kind == 'damaged_houses' %} <a class="button button--text" href="/drafts/{{ draft.id }}.csv" download hx-boost="false">{{ icon("download") }}Download this version as CSV</a>{% endif %}</p>
 
   {% if draft.status == 'approved' %}
     <p class="banner ok keep"><strong>{{ "APPROVED FOR FILING, NOT FILED" if nol else "APPROVED" }}</strong> {{ draft.decided_at|manila_time }}{% if draft.decided_by %} by {{ draft.decided_by }}{% endif %}{% if draft.decision_reason %} · {{ draft.decision_reason }}{% endif %}. This version is frozen.{% if nol %} {{ c.not_filed }} The filing clock keeps running.{% endif %}</p>
@@ -42,7 +43,7 @@
       <section class="rdana-section">
         <h2>{% if section.number %}{{ section.number }}. {% endif %}{{ section.title }}</h2>
         <div class="table-wrap">
-        <table>
+        <table class="form-table">
           <tbody>
           {% for f in section.fields %}
             {% if f.heading %}
@@ -50,7 +51,7 @@
             {% else %}
               {% set selected = (f.value or "").split(", ") %}
               <tr class="keep" id="f-{{ f.key }}">
-                <td style="width: 38%"><strong>{{ f.number }}</strong>{% if f.sic %} <span class="muted">(sic)</span>{% endif %} {{ f.label }}{% if f.required %} <span class="muted">(required)</span>{% endif %}</td>
+                <td class="field-label"><strong>{{ f.number }}</strong>{% if f.sic %} <span class="muted">(sic)</span>{% endif %} {{ f.label }}{% if f.required %} <span class="muted">(required)</span>{% endif %}</td>
                 <td>
                   {% set waiting = f.count.pending if f.count is defined else none %}
                   {% if f.value is not none %}
@@ -109,7 +110,7 @@
       <h2>Officer decision</h2>
       <p class="muted">Write your designation so the audit shows who decided (the sign-in passcode is shared, so it cannot tell officers apart).</p>
       <div class="decision-forms">
-        <form method="post" action="/drafts/{{ draft.id }}/approve">
+        <form method="post" action="/drafts/{{ draft.id }}/approve" data-done="{{ 'Approved for filing. Ulat files nothing: the assured files with PCIC.' if nol else 'Draft approved' }}">
           <fieldset><legend>Approve</legend>
             <label>Decided by (designation) <input type="text" name="decided_by" maxlength="{{ decided_by_max }}" value="{{ current_officer() }}" placeholder="e.g. CDRRMO Head"></label>
             {% if pending %}<label>Reason (required: figures wait for grouping review) <textarea name="reason" required minlength="{{ reason_min }}" maxlength="{{ reason_max }}" rows="2"></textarea></label>
@@ -118,11 +119,11 @@
             <button type="submit">{{ "Approve for filing (Ulat files nothing)" if nol else "Approve this version" }}</button>
           </fieldset>
         </form>
-        <form method="post" action="/drafts/{{ draft.id }}/reject">
+        <form method="post" action="/drafts/{{ draft.id }}/reject" data-done="Draft rejected">
           <fieldset><legend>Reject</legend>
             <label>Decided by (designation) <input type="text" name="decided_by" maxlength="{{ decided_by_max }}" value="{{ current_officer() }}"></label>
             <label>Reason (required) <textarea name="reason" required minlength="{{ reason_min }}" maxlength="{{ reason_max }}" rows="2"></textarea></label>
-            <button type="submit">Reject</button>
+            <button type="submit" class="button--danger">Reject</button>
           </fieldset>
         </form>
       </div>

@@ -1,7 +1,8 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon %}
 {% block title %}Request not completed{% endblock %}
 {% block content %}
-  <h1>Request not completed</h1>
-  <p class="banner alert">{{ message }}</p>
-  <p><a href="javascript:history.back()">Go back</a> · <a href="/drafts">Drafts</a></p>
+  <header><h1>Request not completed</h1></header>
+  <p class="banner alert" role="alert">{{ message }}</p>
+  <p class="toolbar"><button type="button" onclick="history.back()">{{ icon("arrow_back") }}Go back</button> <a class="button button--text" href="/drafts">Drafts</a></p>
 {% endblock %}

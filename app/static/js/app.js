@@ -1,4 +1,5 @@
-// Ulat officer dashboard. Plain script, no build step; every page works without it.
+// Ulat officer dashboard. Plain script, no build step; every page works without it: links and
+// forms are plain HTML, and htmx only loads the next page into #shell instead of reloading.
 (function () {
   "use strict";
 
@@ -64,7 +65,11 @@
   const pending = new Set();
   let known = null;
 
-  try { known = JSON.parse(document.body.dataset.liveTokens || "null"); } catch (e) { known = null; }
+  const pageTokens = () => {
+    const main = document.querySelector("[data-live-tokens]");
+    try { return JSON.parse((main && main.dataset.liveTokens) || "null"); } catch (e) { return null; }
+  };
+  known = pageTokens();
 
   const clock = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
@@ -117,7 +122,8 @@
   // from what the server rendered.
   function inUse(region) {
     const active = document.activeElement;
-    if (active && active !== document.body && active !== region && region.contains(active)) return true;
+    if (active && active !== document.body && active !== region && region.contains(active)
+      && active.getAttribute("tabindex") !== "-1") return true;
     return Array.from(region.querySelectorAll("input, textarea, select")).some(fieldChanged);
   }
 
@@ -206,7 +212,7 @@
     busy.add(id);
     const before = capture(region);
     window.htmx.ajax("GET", window.location.pathname + window.location.search, {
-      target: "#" + id, select: "#" + id, swap: "outerHTML",
+      target: "#" + id, select: "#" + id, swap: "outerHTML ignoreTitle:true",
     }).then(() => {
       const fresh = document.getElementById(id);
       if (fresh && fresh !== region) { restore(fresh, before); markUpdated(); }
@@ -296,11 +302,251 @@
   window.addEventListener("pagehide", () => { if (source) { source.close(); source = null; } });
   window.addEventListener("pageshow", (event) => { if (event.persisted && hasListeners()) { failures = 0; connect(); } });
 
-  if (window.htmx) {
-    window.htmx.config.ignoreTitle = true;
-    window.htmx.config.historyEnabled = false;
+  // Connect when a page with live sections or a map is shown; the stream then stays open while
+  // the officer moves between pages (one connection per tab, no reconnect on each navigation).
+  function ensureLive() {
+    if (!window.htmx || source || pollTimer || !hasListeners()) return;
+    failures = 0;
+    connect();
   }
-  if (hasListeners() && window.htmx) connect();
 
-  window.Ulat = { tickCountdowns, inUse, refresh };
+  // A page loaded into the shell was rendered with its own tokens. Before the stream is open they
+  // are the starting point; after, a section whose topics differ from what the stream last said
+  // refreshes once (a change can land between the render and the swap).
+  function adoptPage() {
+    Array.from(pending).forEach((id) => { if (!document.getElementById(id)) pending.delete(id); });
+    const tokens = pageTokens();
+    if (!tokens) return;
+    if (!known || !(source || pollTimer)) { known = tokens; return; }
+    const stale = new Set(Object.keys(tokens).filter((t) => tokens[t] !== known[t]));
+    if (stale.size) regions().forEach((region) => {
+      if (region.dataset.live.split(/\s+/).some((t) => stale.has(t))) schedule(region.id);
+    });
+  }
+
+  // ---------- Maps: Leaflet loads only on a page that shows a map ----------
+  const assets = new Map();
+  function loadAsset(url) {
+    if (!assets.has(url)) assets.set(url, new Promise((resolve, reject) => {
+      const css = /\.css(\?|$)/.test(url);
+      const node = document.createElement(css ? "link" : "script");
+      if (css) { node.rel = "stylesheet"; node.href = url; } else { node.src = url; node.async = false; }
+      node.onload = resolve;
+      node.onerror = () => { assets.delete(url); node.remove(); reject(new Error(url)); };
+      document.head.append(node);
+    }));
+    return assets.get(url);
+  }
+
+  function mountMaps() {
+    document.querySelectorAll("[data-live-map]:not([data-mounted])").forEach((container) => {
+      container.dataset.mounted = "";
+      const urls = (container.dataset.assets || "").split(/\s+/).filter(Boolean);
+      Promise.all(urls.map(loadAsset)).then(() => {
+        if (window.UlatMap && container.isConnected) window.UlatMap.mount(container);
+      }).catch(() => {
+        const note = container.parentElement.querySelector("[data-map-note]");
+        if (note) { note.textContent = "The map could not load. The list on this page has every incident."; note.hidden = false; }
+      });
+    });
+  }
+
+  // ---------- Snackbar: the result of an action ----------
+  const SNACKBAR_MS = 6000;
+  const SNACKBAR_ERROR_MS = 10000;
+  const snack = document.querySelector("[data-snackbar]");
+  let snackTimer = null;
+
+  function hideSnackbar() {
+    clearTimeout(snackTimer);
+    if (!snack || !snack.classList.contains("is-open")) return;
+    snack.classList.remove("is-open", "snackbar--error");
+    // Emptied after it fades, so a screen reader never meets a stale message.
+    snackTimer = setTimeout(() => { snack.querySelector("[data-snackbar-text]").textContent = ""; }, 200);
+  }
+
+  function snackbar(text, tone) {
+    if (!snack || !text) return;
+    clearTimeout(snackTimer);
+    snack.classList.toggle("snackbar--error", tone === "error");
+    snack.classList.add("is-open");
+    snack.querySelector("[data-snackbar-text]").textContent = text;
+    snackTimer = setTimeout(hideSnackbar, tone === "error" ? SNACKBAR_ERROR_MS : SNACKBAR_MS);
+  }
+  document.addEventListener("click", (event) => { if (event.target.closest("[data-snackbar-close]")) hideSnackbar(); });
+
+  // ---------- Page navigation without reloads (htmx boost on <body>) ----------
+  // Links and forms load the next page's #shell (navigation and content); the app bar, the live
+  // connection and the snackbar stay. The address bar, Back and Forward work as usual: Back
+  // re-fetches the page (never a stale or stored copy) and returns to where the officer was.
+  const PROGRESS_DELAY_MS = 150;
+  const progress = document.querySelector("[data-page-progress]");
+  const scrolls = new Map();   // scroll position per page, for Back and Forward
+  const here = () => window.location.pathname + window.location.search;
+  let shownPath = here();
+  let nav = null;              // the boosted request in flight: { verb, elt, swapping }
+  let progressTimer = null;
+
+  function showProgress(on) {
+    clearTimeout(progressTimer);
+    if (!progress) return;
+    if (on) progressTimer = setTimeout(() => { progress.hidden = false; }, PROGRESS_DELAY_MS);
+    else progress.hidden = true;
+  }
+
+  function closePopovers() {
+    document.querySelectorAll("[popover]").forEach((p) => {
+      try { if (p.matches(":popover-open")) p.hidePopover(); } catch (e) { /* no popover support */ }
+    });
+  }
+
+  function setBusy(form, busy) {
+    if (!form || form.tagName !== "FORM") return;
+    form.querySelectorAll("button:not([type]), button[type=submit]").forEach((b) => {
+      b.disabled = busy;
+      if (busy) b.setAttribute("aria-busy", "true"); else b.removeAttribute("aria-busy");
+    });
+  }
+
+  // For screen readers and keyboards: the new page starts at its heading.
+  function focusHeading() {
+    const main = document.getElementById("main");
+    const target = (main && main.querySelector("h1")) || main;
+    if (!target) return;
+    if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
+    target.focus({ preventScroll: true });
+  }
+
+  function pageShown() {
+    shownPath = here();
+    closePopovers();
+    mountMaps();
+    adoptPage();
+    ensureLive();
+    document.dispatchEvent(new CustomEvent("ulat:page"));
+  }
+
+  document.addEventListener("htmx:beforeRequest", (event) => {
+    if (!event.detail.boosted) return;
+    nav = { verb: event.detail.requestConfig.verb, elt: event.detail.elt, swapping: false };
+    closePopovers();
+    hideSnackbar();
+    showProgress(true);
+    setBusy(event.detail.elt, true);
+  });
+
+  document.addEventListener("htmx:beforeSwap", (event) => {
+    const detail = event.detail;
+    if (!detail.boosted || !nav) return;
+    // Any dashboard page is shown, an error page too (a form's 4xx carries its message).
+    if (/\bid="shell"/.test(detail.xhr.responseText || "")) {
+      detail.shouldSwap = true;
+      detail.isError = false;
+      nav.swapping = true;
+      return;
+    }
+    // Not a dashboard page (a download, an image, a plain server error): let the browser have it.
+    detail.shouldSwap = false;
+    if (nav.verb === "get") { window.location.assign(detail.xhr.responseURL || detail.pathInfo.finalRequestPath); return; }
+    snackbar("The server could not finish this request (error " + detail.xhr.status + "). Reload the page to see what was saved.", "error");
+  });
+
+  document.addEventListener("htmx:beforeHistoryUpdate", (event) => {
+    const update = event.detail.history;
+    if (!update || !update.type) return;
+    window.history.scrollRestoration = "manual";
+    // A refused form keeps the page's own address (a reload shows the page, not the form's URL)
+    // in a new entry, as the browser would: Back, or the error page's "Go back", returns to it.
+    if (event.detail.xhr && event.detail.xhr.status >= 400) { update.type = "push"; update.path = here(); return; }
+    // Like the browser: a link to the address already shown replaces it instead of adding one.
+    if (update.type === "push" && nav && nav.verb === "get" && update.path.split("#")[0] === here()) update.type = "replace";
+  });
+
+  // Each history entry this page shows gets an id, so a Back or Forward that only moves between
+  // #fragments of the same entry is told apart from one to another page at the same address.
+  let entry = null;
+  function markEntry() {
+    entry = Date.now().toString(36) + Math.random().toString(36).slice(2);
+    window.history.replaceState(Object.assign({}, window.history.state, { htmx: true, ulat: entry }), "");
+  }
+  document.addEventListener("htmx:pushedIntoHistory", markEntry);
+  document.addEventListener("htmx:replacedInHistory", markEntry);
+
+  document.addEventListener("htmx:afterRequest", (event) => {
+    if (!event.detail.boosted) return;
+    showProgress(false);
+    setBusy(event.detail.elt, false);
+    if (nav && !nav.swapping) nav = null;
+  });
+
+  document.addEventListener("htmx:sendError", (event) => {
+    if (event.detail.boosted) snackbar("No connection. Check your signal and try again; nothing was sent.", "error");
+  });
+
+  document.addEventListener("htmx:afterSettle", (event) => {
+    if (!nav || !nav.swapping || !event.detail.elt || event.detail.elt.id !== "shell") return;
+    const done = nav;
+    nav = null;
+    pageShown();
+    const failed = event.detail.xhr && event.detail.xhr.status >= 400;
+    const main = document.getElementById("main");
+    if (failed) {
+      const problem = main.querySelector('[aria-invalid="true"], [role="alert"], .banner.alert');
+      if (problem) {
+        problem.scrollIntoView({ block: "center" });
+        if (!problem.matches("input, textarea, select")) problem.setAttribute("tabindex", "-1");
+        problem.focus({ preventScroll: true });
+      } else { window.scrollTo(0, 0); focusHeading(); }
+      if (done.verb !== "get") snackbar("Not saved. The page says what to fix.", "error");
+      return;
+    }
+    const hash = window.location.hash.slice(1);
+    const anchor = (hash && document.getElementById(decodeURIComponent(hash)))
+      || (done.elt.dataset && done.elt.dataset.returnAnchor && document.getElementById(done.elt.dataset.returnAnchor));
+    if (anchor) anchor.scrollIntoView({ block: "start" }); else window.scrollTo(0, 0);
+    focusHeading();
+    if (done.verb !== "get") {
+      const flash = main.querySelector("[data-flash]");
+      snackbar((flash && flash.textContent.trim()) || (done.elt.dataset && done.elt.dataset.done));
+    }
+  });
+
+  // Back and Forward: htmx fetches the page again; show progress, report a failed load, and
+  // return to the scroll position the officer left.
+  document.addEventListener("htmx:historyCacheMiss", (event) => {
+    showProgress(true);
+    const xhr = event.detail.xhr;
+    xhr.addEventListener("loadend", () => showProgress(false));
+    xhr.addEventListener("error", () => snackbar("No connection: this page could not load. Try again when you have signal.", "error"));
+  });
+  document.addEventListener("htmx:historyCacheMissLoadError", () => {
+    snackbar("This page could not load. Reload to try again.", "error");
+  });
+  document.addEventListener("htmx:beforeHistorySave", () => { scrolls.set(shownPath, window.scrollY); });
+  document.addEventListener("htmx:historyRestore", () => {
+    markEntry();
+    pageShown();
+    window.scrollTo(0, scrolls.get(here()) || 0);
+    focusHeading();
+  });
+  // A Back or Forward that only changes the #fragment stays on this page (no re-fetch).
+  window.addEventListener("load", () => {
+    const htmxPopstate = window.onpopstate;
+    if (!htmxPopstate) return;
+    window.onpopstate = (event) => {
+      if (event.state && event.state.ulat && event.state.ulat === entry) return;
+      htmxPopstate.call(window, event);
+    };
+  });
+
+  if (window.htmx) {
+    const config = window.htmx.config;
+    config.historyCacheSize = 0;           // never keep report content in sessionStorage
+    config.scrollIntoViewOnBoost = false;  // handled above: top, the #anchor, or Back's position
+  }
+  if (window.htmx) markEntry();
+  mountMaps();
+  ensureLive();
+
+  window.Ulat = { tickCountdowns, inUse, refresh, snackbar };
 })();

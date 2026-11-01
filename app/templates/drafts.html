@@ -3,6 +3,7 @@
 {% from "_links.html" import report_href %}
 {% from "_deadline.html" import clock, deadline_notes %}
 {% from "_status.html" import draft_status %}
+{% from "_icons.html" import icon %}
 {% block content %}
 <div id="live-drafts" data-live="reports incidents drafts">
   <header>
@@ -10,18 +11,18 @@
     <p class="muted">RDANA form (NDRRMC Memo 107 s. 2021, Annex I) per barangay · {{ rdana_deadline.label }} within {{ rdana_deadline.window_text }} of {{ rdana_deadline.start }} (<a href="{{ rdana_deadline.url }}">{{ rdana_deadline.source }}</a>) · Philippine time (GMT+8)</p>
   </header>
   <p>Each draft fills only what the reports show, links every value to its evidence and leaves the rest for the RDANA team. Nothing is submitted until you approve it.</p>
-  <p class="toolbar"><a href="/damaged-houses">Damaged-houses table (DROMIC columns)</a> · <a href="/damaged-houses.csv">Download CSV</a></p>
+  <p class="toolbar"><a class="button button--tonal" href="/damaged-houses">{{ icon("house") }}Damaged-houses table (DROMIC columns)</a> <a class="button button--text" href="/damaged-houses.csv" download hx-boost="false">{{ icon("download") }}Download CSV</a></p>
   {% if not statuses %}
     <p class="empty">No barangay has assessed reports yet. Drafts can be generated once reports are assessed and placed.</p>
   {% else %}
     <div class="table-wrap">
-    <table>
+    <table class="stack">
       <thead><tr><th>Barangay</th><th>Evidence</th><th>Latest RDANA draft</th><th class="no-print">Generate</th></tr></thead>
       <tbody>
       {% for s in statuses %}
         <tr id="barangay-{{ s.barangay|replace(' ', '-') }}">
-          <td><strong>{{ s.barangay }}</strong></td>
-          <td>
+          <td data-label="Barangay"><strong>{{ s.barangay }}</strong></td>
+          <td data-label="Evidence">
             {% if s.evidence %}
               {{ s.evidence.report_ids|length }} report{{ 's' if s.evidence.report_ids|length != 1 }} in {{ s.evidence.incidents|length }} incident{{ 's' if s.evidence.incidents|length != 1 }}
               <div class="muted">{% for i in s.evidence.incidents %}{% if i.incident_id %}<a href="/incidents/{{ i.incident_id }}">#{{ i.incident_id }}</a>{% else %}ungrouped <a href="{{ report_href(i.report_ids[0]) }}">report #{{ i.report_ids[0] }}</a>{% endif %}{{ ", " if not loop.last }}{% endfor %}</div>
@@ -30,7 +31,7 @@
               {% if s.evidence.unassessed_report_ids %}<div class="chip warn">{{ s.evidence.unassessed_report_ids|length }} report{{ 's' if s.evidence.unassessed_report_ids|length != 1 }} not assessed yet, not counted</div>{% endif %}
             {% else %}<span class="muted">No assessed reports placed here now.</span>{% endif %}
           </td>
-          <td>
+          <td data-label="Latest RDANA draft">
             {% if s.latest %}
               <a href="/drafts/{{ s.latest.id }}">Version {{ s.latest.version }}</a>
               {{ draft_status(s.latest.status) }}
@@ -41,7 +42,7 @@
           </td>
           <td class="no-print">
             {% if s.evidence %}
-            <form method="post" action="/drafts">
+            <form method="post" action="/drafts" data-done="RDANA draft generated for {{ s.barangay }}">
               <input type="hidden" name="barangay" value="{{ s.barangay }}">
               <details><summary>Event details (optional)</summary>
                 <label>1.1.1 Name of operation/event <input type="text" name="event_name" maxlength="160" placeholder="e.g. Typhoon response 2026"></label>
@@ -72,19 +73,19 @@
       <p class="empty">No assessed report states {{ commodity.name }} damage yet.</p>
     {% else %}
     <div class="table-wrap">
-    <table>
+    <table class="stack">
       <thead><tr><th>Incident</th><th>Filing clock (from the first report)</th><th>Latest draft</th><th class="no-print">Generate</th></tr></thead>
       <tbody>
       {% for n in rows %}
         <tr id="{{ n.anchor }}">
-          <td><a href="/incidents/{{ n.incident.incident_id }}">Incident #{{ n.incident.incident_id }}</a> · {{ n.incident.barangay or "Location unknown" }}
+          <td data-label="Incident"><a href="/incidents/{{ n.incident.incident_id }}">Incident #{{ n.incident.incident_id }}</a> · {{ n.incident.barangay or "Location unknown" }}
             <div class="muted">{{ n.incident.report_ids|length }} report{{ 's' if n.incident.report_ids|length != 1 }} · first {{ n.incident.members[0].at|manila_time }}{% if n.incident.place() %} · {{ n.incident.place() }}{% endif %}</div>
             {% if n.incident.reporter_count == 1 %}<span class="chip warn">single source</span>{% endif %}
             {% if n.incident.pending %}<span class="chip warn">grouping needs officer review</span>{% endif %}
             {% if n.flagged_report_ids %}<span class="chip alert">flagged: report{{ 's' if n.flagged_report_ids|length != 1 }} {{ n.flagged_report_ids|join(", ") }}</span>{% endif %}
           </td>
-          <td>{% for row, c in n.clocks %}<div>{{ clock(row, c) }}</div>{% endfor %}</td>
-          <td>
+          <td data-label="Filing clock">{% for row, c in n.clocks %}<div>{{ clock(row, c) }}</div>{% endfor %}</td>
+          <td data-label="Latest draft">
             {% if n.latest %}
               <a href="/drafts/{{ n.latest.id }}">Version {{ n.latest.version }}</a>
               {{ draft_status(n.latest.status, nol=true) }}
@@ -93,7 +94,7 @@
             {% else %}<span class="muted">None yet</span>{% endif %}
           </td>
           <td class="no-print">
-            <form method="post" action="/drafts/notice-of-loss">
+            <form method="post" action="/drafts/notice-of-loss" data-done="Notice of Loss draft generated for incident #{{ n.incident.incident_id }}">
               <input type="hidden" name="commodity" value="{{ commodity.key }}">
               <input type="hidden" name="incident_id" value="{{ n.incident.incident_id }}">
               <button type="submit">Generate Notice of Loss draft</button>
@@ -111,23 +112,23 @@
   <section class="no-print">
     <h2>Damaged-houses table</h2>
     {% if has_house_counts %}
-      <form method="post" action="/drafts/damaged-houses"><button type="submit">Save the current table as a draft for approval</button></form>
+      <form method="post" action="/drafts/damaged-houses" data-done="Damaged-houses table saved as a draft"><button type="submit">Save the current table as a draft for approval</button></form>
     {% else %}<p class="muted">No report states a number of damaged houses yet.</p>{% endif %}
   </section>
   <h2 id="all-drafts">All drafts</h2>
   {% if not history %}<p class="empty">No drafts generated yet.</p>{% else %}
   <div class="table-wrap">
-  <table>
+  <table class="stack">
     <thead><tr><th>Draft</th><th>Output</th><th>Version</th><th>Status</th><th>Generated</th><th>Decided</th></tr></thead>
     <tbody>
     {% for d in history %}
       <tr id="draft-{{ d.id }}">
-        <td><a href="/drafts/{{ d.id }}">#{{ d.id }}</a></td>
-        <td>{{ output_label(d) }}</td>
-        <td>{{ d.version }}</td>
-        <td>{{ draft_status(d.status) }}</td>
-        <td>{{ d.created_at|manila_time }}</td>
-        <td>{% if d.decided_at %}{{ d.decided_at|manila_time }}{% if d.decided_by %} · {{ d.decided_by }}{% endif %}{% endif %}</td>
+        <td data-label="Draft"><a href="/drafts/{{ d.id }}">#{{ d.id }}</a></td>
+        <td data-label="Output">{{ output_label(d) }}</td>
+        <td data-label="Version">{{ d.version }}</td>
+        <td data-label="Status">{{ draft_status(d.status) }}</td>
+        <td data-label="Generated">{{ d.created_at|manila_time }}</td>
+        <td data-label="Decided">{% if d.decided_at %}{{ d.decided_at|manila_time }}{% if d.decided_by %} · {{ d.decided_by }}{% endif %}{% endif %}</td>
       </tr>
     {% endfor %}
     </tbody>
