@@ -17,7 +17,7 @@ else edits the numbers by hand. Its shape (``schema`` 1)::
       },
       "entries": [                       # one per (task, dataset, model)
         {
-          "task": "photo_judge" | "pair_judge" | "screen",
+          "task": "photo_judge" | "pair_judge" | "screen" | "transcribe",
           "dataset": "<id>",
           "model": str,                  # backend name, e.g. "muse-spark-1.3"
           "model_id": str,               # the provider's model id
@@ -40,7 +40,12 @@ threshold, review_rate, reviews and miss_ids. ``screen`` metrics (the not-a-repo
 app.screening): scores for the "real report" class (a kept message is a positive), plus
 wrongly_filtered (real reports screened out), non_reports_filtered, rule_filtered (dropped by
 the free rule), model_calls (screening calls made), unsure and miss_ids. ``scores`` are
-precision, recall, f1 and the tp/fp/fn/tn counts.
+precision, recall, f1 and the tp/fp/fn/tn counts. ``transcribe`` metrics (Voice Transcribe on
+voice notes, scripts.eval_transcribe): reference_words, production (the settings key the bot
+uses) and settings {name: {label, language_bias (list or null), keywords (what was sent:
+"none", "barangays" or "barangays+places"), keyword_count, wer, wer_clean (after
+app.transcript_cleanup), place_names_heard, place_names (both null when unlabelled)}}; every
+setting was run on the same n notes.
 """
 
 import json
@@ -56,7 +61,7 @@ from app.models import MANILA
 
 RESULTS_PATH = REPO_ROOT / "data" / "eval" / "results.json"
 SCHEMA_VERSION = 1
-TASKS = ("photo_judge", "pair_judge", "screen")
+TASKS = ("photo_judge", "pair_judge", "screen", "transcribe")
 PROVENANCES = ("real", "synthetic")
 FLAGS = ("floodwater", "debris", "tarpaulin", "fallen_tree")
 SAM_CONCEPTS = ("roof", "floodwater")
@@ -67,10 +72,14 @@ _ENTRY_KEYS = (
     "spend_usd", "metrics",
 )  # fmt: skip
 
-Task = Literal["photo_judge", "pair_judge", "screen"]
+Task = Literal["photo_judge", "pair_judge", "screen", "transcribe"]
 SCREEN_KEYS = (
     "wrongly_filtered", "non_reports_filtered", "rule_filtered", "model_calls", "unsure",
     "miss_ids",
+)  # fmt: skip
+TRANSCRIBE_SETTING_KEYS = (
+    "label", "language_bias", "keywords", "keyword_count", "wer", "wer_clean",
+    "place_names_heard", "place_names",
 )  # fmt: skip
 
 
@@ -200,6 +209,8 @@ def _metric_errors(task: str, metrics: Any) -> list[str]:
     if task == "screen":
         missing = [k for k in (*_SCORE_KEYS, *SCREEN_KEYS) if k not in metrics]
         return [f"metrics miss {', '.join(missing)}"] if missing else []
+    if task == "transcribe":
+        return _transcribe_errors(metrics)
     errors = []
     roof = metrics.get("roof_damage")
     if not isinstance(roof, dict) or not {"kappa", "agreement", "confusion"} <= set(roof):
@@ -218,6 +229,40 @@ def _metric_errors(task: str, metrics: Any) -> list[str]:
     ):
         errors.append(f"metrics.sam needs scores for {', '.join(SAM_CONCEPTS)}")
     return errors
+
+
+def _transcribe_errors(metrics: dict[str, Any]) -> list[str]:
+    settings = metrics.get("settings")
+    if not _positive_int(metrics.get("reference_words")):
+        return ["metrics.reference_words must be a positive integer"]
+    if not isinstance(settings, dict) or not settings:
+        return ["metrics.settings must be a non-empty object"]
+    errors = []
+    if metrics.get("production") not in settings:
+        errors.append("metrics.production must name one of the settings")
+    for name, setting in settings.items():
+        where = f"metrics.settings.{name}"
+        if not isinstance(setting, dict) or set(setting) != set(TRANSCRIBE_SETTING_KEYS):
+            errors.append(f"{where} needs exactly {', '.join(TRANSCRIBE_SETTING_KEYS)}")
+            continue
+        if not all(_rate(setting[k]) for k in ("wer", "wer_clean")):
+            errors.append(f"{where}: wer and wer_clean must be non-negative numbers")
+        heard, total = setting["place_names_heard"], setting["place_names"]
+        if not (heard is None and total is None) and not (
+            _count(heard) and _positive_int(total) and heard <= total
+        ):
+            errors.append(f"{where}: place_names_heard must be a count up to place_names")
+        if not _count(setting["keyword_count"]):
+            errors.append(f"{where}: keyword_count must be a count")
+    return errors
+
+
+def _rate(value: Any) -> bool:
+    return isinstance(value, int | float) and not isinstance(value, bool) and value >= 0
+
+
+def _count(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
 
 
 def _is_scores(value: Any) -> bool:
@@ -281,7 +326,7 @@ def upsert(path: Path, entry: dict[str, Any]) -> dict[str, Any]:
 
 
 # Who serves each client, by its `service` name, for the results file.
-BACKEND_NAMES = {"Muse Spark": "Meta Model API"}
+BACKEND_NAMES = {"Muse Spark": "Meta Model API", "Voice Transcribe": "Meta Model API"}
 
 
 def backend_of(client: object) -> str:
@@ -297,6 +342,7 @@ def manila_today() -> str:
 EVAL_CODE = (
     "scripts", "app/meta", "app/photo.py", "app/pair_judge.py", "app/facts.py",
     "app/gazetteer.py", "app/evaluation.py", "app/eval_results.py", "app/screening.py",
+    "app/intake.py", "app/audio.py", "app/transcript_cleanup.py",
 )  # fmt: skip
 
 
@@ -388,6 +434,27 @@ def render_markdown(results: Results) -> str:
                 f"| {m['non_reports_filtered']} of {non_reports} | {m['rule_filtered']} "
                 f"| {m['model_calls']} | {e.date} |"
             )
+        lines.append("")
+    transcribes = results.for_task("transcribe")
+    if transcribes:
+        lines += [
+            "**Voice Transcribe** (Taglish voice notes through the bot's own audio path; WER "
+            'counts every word that differs, so "seventy" for "70" is an error):',
+            "",
+            "| Model | Dataset | n | Setting | WER | WER after cleanup | Place names heard "
+            "| Date |",
+            "|---|---|---|---|---|---|---|---|",
+        ]
+        for e in transcribes:
+            for name, s in e.metrics["settings"].items():
+                label = s["label"] + (" **(the bot)**" if name == e.metrics["production"] else "")
+                places = (
+                    f"{s['place_names_heard']} of {s['place_names']}" if s["place_names"] else "–"
+                )
+                lines.append(
+                    f"| {e.model} | {_dataset_cell(e.dataset)} | {e.n} | {label} "
+                    f"| {s['wer']:.1%} | {s['wer_clean']:.1%} | {places} | {e.date} |"
+                )
         lines.append("")
     return "\n".join([*lines, README_END])
 

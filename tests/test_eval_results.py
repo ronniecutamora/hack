@@ -41,10 +41,41 @@ def pair_entry(**changes):
     return {**entry, **changes}
 
 
+def transcribe_entry(**changes):
+    def setting(label, wer, heard):
+        return {
+            "label": label, "language_bias": ["Tagalog", "English"], "keywords": "barangays",
+            "keyword_count": 31, "wer": wer, "wer_clean": wer - 0.02,
+            "place_names_heard": heard, "place_names": 10 if heard is not None else None,
+        }  # fmt: skip
+
+    metrics = {
+        "reference_words": 380,
+        "production": "barangays",
+        "settings": {
+            "language_hint": setting("Language hint", 0.198, None),
+            "barangays": setting("Hint + barangay names", 0.163, 9),
+        },
+    }
+    entry = photo_entry(
+        task="transcribe", dataset="voice-test-8", model="muse-voice-transcribe-1.0",
+        model_id="muse-voice-transcribe-1.0", sam=None, n=8, metrics=metrics,
+    )  # fmt: skip
+    return {**entry, **changes}
+
+
+VOICE_DATASET = {
+    "title": "Taglish voice notes", "provenance": "real", "source": "fixture",
+    "label_source": "fixture", "n": 8, "location": "outside the repo",
+}  # fmt: skip
+
+
 @pytest.fixture
 def path(tmp_path):
     target = tmp_path / "results.json"
-    target.write_text(json.dumps({**eval_results.read_raw(), "entries": []}))
+    raw = eval_results.read_raw()
+    datasets = {**raw["datasets"], "voice-test-8": VOICE_DATASET}
+    target.write_text(json.dumps({**raw, "datasets": datasets, "entries": []}))
     return target
 
 
@@ -90,6 +121,39 @@ def test_upsert_refuses_entries_that_break_the_schema(path, change, message):
     with pytest.raises(eval_results.ResultsError, match=message):
         eval_results.upsert(path, photo_entry(**change))
     assert path.read_text() == before
+
+
+def test_a_transcribe_entry_has_one_row_per_setting_and_marks_the_bots(path):
+    eval_results.upsert(path, transcribe_entry())
+    entry = eval_results.load(path).for_task("transcribe")[0]
+    assert entry.metrics["settings"]["barangays"]["wer"] == 0.163
+    text = eval_results.render_markdown(eval_results.load(path))
+    voice = "| muse-voice-transcribe-1.0 | Taglish voice notes (real) | 8 |"
+    assert f"{voice} Language hint | 19.8% | 17.8% | – |" in text  # unlabelled: no place score
+    assert f"{voice} Hint + barangay names **(the bot)** | 16.3% | 14.3% | 9 of 10 |" in text
+
+
+def _broken(change):
+    entry = transcribe_entry()
+    change(entry["metrics"])
+    return entry
+
+
+@pytest.mark.parametrize(
+    ("entry", "message"),
+    [
+        (_broken(lambda m: m.update(production="none")), "production must name"),
+        (_broken(lambda m: m.update(settings={})), "non-empty"),
+        (_broken(lambda m: m.pop("reference_words")), "reference_words"),
+        (_broken(lambda m: m["settings"]["barangays"].pop("wer")), "needs exactly"),
+        (_broken(lambda m: m["settings"]["barangays"].update(wer=-1)), "non-negative"),
+        (_broken(lambda m: m["settings"]["barangays"].update(place_names_heard=11)), "up to"),
+        (_broken(lambda m: m["settings"]["barangays"].update(place_names=None)), "up to"),
+    ],
+)
+def test_upsert_refuses_broken_transcribe_metrics(path, entry, message):
+    with pytest.raises(eval_results.ResultsError, match=message):
+        eval_results.upsert(path, entry)
 
 
 def test_validate_reports_dataset_and_entry_problems():
