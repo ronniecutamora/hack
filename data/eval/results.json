@@ -52,6 +52,120 @@
   },
   "entries": [
     {
+      "task": "crop_photo",
+      "dataset": "rice-field-19",
+      "model": "muse-spark-1.3",
+      "model_id": "muse-spark-1.3",
+      "backend": "Meta Model API",
+      "sam": "sam-3.1",
+      "date": "2026-11-02",
+      "commit": "7afc2020ac49",
+      "n": 19,
+      "errors": 0,
+      "metrics": {
+        "crop_field": {
+          "kappa": 0.7532,
+          "agreement": 16,
+          "confusion": {
+            "flooded": {
+              "flooded": 4,
+              "lodged": 1,
+              "no_visible_damage": 1,
+              "none": 1
+            },
+            "lodged": {
+              "lodged": 3
+            },
+            "no_visible_damage": {
+              "no_visible_damage": 9
+            }
+          }
+        },
+        "damaged": {
+          "precision": 1.0,
+          "recall": 0.8,
+          "f1": 0.8889,
+          "tp": 8,
+          "fp": 0,
+          "fn": 2,
+          "tn": 9
+        },
+        "sam": {
+          "rice field": {
+            "found": 12,
+            "measured": 12,
+            "water_share_mae": 10.2,
+            "water_share_close": 9,
+            "close_points": 20
+          },
+          "rice plants": {
+            "found": 8,
+            "measured": 8,
+            "water_share_mae": 17.5,
+            "water_share_close": 6,
+            "close_points": 20
+          }
+        }
+      },
+      "spend_usd": 0.0
+    },
+    {
+      "task": "crop_photo",
+      "dataset": "rice-field-19",
+      "model": "muse-spark-open",
+      "model_id": "meta-models/muse-spark-open",
+      "backend": "Baseten",
+      "sam": "sam-3.1",
+      "date": "2026-11-02",
+      "commit": "7afc2020ac49",
+      "n": 19,
+      "errors": 0,
+      "metrics": {
+        "crop_field": {
+          "kappa": 0.8257,
+          "agreement": 17,
+          "confusion": {
+            "flooded": {
+              "flooded": 5,
+              "no_visible_damage": 2
+            },
+            "lodged": {
+              "lodged": 3
+            },
+            "no_visible_damage": {
+              "no_visible_damage": 9
+            }
+          }
+        },
+        "damaged": {
+          "precision": 1.0,
+          "recall": 0.8,
+          "f1": 0.8889,
+          "tp": 8,
+          "fp": 0,
+          "fn": 2,
+          "tn": 9
+        },
+        "sam": {
+          "rice field": {
+            "found": 12,
+            "measured": 12,
+            "water_share_mae": 10.2,
+            "water_share_close": 9,
+            "close_points": 20
+          },
+          "rice plants": {
+            "found": 8,
+            "measured": 8,
+            "water_share_mae": 17.5,
+            "water_share_close": 6,
+            "close_points": 20
+          }
+        }
+      },
+      "spend_usd": 0.0
+    },
+    {
       "task": "crosscheck",
       "dataset": "kill-test-25",
       "model": "muse-spark-1.3",
@@ -288,26 +402,27 @@
       "model_id": "muse-spark-1.3",
       "backend": "Meta Model API",
       "sam": "sam-3.1",
-      "date": "2026-10-30",
-      "commit": "857abcc08f52",
+      "date": "2026-11-02",
+      "commit": "7afc2020ac49-dirty",
       "n": 25,
       "errors": 0,
       "metrics": {
         "roof_damage": {
-          "kappa": 0.6644,
-          "agreement": 19,
+          "kappa": 0.6014,
+          "agreement": 18,
           "confusion": {
             "none": {
-              "none": 7,
-              "partial": 1,
-              "unknown": 1
+              "none": 8,
+              "partial": 1
             },
             "partial": {
-              "partial": 4,
+              "none": 1,
+              "partial": 3,
               "severe": 2
             },
             "severe": {
-              "severe": 7
+              "partial": 1,
+              "severe": 6
             },
             "unknown": {
               "none": 1,
@@ -318,13 +433,13 @@
         },
         "flags": {
           "floodwater": {
-            "precision": 1.0,
+            "precision": 0.8571,
             "recall": 1.0,
-            "f1": 1.0,
+            "f1": 0.9231,
             "tp": 6,
-            "fp": 0,
+            "fp": 1,
             "fn": 0,
-            "tn": 19
+            "tn": 18
           },
           "debris": {
             "precision": 0.8889,
@@ -345,13 +460,13 @@
             "tn": 20
           },
           "tarpaulin": {
-            "precision": 0.75,
+            "precision": 0.8571,
             "recall": 0.8571,
-            "f1": 0.8,
+            "f1": 0.8571,
             "tp": 6,
-            "fp": 2,
+            "fp": 1,
             "fn": 1,
-            "tn": 16
+            "tn": 17
           }
         },
         "sam": {
@@ -375,7 +490,7 @@
           }
         }
       },
-      "spend_usd": 0.0
+      "spend_usd": 0.2208
     },
     {
       "task": "photo_judge",
@@ -384,23 +499,22 @@
       "model_id": "meta-models/muse-spark-open",
       "backend": "Baseten",
       "sam": "sam-3.1",
-      "date": "2026-10-30",
-      "commit": "857abcc08f52",
+      "date": "2026-11-02",
+      "commit": "7afc2020ac49-dirty",
       "n": 25,
       "errors": 0,
       "metrics": {
         "roof_damage": {
-          "kappa": 0.5565,
-          "agreement": 17,
+          "kappa": 0.4966,
+          "agreement": 16,
           "confusion": {
             "none": {
               "none": 6,
-              "partial": 2,
-              "unknown": 1
+              "partial": 3
             },
             "partial": {
-              "partial": 4,
-              "severe": 2
+              "partial": 3,
+              "severe": 3
             },
             "severe": {
               "partial": 1,
@@ -433,21 +547,21 @@
             "tn": 5
           },
           "fallen_tree": {
-            "precision": 0.5,
+            "precision": 1.0,
             "recall": 0.25,
-            "f1": 0.3333,
+            "f1": 0.4,
             "tp": 1,
-            "fp": 1,
+            "fp": 0,
             "fn": 3,
-            "tn": 20
+            "tn": 21
           },
           "tarpaulin": {
             "precision": 1.0,
-            "recall": 0.8571,
-            "f1": 0.9231,
-            "tp": 6,
+            "recall": 1.0,
+            "f1": 1.0,
+            "tp": 7,
             "fp": 0,
-            "fn": 1,
+            "fn": 0,
             "tn": 18
           }
         },
@@ -472,7 +586,7 @@
           }
         }
       },
-      "spend_usd": 0.0
+      "spend_usd": 0.1823
     },
     {
       "task": "photo_judge",
@@ -481,14 +595,14 @@
       "model_id": "muse-spark-1.3",
       "backend": "Meta Model API",
       "sam": "sam-3.1",
-      "date": "2026-10-30",
-      "commit": "857abcc08f52",
+      "date": "2026-11-02",
+      "commit": "7afc2020ac49-dirty",
       "n": 40,
       "errors": 0,
       "metrics": {
         "roof_damage": {
-          "kappa": 0.8413,
-          "agreement": 36,
+          "kappa": 0.8829,
+          "agreement": 37,
           "confusion": {
             "none": {
               "none": 20,
@@ -502,20 +616,19 @@
               "severe": 5
             },
             "unknown": {
-              "none": 1,
-              "unknown": 5
+              "unknown": 6
             }
           }
         },
         "flags": {
           "floodwater": {
-            "precision": 0.8182,
+            "precision": 0.6923,
             "recall": 1.0,
-            "f1": 0.9,
+            "f1": 0.8182,
             "tp": 9,
-            "fp": 2,
+            "fp": 4,
             "fn": 0,
-            "tn": 29
+            "tn": 27
           },
           "debris": {
             "precision": 0.65,
@@ -566,7 +679,7 @@
           }
         }
       },
-      "spend_usd": 0.5971
+      "spend_usd": 1.0027
     },
     {
       "task": "photo_judge",
@@ -575,18 +688,18 @@
       "model_id": "meta-models/muse-spark-open",
       "backend": "Baseten",
       "sam": "sam-3.1",
-      "date": "2026-10-30",
-      "commit": "857abcc08f52",
+      "date": "2026-11-02",
+      "commit": "7afc2020ac49-dirty",
       "n": 40,
       "errors": 0,
       "metrics": {
         "roof_damage": {
-          "kappa": 0.7914,
-          "agreement": 35,
+          "kappa": 0.7541,
+          "agreement": 34,
           "confusion": {
             "none": {
-              "none": 22,
-              "partial": 1
+              "none": 21,
+              "partial": 2
             },
             "partial": {
               "partial": 5,
@@ -613,31 +726,31 @@
             "tn": 30
           },
           "debris": {
-            "precision": 0.619,
+            "precision": 0.6842,
             "recall": 1.0,
-            "f1": 0.7647,
+            "f1": 0.8125,
             "tp": 13,
-            "fp": 8,
+            "fp": 6,
             "fn": 0,
-            "tn": 19
+            "tn": 21
           },
           "fallen_tree": {
             "precision": 1.0,
-            "recall": 1.0,
-            "f1": 1.0,
-            "tp": 5,
+            "recall": 0.8,
+            "f1": 0.8889,
+            "tp": 4,
             "fp": 0,
-            "fn": 0,
+            "fn": 1,
             "tn": 35
           },
           "tarpaulin": {
-            "precision": 1.0,
+            "precision": 0.8333,
             "recall": 1.0,
-            "f1": 1.0,
+            "f1": 0.9091,
             "tp": 5,
-            "fp": 0,
+            "fp": 1,
             "fn": 0,
-            "tn": 35
+            "tn": 34
           }
         },
         "sam": {
@@ -661,7 +774,7 @@
           }
         }
       },
-      "spend_usd": 0.3635
+      "spend_usd": 0.7235
     },
     {
       "task": "screen",
