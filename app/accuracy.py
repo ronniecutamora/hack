@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from app import charts
+from app import charts, crosscheck
 from app.charts import Bar, BarRow, Chart, NumberTable, Panel, Segment, StackRow, Swatch
 from app.eval_results import FLAGS, Dataset, Entry, Results, load
 from app.trace import ModelFamily, model_family
@@ -20,7 +20,7 @@ from app.trace import ModelFamily, model_family
 # Below this a score is shown as weak: kappa 0.6 is the usual floor of "substantial" agreement.
 WEAK_BELOW = 0.6
 MODEL_ORDER = ("muse-spark-1.3", "muse-spark-open")  # Spark 1.3 first, then the open weights
-TASK_ORDER = ("photo_judge", "pair_judge", "screen")
+TASK_ORDER = ("photo_judge", "crosscheck", "pair_judge", "screen")
 PROVENANCE_ORDER = ("real", "synthetic")
 
 TASKS = {
@@ -29,6 +29,14 @@ TASKS = {
         "The agent LLM looks at each photo and says how badly roofs are damaged and whether it "
         "sees floodwater, debris, a tarpaulin or a fallen tree; SAM 3.1 outlines roofs and "
         "floodwater on the photo. Scores compare them with labels a person set by hand.",
+    ),
+    "crosscheck": (
+        "Spark and SAM check each other",
+        "On every photo, the agent LLM's judgment is compared with SAM 3.1's outline. When the "
+        "agent LLM sees floodwater or a partly damaged roof that SAM cannot outline, the report "
+        "is flagged and Review asks the officer, with the photo and its outline side by side. "
+        "The other disagreements are only measured. Each row says how often it happened and "
+        "whose answer matched the label a person set by hand.",
     ),
     "pair_judge": (
         "Duplicate check",
@@ -52,6 +60,9 @@ NOT_MEANING = {
     "photo_judge": "These scores say how often the agent reads a photo the way a person does. "
     "They are not a count of damaged houses: SAM's roof and floodwater outlines are evidence "
     "for the officer and the PCIC adjuster, not the loss figure.",
+    "crosscheck": "The officer's answer does not change the counts: they keep the agent LLM's "
+    "judgment. Saying the thing is there clears the flag; saying it is not keeps the report "
+    "marked as doubtful in the forms, like any other trust signal.",
     "pair_judge": "A merge means two reports describe one situation, so their figures are "
     "counted once instead of added. The officer can split any merged report back out from its "
     "incident page, and its figures then count on their own again.",
@@ -230,7 +241,51 @@ SCREEN_ROWS: list[tuple[str, str, Callable[[Entry], Cell | None]]] = [
         ),
     ),
 ]
-ROWS = {"photo_judge": PHOTO_ROWS, "pair_judge": PAIR_ROWS, "screen": SCREEN_ROWS}
+
+
+def _check_cell(code: str) -> Callable[[Entry], Cell | None]:
+    def cell(entry: Entry) -> Cell | None:
+        m = entry.metrics["checks"].get(code)
+        if m is None:
+            return None
+        return Cell(
+            f"{m['fired']} of {entry.metrics['photos']}",
+            f"the hand label agreed with the agent LLM {m['spark_right']} "
+            f"time{'s' if m['spark_right'] != 1 else ''}, with SAM {m['sam_right']}"
+            if m["fired"]
+            else None,
+        )
+
+    return cell
+
+
+CROSSCHECK_ROWS: list[tuple[str, str, Callable[[Entry], Cell | None]]] = [
+    (
+        "Photos where they disagree",
+        "Photos where at least one of the rows below happened.",
+        lambda e: Cell(f"{e.metrics['disagreed']} of {e.metrics['photos']}"),
+    ),
+    (
+        "Photos the officer is asked about",
+        "Photos where a disagreement worth asking about happened: each one is a question on "
+        "Review.",
+        lambda e: Cell(f"{e.metrics['asked']} of {e.metrics['photos']}"),
+    ),
+    *(
+        (
+            f"{check.label} ({'asked' if check.asks else 'measured only'})",
+            check.why,
+            _check_cell(check.code),
+        )
+        for check in crosscheck.CHECKS
+    ),
+]
+ROWS = {
+    "photo_judge": PHOTO_ROWS,
+    "crosscheck": CROSSCHECK_ROWS,
+    "pair_judge": PAIR_ROWS,
+    "screen": SCREEN_ROWS,
+}
 
 
 def _model_key(entry: Entry) -> tuple[int, str]:
@@ -526,6 +581,7 @@ def _screen_charts(dataset_id: str, entries: list[Entry]) -> list[Chart]:
 
 CHARTS: dict[str, Callable[[str, list[Entry]], list[Chart]]] = {
     "photo_judge": _photo_charts,
+    "crosscheck": lambda _dataset_id, _entries: [],  # its few counts read best as the table
     "pair_judge": _pair_charts,
     "screen": _screen_charts,
 }

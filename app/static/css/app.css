@@ -754,6 +754,13 @@ td.field-label { width: 38%; }
 .msg__photo { display: block; }
 .msg__photo img { display: block; width: 100%; height: auto; max-height: 15rem; object-fit: cover; }
 .q--compare .msg__photo img { max-height: 9rem; aspect-ratio: 4 / 3; }
+/* A photo signal: the photo and what Ulat outlined on it, side by side even on a phone. */
+.q__pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
+.q__shot { margin: 0; min-width: 0; }
+.q__shot img { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: contain; background: var(--md-sys-color-surface-container); border-radius: var(--md-sys-shape-corner-small); }
+.q__shot figcaption { margin-top: var(--space-1); font: var(--md-sys-typescale-label-medium); color: var(--md-sys-color-on-surface-variant); }
+.q__shot-none { aspect-ratio: 4 / 3; display: grid; place-items: center; margin: 0; text-align: center; border: 1px dashed var(--md-sys-color-outline); border-radius: var(--md-sys-shape-corner-small); }
+.q__note { margin: 0; font: var(--md-sys-typescale-body-medium); }
 .msg__text { margin: 0; padding: var(--space-3) var(--space-3) 0; font: var(--md-sys-typescale-body-large); overflow-wrap: anywhere; }
 .q--compare .msg__text { font: var(--md-sys-typescale-body-medium); display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
 .msg__voice { color: var(--md-sys-color-on-surface-variant); }

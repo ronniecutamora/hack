@@ -35,6 +35,7 @@
 <section>
   <h2>Evidence annex for the PCIC adjuster</h2>
   <p class="muted">{% if technical() %}Every report in incident #{{ c.incident_id }}, oldest first. Photo judgments are by the agent LLM; SAM 3.1 measurements are {{ c.sam_label }}.{% else %}Every report about this loss, oldest first. Ulat judged each photo and measured it; the measurements are {{ c.sam_label }}.{% endif %}{% if c.sam_caveat %} {{ c.sam_caveat|plain }}{% endif %} Names and contact details (phone numbers, emails, handles, account names) are removed from the excerpts and the agent's photo notes. Photo links work until raw media are deleted after the retention period; the judgments and measurements stay.</p>
+  <p class="muted">{{ "SAM 3.1 overlay" if technical() else "Measured photo" }}: {{ GLOSSARY.outline[1] }}</p>
   <div class="table-wrap">
   <table class="stack">
     <thead><tr><th>Report</th><th>Photo evidence</th><th>What the reporter said</th><th>Trust</th></tr></thead>

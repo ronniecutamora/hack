@@ -3,7 +3,7 @@
 {% from "_icons.html" import icon %}
 
 {% macro whats_this(key) %}{% set term, text = GLOSSARY[key] %}
-  <details class="whats-this"><summary>What's {{ term if term != "Incident" else "an incident" }}?</summary><p><strong>{{ term }}</strong>: {{ text }}</p></details>
+  <details class="whats-this"><summary>What's {{ (("an " if term[0] in "AEIOU" else "a ") ~ term|lower) if term.istitle() and " " not in term else term }}?</summary><p><strong>{{ term }}</strong>: {{ text }}</p></details>
 {%- endmacro %}
 
 {% macro hint(text) %}<p class="hint">{{ icon("info") }}<span>{{ text }}</span></p>{% endmacro %}

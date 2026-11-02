@@ -17,7 +17,7 @@ else edits the numbers by hand. Its shape (``schema`` 1)::
       },
       "entries": [                       # one per (task, dataset, model)
         {
-          "task": "photo_judge" | "pair_judge" | "screen" | "transcribe",
+          "task": "photo_judge" | "pair_judge" | "screen" | "transcribe" | "crosscheck",
           "dataset": "<id>",
           "model": str,                  # backend name, e.g. "muse-spark-1.3"
           "model_id": str,               # the provider's model id
@@ -45,7 +45,11 @@ voice notes, scripts.eval_transcribe): reference_words, production (the settings
 uses) and settings {name: {label, language_bias (list or null), keywords (what was sent:
 "none", "barangays" or "barangays+places"), keyword_count, wer, wer_clean (after
 app.transcript_cleanup), place_names_heard, place_names (both null when unlabeled)}}; every
-setting was run on the same n notes.
+setting was run on the same n notes. ``crosscheck`` metrics (Spark and SAM checking each other,
+app.crosscheck, scored by scripts.eval_crosscheck from a photo_judge run's outputs): photos,
+disagreed (photos where any rule fired), asked (photos where a rule that asks the officer
+fired) and checks {code: {asks, fired, spark_right, sam_right}}, where spark_right + sam_right
+== fired.
 """
 
 import json
@@ -61,7 +65,7 @@ from app.models import MANILA
 
 RESULTS_PATH = REPO_ROOT / "data" / "eval" / "results.json"
 SCHEMA_VERSION = 1
-TASKS = ("photo_judge", "pair_judge", "screen", "transcribe")
+TASKS = ("photo_judge", "pair_judge", "screen", "transcribe", "crosscheck")
 PROVENANCES = ("real", "synthetic")
 FLAGS = ("floodwater", "debris", "tarpaulin", "fallen_tree")
 SAM_CONCEPTS = ("roof", "floodwater")
@@ -72,7 +76,7 @@ _ENTRY_KEYS = (
     "spend_usd", "metrics",
 )  # fmt: skip
 
-Task = Literal["photo_judge", "pair_judge", "screen", "transcribe"]
+Task = Literal["photo_judge", "pair_judge", "screen", "transcribe", "crosscheck"]
 SCREEN_KEYS = (
     "wrongly_filtered", "non_reports_filtered", "rule_filtered", "model_calls", "unsure",
     "miss_ids",
@@ -81,6 +85,7 @@ TRANSCRIBE_SETTING_KEYS = (
     "label", "language_bias", "keywords", "keyword_count", "wer", "wer_clean",
     "place_names_heard", "place_names",
 )  # fmt: skip
+CROSSCHECK_KEYS = ("asks", "fired", "spark_right", "sam_right")
 
 
 @dataclass(frozen=True)
@@ -211,6 +216,8 @@ def _metric_errors(task: str, metrics: Any) -> list[str]:
         return [f"metrics miss {', '.join(missing)}"] if missing else []
     if task == "transcribe":
         return _transcribe_errors(metrics)
+    if task == "crosscheck":
+        return _crosscheck_errors(metrics)
     errors = []
     roof = metrics.get("roof_damage")
     if not isinstance(roof, dict) or not {"kappa", "agreement", "confusion"} <= set(roof):
@@ -254,6 +261,32 @@ def _transcribe_errors(metrics: dict[str, Any]) -> list[str]:
             errors.append(f"{where}: place_names_heard must be a count up to place_names")
         if not _count(setting["keyword_count"]):
             errors.append(f"{where}: keyword_count must be a count")
+    return errors
+
+
+def _crosscheck_errors(metrics: dict[str, Any]) -> list[str]:
+    checks = metrics.get("checks")
+    if not _positive_int(metrics.get("photos")) or not all(
+        _count(metrics.get(k)) for k in ("disagreed", "asked")
+    ):
+        return ["metrics.photos must be a positive integer, disagreed and asked counts"]
+    if not metrics["asked"] <= metrics["disagreed"] <= metrics["photos"]:
+        return ["metrics.asked cannot exceed disagreed, nor disagreed photos"]
+    if not isinstance(checks, dict) or not checks:
+        return ["metrics.checks must be a non-empty object"]
+    errors = []
+    for code, check in checks.items():
+        where = f"metrics.checks.{code}"
+        if not isinstance(check, dict) or set(check) != set(CROSSCHECK_KEYS):
+            errors.append(f"{where} needs exactly {', '.join(CROSSCHECK_KEYS)}")
+        elif not isinstance(check["asks"], bool) or not all(
+            _count(check[k]) for k in CROSSCHECK_KEYS[1:]
+        ):
+            errors.append(f"{where}: asks must be true or false and the rest counts")
+        elif check["spark_right"] + check["sam_right"] != check["fired"] or (
+            check["fired"] > metrics["photos"]
+        ):
+            errors.append(f"{where}: spark_right + sam_right must equal fired (at most photos)")
     return errors
 
 
@@ -342,7 +375,7 @@ def manila_today() -> str:
 EVAL_CODE = (
     "scripts", "app/meta", "app/photo.py", "app/pair_judge.py", "app/facts.py",
     "app/gazetteer.py", "app/evaluation.py", "app/eval_results.py", "app/screening.py",
-    "app/intake.py", "app/audio.py", "app/transcript_cleanup.py",
+    "app/intake.py", "app/audio.py", "app/transcript_cleanup.py", "app/crosscheck.py",
 )  # fmt: skip
 
 
@@ -399,6 +432,7 @@ def render_markdown(results: Results) -> str:
                 f"| {' | '.join(sam_cells)} | {e.date} |"
             )
         lines.append("")
+    lines += _crosscheck_markdown(results.for_task("crosscheck"))
     pairs = results.for_task("pair_judge")
     if pairs:
         lines += [
@@ -457,6 +491,47 @@ def render_markdown(results: Results) -> str:
                 )
         lines.append("")
     return "\n".join([*lines, README_END])
+
+
+def _crosscheck_markdown(entries: list[Entry]) -> list[str]:
+    """Spark and SAM checking each other: how often each rule fired, whom the label sided with."""
+    from app.crosscheck import CHECKS  # the rules; imported here to keep this module light
+
+    if not entries:
+        return []
+    totals: dict[str, list[int]] = {}
+    for e in entries:
+        total = totals.setdefault(e.model, [0, 0, 0])
+        for i, key in enumerate(("photos", "disagreed", "asked")):
+            total[i] += e.metrics[key]
+    lines = [
+        "**Spark and SAM 3.1 check each other** on every photo. When Spark sees floodwater or a "
+        "partly damaged roof that SAM cannot outline, the report gets a trust signal and Review "
+        "asks the officer; the other disagreements are only measured (each cell: times it fired, "
+        "then whose answer matched the hand label). "
+        + "; ".join(
+            f"{model}: they disagreed on {d} of {n} photos, and Review asked about {a}"
+            for model, (n, d, a) in totals.items()
+        )
+        + ".",
+        "",
+        "| Model | Dataset | n | Disagreed | Asked the officer | "
+        + " | ".join(f"{c.label} ({'asks' if c.asks else 'measured only'})" for c in CHECKS)
+        + " | Date |",
+        "|---|---|---|---|---|" + "---|" * len(CHECKS) + "---|",
+    ]
+    for e in entries:
+        cells = []
+        for check in CHECKS:
+            m = e.metrics["checks"].get(check.code)
+            cells.append(
+                f"{m['fired']} (Spark {m['spark_right']}, SAM {m['sam_right']})" if m else "–"
+            )
+        lines.append(
+            f"| {e.model} | {_dataset_cell(e.dataset)} | {e.n} | {e.metrics['disagreed']} "
+            f"| {e.metrics['asked']} of {e.metrics['photos']} | {' | '.join(cells)} | {e.date} |"
+        )
+    return [*lines, ""]
 
 
 def readme_block(readme: str) -> str | None:

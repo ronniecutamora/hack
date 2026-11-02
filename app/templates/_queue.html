@@ -6,11 +6,11 @@
 {% from "_icons.html" import icon %}
 
 {# A report as the reporter sent it: like the chat message it came in as. #}
-{% macro message(r, label, photos, ago, transcript=none) %}
+{% macro message(r, label, photos, ago, transcript=none, show_photo=true) %}
   <figure class="msg">
     {% if label %}<figcaption class="msg__label">{{ label }}</figcaption>{% endif %}
     <div class="msg__bubble">
-      {% for p in photos.get(r.id, [])[:1] %}<a class="msg__photo" href="/media/{{ p.id }}" hx-boost="false"><img src="/media/{{ p.id }}" alt="Photo sent with the report" loading="lazy" width="320" height="240"></a>{% endfor %}
+      {% for p in (photos.get(r.id, []) if show_photo else [])[:1] %}<a class="msg__photo" href="/media/{{ p.id }}" hx-boost="false"><img src="/media/{{ p.id }}" alt="Photo sent with the report" loading="lazy" width="320" height="240"></a>{% endfor %}
       {% if r.text %}<p class="msg__text">{{ r.text }}</p>
       {% elif transcript or r.transcript %}<p class="msg__text"><span class="msg__voice">Voice note:</span> {{ transcript or r.transcript }}</p>
       {% elif not photos.get(r.id) %}<p class="msg__text muted">A location without words</p>{% endif %}
@@ -26,8 +26,15 @@
   {% set refused = form and form.report_id == r.id %}
   <li class="q{% if q.compare %} q--compare{% endif %}" id="{{ q.key }}" data-key="{{ q.key }}" data-q{% if index != shown %} hidden{% endif %}>
     <div class="q__evidence">
-      {{ message(r, "This report" if q.compare else "", photos, ago, q.card.assessment.transcript_clean if q.card.assessment else none) }}
+      {{ message(r, "This report" if q.compare else "", photos, ago, q.card.assessment.transcript_clean if q.card.assessment else none, show_photo=not q.pair) }}
       {% if q.compare %}{{ message(q.compare, "Sent earlier" if q.kind == "duplicate" else "The other report", photos, ago) }}{% endif %}
+      {% if q.pair %}{% set photo, outline = q.pair %}
+      <div class="q__pair">
+        <figure class="q__shot"><a href="/media/{{ photo.id }}" hx-boost="false"><img src="/media/{{ photo.id }}" alt="The photo sent with the report" loading="lazy" width="320" height="240"></a><figcaption>The photo</figcaption></figure>
+        <figure class="q__shot">{% if outline %}<a href="/media/{{ outline.id }}" hx-boost="false"><img src="/media/{{ outline.id }}" alt="The same photo with what Ulat outlined: roofs orange, floodwater blue" loading="lazy" width="320" height="240"></a>{% else %}<p class="q__shot-none muted">No outline was saved for this photo.</p>{% endif %}<figcaption>What Ulat outlined</figcaption></figure>
+      </div>
+      <p class="q__note muted">{{ GLOSSARY.outline[1] }}</p>
+      {% endif %}
     </div>
     <h2 class="q__ask" id="{{ q.key }}-ask">{{ q.ask }}</h2>
     <p class="q__why">{{ q.why }}</p>

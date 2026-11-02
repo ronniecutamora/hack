@@ -96,6 +96,11 @@ GLOSSARY: dict[str, tuple[str, str]] = {
         "situation is counted once. If Ulat is not sure two reports belong together, it asks "
         "you on Review.",
     ),
+    "outline": (
+        "Outline",
+        "The outline shows exactly what Ulat measured in the photo, so you can check it in a "
+        "second: roofs in orange, floodwater in blue. It is evidence, not the loss figure.",
+    ),
 }
 
 # Internal statuses, said plainly (Simple mode); Technical mode shows the raw value.
@@ -142,6 +147,9 @@ PLAIN_SIGNALS: dict[str, str] = {
     "photo_old": "The photo may be older than this flood",
     "pin_outside_binan": "The map pin is outside Biñan",
     "pin_text_mismatch": "The map pin and the place in the message do not match",
+    # Spark and SAM disagree on a photo (app.crosscheck)
+    "floodwater_not_outlined": "The photo check sees floodwater, but the outline found none",
+    "roof_not_outlined": "The photo check sees a damaged roof, but the outline found no roof",
 }
 
 # What an officer's review action did, for the confirmation after it (Simple mode); Technical

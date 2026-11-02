@@ -2,13 +2,14 @@
 {% from "_trust.html" import signal_chips %}
 {% from "_trace.html" import agent_trace %}
 {% from "_icons.html" import icon %}
-{% from "_help.html" import hint %}
+{% from "_help.html" import hint, whats_this %}
 {% block content %}
 <div id="live-reports" data-live="reports spend">
   {% if not technical() %}
   <header>
     <h1>Reports</h1>
     {{ hint("Every message people sent to the bot, newest first, with what Ulat read from it. Photos are deleted after " ~ ttl_hours ~ " hours for privacy.") }}
+    {{ whats_this("outline") }}
   </header>
   {% if around %}<p class="banner">Showing the reports around the one you opened, newest first. <a href="/reports">Back to the most recent reports</a></p>{% endif %}
   {% if not items %}

@@ -16,6 +16,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from sqlalchemy import Engine, func
 from sqlmodel import Session, col, select
 
+from app import crosscheck
 from app.config import Settings, get_settings
 from app.db import init_db, make_engine
 from app.gazetteer import find_in_text
@@ -202,9 +203,10 @@ def compute_signals(
         )
 
     # Keep capture times/GPS when a re-assessment has no raw photo left to read.
-    for photo in session.exec(
+    assessed = session.exec(
         select(PhotoAssessment).where(PhotoAssessment.report_id == report.id)
-    ).all():
+    ).all()
+    for photo in assessed:
         if photo.taken_at is not None:
             age = report.received_at - photo.taken_at
             if age > timedelta(days=settings.photo_max_age_days) or age < -timedelta(days=1):
@@ -217,12 +219,11 @@ def compute_signals(
                         "(EXIF can be edited).",
                     }
                 )
+    signals.extend(crosscheck.signals(assessed))  # Spark and SAM disagree on a photo
     points = []
     if report.lat is not None and report.lon is not None:
         points.append(("pin", report.lat, report.lon))
-    for photo in session.exec(
-        select(PhotoAssessment).where(PhotoAssessment.report_id == report.id)
-    ).all():
+    for photo in assessed:
         if photo.gps_lat is not None and photo.gps_lon is not None:
             points.append((f"photo {photo.media_id} GPS", photo.gps_lat, photo.gps_lon))
     named = find_in_text("\n".join(v for v in (report.text, transcript) if v))

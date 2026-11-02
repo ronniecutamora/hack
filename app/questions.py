@@ -5,7 +5,8 @@ and every answer is one of the officer actions that already exist (merge, keep s
 place, signal review, fallen-tree verdict), posted to the same endpoint with the same audit.
 Nothing here decides anything: it only says the decision the officer is asked for in plain
 words, and never asks what does not apply (a fallen tree only when a photo judgment or the
-report's words suggest one).
+report's words suggest one). A trust signal is asked as "Is it OK to use?", unless SIGNAL_ASKS
+words it as its own question (Spark and SAM disagreeing on a photo: "Is there floodwater?").
 
 `plan` derives the questions from the cards alone (no queries), so Home's to-do count, the
 navigation badge and the queue's "1 of 9" are the same number. `questions` adds what the queue
@@ -18,8 +19,9 @@ from typing import Any
 
 from sqlmodel import Session, col, func, select
 
+from app import crosscheck
 from app.gazetteer import BARANGAYS, find_in_text
-from app.models import MANILA, Assessment, Incident, Media, Report
+from app.models import MANILA, Assessment, Incident, Media, PhotoAssessment, Report
 from app.modes import PLAIN_SIGNALS
 from app.review import TREE_VERDICTS, ReviewCard
 
@@ -49,6 +51,37 @@ KINDS: dict[str, Kind] = {
 
 
 @dataclass(frozen=True)
+class SignalAsk:
+    """A trust signal asked as its own question: the officer looks and says what is there."""
+
+    ask: str
+    thing: str  # what is or is not there, for the snackbar and the audit note
+    yes: str  # the answer saying it is there
+    no: str  # the answer saying it is not
+
+
+_DISAGREE_WHY = (
+    "Ulat counts what the photo check says. If it is wrong, the forms mark this report as doubtful."
+)
+# Spark and SAM 3.1 disagree on a photo (app.crosscheck): shown with the photo and its outline.
+SIGNAL_ASKS: dict[str, SignalAsk] = {
+    "floodwater_not_outlined": SignalAsk(
+        "The photo check and the outline disagree about floodwater in this photo. "
+        "Is there floodwater?",
+        "floodwater",
+        "Yes, floodwater",
+        "No floodwater",
+    ),
+    "roof_not_outlined": SignalAsk(
+        "The photo check and the outline disagree about the roof in this photo. Is a roof damaged?",
+        "damaged roof",
+        "Yes, a damaged roof",
+        "No damaged roof",
+    ),
+}
+
+
+@dataclass(frozen=True)
 class Answer:
     label: str  # the button
     action: str  # the review endpoint (app.main.REVIEW_ACTIONS)
@@ -70,6 +103,8 @@ class Question:
     other_count: int = 0
     compare: Report | None = None  # the report shown beside this one
     choices: list[str] = field(default_factory=list)  # likely barangays (place)
+    # The photo a signal is about and its outline (None when deleted), shown side by side.
+    pair: tuple[Media, Media | None] | None = None
 
 
 def plan(cards: list[ReviewCard]) -> list[Question]:
@@ -150,6 +185,27 @@ def _answers(q: Question) -> None:
         q.ask = "Count this report as its own flood?"
         q.why = "Ulat could not compare it with other reports, and no other flood is open here."
         q.answers = [Answer("Yes, count it on its own", "keep", {}, "Saved: its own flood")]
+    elif q.kind == SIGNAL and (asked := SIGNAL_ASKS.get(q.signal[1].get("code", ""))):
+        key, signal = q.signal
+        q.ask = asked.ask
+        q.why = _DISAGREE_WHY
+        # The officer's "it is there" agrees with Spark when Spark saw it: the evidence stands.
+        spark_sees = crosscheck.BY_CODE[signal["code"]].spark_sees
+        q.answers = [
+            Answer(
+                label,
+                "signal",
+                {
+                    "signal": key,
+                    "verdict": "genuine" if there == spark_sees else "problem",
+                    "note": f"Officer looked at the photo: {seen}",
+                },
+                f"Saved: {seen}",
+                "filled" if there else "tonal",
+            )
+            for label, there in ((asked.yes, True), (asked.no, False))
+            for seen in [("" if there else "no ") + asked.thing]
+        ]
     elif q.kind == SIGNAL:
         key, signal = q.signal
         statement = PLAIN_SIGNALS.get(signal.get("code", ""), "Something about this report")
@@ -237,6 +293,7 @@ def questions(session: Session, cards: list[ReviewCard]) -> list[Question]:
             compare_ids[q.key] = int(q.signal[1]["related_report_id"])
         elif q.kind == PLACE:
             q.choices = place_choices(card.assessment, card.report, active)
+    _photo_pairs(session, [q for q in items if q.kind == SIGNAL and q.signal[1].get("media_id")])
     wanted_ids = set(compare_ids.values())
     compared = (
         {r.id: r for r in session.exec(select(Report).where(col(Report.id).in_(wanted_ids))).all()}
@@ -247,6 +304,31 @@ def questions(session: Session, cards: list[ReviewCard]) -> list[Question]:
         q.compare = compared.get(compare_ids.get(q.key, -1))
         _answers(q)
     return items
+
+
+def _photo_pairs(session: Session, items: list[Question]) -> None:
+    """Each photo signal's photo and outline, when the photo is still stored."""
+    media_ids = {int(q.signal[1]["media_id"]) for q in items}
+    if not media_ids:
+        return
+    overlays = dict(
+        session.exec(
+            select(PhotoAssessment.media_id, PhotoAssessment.overlay_media_id).where(
+                col(PhotoAssessment.media_id).in_(media_ids)
+            )
+        ).all()
+    )
+    wanted = media_ids | {i for i in overlays.values() if i is not None}
+    stored = {
+        m.id: m
+        for m in session.exec(
+            select(Media).where(col(Media.id).in_(wanted), col(Media.purged_at).is_(None))
+        ).all()
+    }
+    for q in items:
+        media_id = int(q.signal[1]["media_id"])
+        if media_id in stored:
+            q.pair = (stored[media_id], stored.get(overlays.get(media_id) or -1))
 
 
 def current(items: list[Question], at: str | None) -> int:
