@@ -437,14 +437,16 @@ values. It has two views of the same pages ([app/modes.py](app/modes.py)), decid
 and remembered per browser in a cookie (not personal data): the account menu's **View** switch, or `?mode=technical`
 on any link for a demo; `DASHBOARD_MODE` sets the default. **Simple** (the default, for officers) opens on a to-do
 list in plain words, most urgent first, each item one card with one button: a Notice of Loss with its filing
-countdown ("Make the draft" or "Check and approve"), the reports that need a check ("Review"), drafts ready to
+countdown ("Make the draft" or "Check and approve"), the quick questions about reports ("Answer"), drafts ready to
 approve, barangays with new reports for the RDANA form, and new reports; "All caught up" with the latest incidents
 when nothing waits. It names no models, costs, ids, confidence numbers or internal statuses, explains RDANA, DROMIC,
-Notice of Loss and incident in place ("What's this?"), labels buttons by what they do ("Approve for filing", "Not the
-same flood, keep separate"), gives every page a one-line hint and an empty state, shows a dismissible three-step
+Notice of Loss and incident in place ("What's this?"), labels buttons by what they do ("Approve for filing", "Same
+flood"), gives every page a one-line hint and an empty state, shows a dismissible three-step
 "How Ulat works" guide once per browser (again from More, then Help) and hides Accuracy, the agent trace, the model
-strip and raw tables. **Technical** (for developers, judges and the video) shows everything below. The officer's
-actions, forms and permissions are the same in both views (a test compares every form). Messages set aside as not
+strip and raw tables. **Technical** (for developers, judges and the video) shows everything below. Every officer
+action and permission is the same in both views and posts to the same endpoint with the same audit (a test compares
+every page's actions); Simple mode only words them differently, asks Review one question at a time and folds the
+rarer actions under "More options". Messages set aside as not
 reports have their own list with Restore (`/reports/set-aside`); Simple mode shows only a quiet "N messages set
 aside" line. In Technical mode the home page `/` is an overview: open incidents, incidents waiting for officer review, reports in the last
 24 hours (and held ones), drafts awaiting approval, the next filing deadline with its live countdown and model spend
@@ -496,6 +498,26 @@ it). The pending bucket, the counts and the incident rollups follow at once, dep
 their evidence fingerprint, and open dashboards refresh over the live stream. Rejected forms (no initials, an
 incident outside the allowed set) come back with a 400, the typed values and the error beside the field;
 cross-site posts get a 403.
+
+In **Simple mode** (the default) Review is a one-question queue ([app/questions.py](app/questions.py)): one item at a
+time, "1 of 9", Skip and Back, the report as it came in (photo, text or voice transcript, place, "2 h ago", drawn
+like the chat message it was) and one question with one or two big buttons. Each open reason on a card becomes one
+question, from one table, and each answer is one of the actions above with its audit: a possible duplicate asks "Is
+this the same flood as *Malaban · flood · Purok 3* (4 reports)?" with both reports side by side (**Same flood** merges,
+**Different** keeps it separate); an unknown place asks "Where is this?" with the likely barangays (the names the
+geolocation found too many of, names loosely matched in the words, then where floods are reported now) and
+"Other…" for the full list; a trust signal asks "Someone else already sent this same photo, on Oct 30. Is it OK to
+use?" (**It's fine** marks it genuine, **Not OK** keeps it marked doubtful on the forms); a fallen tree is asked
+**only** when a photo judgment or the report's words suggest one. A report with two open questions asks them one
+after the other. The initials are never shown when they are known (typed at sign-in, or asked once on Review and
+kept in the signed session), and Technical mode keeps the field on every form. With JavaScript, an answer waits
+behind the snackbar's **Undo** for six seconds before it is sent (answering the next question or leaving the page
+sends it at once) and the next question is already on screen; a live update never replaces the question being read:
+answered ones drop out and new ones join the end with a quiet "2 new" chip. Without JavaScript each answer is a plain
+form and Skip and Back are links. Moving a report to any other flood, keeping it on its own, setting the barangay by
+hand and blocking the sender sit under the item's "More options". Home's to-do card, the Review badge and the
+queue's "1 of n" are one count (`app.questions.plan`), and the incident page links its questions to Review instead
+of repeating the forms.
 
 ## Demo
 
@@ -737,6 +759,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-11-02 | Fillable RDANA form and Notice of Loss (`app/fillable.py`): every field a typed input defined as data (control, the paper form's own options, hint, asked-first, personal), validated on the server; saving makes an append-only version with an "edited" audit of field keys; approval names the exact version; regeneration carries the officer's entries and flags evidence that moved under them; Simple mode's "What you need to fill in" with progress; personal fields typed for the printout only, never posted or stored; a print view that is the paper form alone (A4, ruled blanks, DRAFT/APPROVED status line); no "not in reports" placeholders left |
 | 2026-11-02 | Fill the whole form on screen, then print it; a "?" help on every field: each RDANA and Notice of Loss field carries a short help (what to enter, an example) and its source as data, read from the official PDFs (the RDANA SOP's Annex I note and headings and section 7.5.2, the PCIC fisheries brochure, application form and farm plan) or, where no document explains it, the form's own label with its Annex I page; a test and the start-up check refuse a field without one. The "?" is a 48 px icon button with a native popover (a bottom sheet on a phone, beside the button on wider screens; Escape and a tap outside close it; hidden in print). Personal details say they are kept on this device only, warn once about shared computers and have a Clear personal details button. Print final form (approved) and Print draft for checking first flag unsaved changes and the office's empty fields |
 | 2026-11-02 | Print fidelity: every printed element of the RDANA form and the Notice of Loss audited against the official scans (62 RDANA labels and section titles and 27 options put back into the paper's own words, the old wording still read from saved entries); the printout now follows each form's layout (Annex I's boxes, columns, tables, matrix, title bar and page breaks from a layout table in `app/rdana_form.py`; the PCIC letter's captions, ruled lines and signature block); Ulat's additions removed except one stamp line with the page count in the page margin; an optional, off-by-default "Include the photo evidence page" prints the Notice of Loss photos and measurements as a separate attachment |
+| 2026-11-02 | Simple mode's Review as a one-question queue (`app/questions.py`, `_queue.html`): one item at a time with "1 of n", Skip and Back, the report as it came in and one question with one or two big buttons, built from one table of question kinds (possible duplicate with both reports side by side, unknown place with the likely barangays, a photo or pin to double-check, a fallen tree only when a photo or the words suggest one), each answer posting the existing officer action with its audit; Undo in the snackbar before an answer is sent; live updates add new questions at the end ("2 new") without replacing the one being read; initials asked once and kept in the signed session, never shown in Simple mode when known; rarer actions under "More options"; Home's to-do, the Review badge and the queue share one count; Drafts and Reports in plainer words with the history and event details folded away; before/after button counts per screen and screenshots in the slice report |
 
 ### Third-party code and assets
 
