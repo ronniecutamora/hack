@@ -40,6 +40,14 @@
       "label_source": "references are the scripts read, corrected against the audio by the builder on 2026-10-27; place-name labels (8 barangays, 2 sitios) from the same notes' fact labels",
       "n": 8,
       "location": "outside this repo (the builder's own voice: only aggregate metrics are committed)"
+    },
+    "rice-field-19": {
+      "title": "Real rice-field photos",
+      "provenance": "real",
+      "source": "19 Wikimedia Commons photos of rice fields under CC0, public domain, CC BY 2.0/3.0 or CC BY-SA 3.0/4.0, no people: 7 flooded (3 IRRI photos of Typhoon Ketsana 2009 in the Philippines, Naga and Iriga in Camarines Sur, Odisha, East Kalimantan), 3 lodged (Bulacan, Chiba, Kanagawa) and 9 not damaged, 4 of them irrigated paddies with standing water as hard negatives; not from Biñan",
+      "label_source": "field condition and a rough share of the field under open water labeled by eye by the builder on 2026-11-02 (3 borderline photos noted in labels.csv); each file's license and author in credits.json",
+      "n": 19,
+      "location": "outside this repo (images are credited in the README, not copied)"
     }
   },
   "entries": [

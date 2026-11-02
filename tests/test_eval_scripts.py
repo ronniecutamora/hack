@@ -3,7 +3,8 @@ import json
 import pytest
 
 from app.evaluation import REPO_ROOT
-from scripts import eval_facts, eval_vision
+from app.meta.sam import Detection, Mask, SamResult
+from scripts import eval_crop, eval_facts, eval_vision
 from tests.test_assessment import FakeLLM, FakeSam, facts, jpeg
 
 
@@ -59,7 +60,53 @@ def test_vision_eval_asks_before_spending(photo_folder, monkeypatch, settings):
     assert eval_vision.main([str(photo_folder)]) == 1
 
 
-@pytest.mark.parametrize("script", [eval_vision, eval_facts])
+def full_mask(box: tuple[float, float, float, float]) -> Detection:
+    """A detection whose mask covers its whole box (a 2x2 grid of ones)."""
+    return Detection(0.9, box, 0.0, Mask(2, 2, box, bytes([1, 1, 1, 1])))
+
+
+def test_water_on_field_is_the_water_share_of_field_plus_water():
+    size = (1000, 500)
+    field = SamResult("rice field", [full_mask((0, 0, 1000, 250))], size)
+    water = SamResult("floodwater", [full_mask((0, 250, 1000, 500))], size)
+    assert eval_crop.water_on_field(field, water, 0.5) == pytest.approx(0.5, abs=0.02)
+    # Water the field mask also covers is water; without a field there is no measurement.
+    overlap = SamResult("floodwater", [full_mask((0, 0, 1000, 500))], size)
+    assert eval_crop.water_on_field(field, overlap, 0.5) == 1.0
+    assert eval_crop.water_on_field(SamResult("rice field", [], size), water, 0.5) is None
+
+
+def test_crop_eval_scores_the_field_judgment_and_sam(tmp_path, monkeypatch, settings, capsys):
+    (tmp_path / "images").mkdir()
+    rows = ["file,crop_field,water_pct"]
+    for name, label, water in (("a.jpg", "flooded", 100), ("b.jpg", "none", 0)):
+        (tmp_path / "images" / name).write_bytes(jpeg())
+        rows.append(f"{name},{label},{water}")
+    (tmp_path / "labels.csv").write_text("\n".join(rows) + "\n")
+    monkeypatch.setattr(eval_crop, "get_settings", lambda: settings)
+    monkeypatch.setattr(eval_crop, "make_agent_llm", fake_llm_factory(FakeLLM()))
+
+    class Sam(FakeSam, Closable):
+        pass
+
+    monkeypatch.setattr(eval_crop, "make_sam", lambda settings: Sam())
+    out_file = tmp_path / "out.json"
+
+    code = eval_crop.main([str(tmp_path), "--yes", "--out", str(out_file)])
+
+    out = capsys.readouterr().out
+    metrics = json.loads(out[out.index("{") : out.index("logged spend")])
+    assert code == 0
+    # The fake judge says "none" for every photo: right for b, wrong for a.
+    assert metrics["crop_field"]["agreement"] == 1
+    assert metrics["damaged"]["fn"] == 1 and metrics["damaged"]["tp"] == 0
+    # The same masks for "floodwater" and "rice field": all water, 100% of the field.
+    sam = metrics["sam"]["rice field"]
+    assert (sam["found"], sam["measured"], sam["water_share_mae"]) == (2, 2, 50.0)
+    assert len(json.loads(out_file.read_text())) == 2
+
+
+@pytest.mark.parametrize("script", [eval_vision, eval_facts, eval_crop])
 def test_eval_scripts_refuse_data_inside_the_repo(script, capsys):
     assert script.main([str(REPO_ROOT / "tests"), "--yes"]) == 2
     assert "outside the repository" in capsys.readouterr().err

@@ -8,6 +8,10 @@ Model jobs follow the 2026-10-27 kill test on 25 labeled typhoon and flood photo
   thresholds: roofs are counted at 0.5 (F1 1.00); floodwater counts at 0.7 (F1 1.00), or at
   0.5 when the masks cover at least 10% of the photo (puddles were the false positives).
 - Neither model finds fallen trees reliably, so a "fallen tree" judgment needs confirmation.
+- Rice fields (slice 7m kill test, 19 public photos): the LLM judges the field (crop_field,
+  kappa 0.75; flooded or lodged precision 1.00, recall 0.80, no false alarm on irrigated
+  paddies). SAM's "rice field" mask misses most flooded fields (5 of 7), so the share of a
+  field under water is not measured; "floodwater" stays evidence, as for streets.
 
 Measurements are evidence for the officer, not a loss figure.
 """
@@ -23,6 +27,8 @@ from app.meta.llm import AgentLLM
 from app.meta.sam import SamClient, SamResult
 from app.trace import SAM_STEPS, Step, in_step
 
+# A rice or other crop field's condition, as the photo shows it (rice claims, slice 7m).
+CROP_FIELD = ("none", "no_visible_damage", "flooded", "lodged", "unknown")
 JUDGE_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
@@ -32,6 +38,7 @@ JUDGE_SCHEMA: dict[str, Any] = {
         "debris": {"type": "boolean"},
         "tarpaulin": {"type": "boolean"},
         "house_count_estimate": {"type": "integer", "minimum": 0},
+        "crop_field": {"type": "string", "enum": list(CROP_FIELD)},
         "notes": {"type": "string"},
     },
     "required": [
@@ -41,6 +48,7 @@ JUDGE_SCHEMA: dict[str, Any] = {
         "debris",
         "tarpaulin",
         "house_count_estimate",
+        "crop_field",
         "notes",
     ],
     "additionalProperties": False,
@@ -61,6 +69,12 @@ JUDGE_SYSTEM = (
     "tarpaulin: true if a tarpaulin, plastic sheet or tent canvas is visible.\n"
     "house_count_estimate: number of houses (residential buildings, intact or ruined) visible; "
     "0 if none.\n"
+    "crop_field: the most prominent rice paddy or crop field. none = no crop field visible; "
+    "no_visible_damage = plants standing upright, including a normally irrigated paddy with "
+    "shallow water between young plants or a field puddled for planting; flooded = floodwater "
+    "over the field submerges most of the plants' height or hides them; lodged = plants bent or "
+    "flattened to the ground and not under water; unknown = a field is visible but its "
+    "condition cannot be judged.\n"
     "notes: one short sentence."
 )
 JUDGE_PROMPT = "Assess this photo."

@@ -17,7 +17,8 @@ else edits the numbers by hand. Its shape (``schema`` 1)::
       },
       "entries": [                       # one per (task, dataset, model)
         {
-          "task": "photo_judge" | "pair_judge" | "screen" | "transcribe" | "crosscheck",
+          "task": "photo_judge" | "crop_photo" | "pair_judge" | "screen" | "transcribe"
+                  | "crosscheck",
           "dataset": "<id>",
           "model": str,                  # backend name, e.g. "muse-spark-1.3"
           "model_id": str,               # the provider's model id
@@ -51,6 +52,11 @@ absent in runs recorded before 2026-11-02)}}; every setting was run on the same 
 scripts.eval_crosscheck from a photo_judge run's outputs): photos, disagreed (photos where
 any rule fired), asked (photos where a rule that asks the officer fired) and checks {code:
 {asks, fired, spark_right, sam_right}}, where spark_right + sam_right == fired.
+
+``crop_photo`` metrics (rice-field photos, scripts.eval_crop): ``crop_field`` {kappa, agreement,
+confusion} like roof_damage, ``damaged`` scores (flooded or lodged is a positive) and ``sam``
+{field concept: {found, measured, water_share_mae, water_share_close, close_points}}: how often
+SAM outlined the field, and how far its share of the field under water was from the label.
 """
 
 import json
@@ -66,7 +72,7 @@ from app.models import MANILA
 
 RESULTS_PATH = REPO_ROOT / "data" / "eval" / "results.json"
 SCHEMA_VERSION = 1
-TASKS = ("photo_judge", "pair_judge", "screen", "transcribe", "crosscheck")
+TASKS = ("photo_judge", "crop_photo", "pair_judge", "screen", "transcribe", "crosscheck")
 PROVENANCES = ("real", "synthetic")
 FLAGS = ("floodwater", "debris", "tarpaulin", "fallen_tree")
 SAM_CONCEPTS = ("roof", "floodwater")
@@ -77,7 +83,8 @@ _ENTRY_KEYS = (
     "spend_usd", "metrics",
 )  # fmt: skip
 
-Task = Literal["photo_judge", "pair_judge", "screen", "transcribe", "crosscheck"]
+Task = Literal["photo_judge", "crop_photo", "pair_judge", "screen", "transcribe", "crosscheck"]
+CROP_SAM_KEYS = ("found", "measured", "water_share_mae", "water_share_close", "close_points")
 SCREEN_KEYS = (
     "wrongly_filtered", "non_reports_filtered", "rule_filtered", "model_calls", "unsure",
     "miss_ids",
@@ -219,6 +226,8 @@ def _metric_errors(task: str, metrics: Any) -> list[str]:
         return _transcribe_errors(metrics)
     if task == "crosscheck":
         return _crosscheck_errors(metrics)
+    if task == "crop_photo":
+        return _crop_errors(metrics)
     errors = []
     roof = metrics.get("roof_damage")
     if not isinstance(roof, dict) or not {"kappa", "agreement", "confusion"} <= set(roof):
@@ -236,6 +245,21 @@ def _metric_errors(task: str, metrics: Any) -> list[str]:
         not isinstance(sam, dict) or not all(_is_scores(sam.get(c)) for c in SAM_CONCEPTS)
     ):
         errors.append(f"metrics.sam needs scores for {', '.join(SAM_CONCEPTS)}")
+    return errors
+
+
+def _crop_errors(metrics: dict[str, Any]) -> list[str]:
+    errors = []
+    field = metrics.get("crop_field")
+    if not isinstance(field, dict) or not {"kappa", "agreement", "confusion"} <= set(field):
+        errors.append("metrics.crop_field needs kappa, agreement and confusion")
+    if not _is_scores(metrics.get("damaged")):
+        errors.append("metrics.damaged is not a scores object")
+    sam = metrics.get("sam")
+    if not isinstance(sam, dict) or not all(
+        isinstance(v, dict) and set(v) == set(CROP_SAM_KEYS) for v in sam.values()
+    ):
+        errors.append(f"metrics.sam needs {', '.join(CROP_SAM_KEYS)} per concept")
     return errors
 
 
@@ -435,6 +459,31 @@ def render_markdown(results: Results) -> str:
                 f"| {e.model} | {_dataset_cell(e.dataset)} | {e.n} "
                 f"| {_f(e.metrics['roof_damage']['kappa'])} | {' | '.join(flags)} "
                 f"| {' | '.join(sam_cells)} | {e.date} |"
+            )
+        lines.append("")
+    crops = results.for_task("crop_photo")
+    if crops:
+        lines += [
+            "**Rice-field judge** (the same photo judge says whether a rice field is flooded, "
+            'lodged or not visibly damaged; SAM 3.1 is asked for "rice field" and "floodwater" '
+            "to see whether it can measure the share of a field under water):",
+            "",
+            "| Model | Dataset | n | Field condition κ | Same as label | Flooded or lodged: "
+            "precision / recall | SAM field outlined | SAM water share within "
+            "20 points | Date |",
+            "|---|---|---|---|---|---|---|---|---|",
+        ]
+        for e in crops:
+            m, damaged = e.metrics, e.metrics["damaged"]
+            sams = [f'"{c}" {s["found"]} of {e.n}' for c, s in m["sam"].items()]
+            close = [
+                f'"{c}" {s["water_share_close"]} of {s["measured"]}' for c, s in m["sam"].items()
+            ]
+            lines.append(
+                f"| {e.model} | {_dataset_cell(e.dataset)} | {e.n} "
+                f"| {_f(m['crop_field']['kappa'])} | {m['crop_field']['agreement']} of {e.n} "
+                f"| {_f(damaged['precision'])} / {_f(damaged['recall'])} | {'; '.join(sams)} "
+                f"| {'; '.join(close)} | {e.date} |"
             )
         lines.append("")
     lines += _crosscheck_markdown(results.for_task("crosscheck"))

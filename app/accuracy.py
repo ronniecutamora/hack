@@ -20,7 +20,7 @@ from app.trace import ModelFamily, model_family
 # Below this a score is shown as weak: kappa 0.6 is the usual floor of "substantial" agreement.
 WEAK_BELOW = 0.6
 MODEL_ORDER = ("muse-spark-1.3", "muse-spark-open")  # Spark 1.3 first, then the open weights
-TASK_ORDER = ("photo_judge", "crosscheck", "pair_judge", "screen")
+TASK_ORDER = ("photo_judge", "crosscheck", "crop_photo", "pair_judge", "screen")
 PROVENANCE_ORDER = ("real", "synthetic")
 
 TASKS = {
@@ -37,6 +37,12 @@ TASKS = {
         "is flagged and Review asks the officer, with the photo and its outline side by side. "
         "The other disagreements are only measured. Each row says how often it happened and "
         "whose answer matched the label a person set by hand.",
+    ),
+    "crop_photo": (
+        "Rice-field judge",
+        "The same photo judge says whether a rice field in a photo is flooded, lodged "
+        "(flattened) or not visibly damaged. SAM 3.1 was asked to outline the field and the "
+        "water on it. Scores compare them with labels a person set by hand.",
     ),
     "pair_judge": (
         "Duplicate check",
@@ -56,6 +62,11 @@ PROVENANCE = {
     "synthetic": "Synthetic data made for testing. A score here is not a score on residents' "
     "own reports, which will be messier.",
 }
+# A note for a task whose items are not the photos PROVENANCE describes.
+TASK_PROVENANCE = {
+    "crop_photo": "Real public photos of rice fields (the Philippines, Japan, India, Bangladesh "
+    "and Indonesia), not from Biñan; only a few photos per kind of field.",
+}
 NOT_MEANING = {
     "photo_judge": "These scores say how often the agent reads a photo the way a person does. "
     "They are not a count of damaged houses: SAM's roof and floodwater outlines are evidence "
@@ -63,6 +74,10 @@ NOT_MEANING = {
     "crosscheck": "The officer's answer does not change the counts: they keep the agent LLM's "
     "judgment. Saying the thing is there clears the flag; saying it is not keeps the report "
     "marked as doubtful in the forms, like any other trust signal.",
+    "crop_photo": "A flooded or lodged field in a photo is evidence for the officer and the PCIC "
+    "adjuster, not the loss: the share of the crop lost comes from the farmer and the adjusters. "
+    "SAM missed most flooded fields, so Ulat does not measure how much of a field is under "
+    "water.",
     "pair_judge": "A merge means two reports describe one situation, so their figures are "
     "counted once instead of added. The officer can split any merged report back out from its "
     "incident page, and its figures then count on their own again.",
@@ -188,6 +203,52 @@ PHOTO_ROWS: list[tuple[str, str, Callable[[Entry], Cell | None]]] = [
         _sam("floodwater"),
     ),
 ]
+
+
+def _crop_kappa(entry: Entry) -> Cell:
+    field = entry.metrics["crop_field"]
+    return Cell(
+        f"{field['kappa']:.2f}",
+        f"{field['agreement']} of {entry.n} photos given the same condition as the hand label",
+        field["kappa"] < WEAK_BELOW,
+    )
+
+
+def _field_found(concept: str) -> Callable[[Entry], Cell | None]:
+    def cell(entry: Entry) -> Cell | None:
+        sam = entry.metrics["sam"].get(concept)
+        if sam is None:
+            return None
+        return Cell(
+            f"{sam['found']} of {entry.n}",
+            f"water share within {sam['close_points']} points of the label in "
+            f"{sam['water_share_close']} of {sam['measured']} photos",
+            sam["found"] < WEAK_BELOW * entry.n,
+        )
+
+    return cell
+
+
+CROP_ROWS: list[tuple[str, str, Callable[[Entry], Cell | None]]] = [
+    (
+        "Field condition (κ)",
+        "Agreement on flooded, lodged or not visibly damaged, corrected for lucky guesses: 1 is "
+        "perfect, 0 is chance, above 0.6 is usually read as substantial.",
+        _crop_kappa,
+    ),
+    (
+        "Flooded or lodged",
+        f"A damaged field as a person sees it; irrigated paddies with young plants are the hard "
+        f"negatives. {F1_HELP}",
+        lambda e: _scores(e.metrics["damaged"]),
+    ),
+    (
+        'SAM 3.1: "rice field" outlined',
+        "Photos where SAM outlined the field. Without the field it cannot say how much of it is "
+        "under water, so that share is not shown to officers.",
+        _field_found("rice field"),
+    ),
+]
 PAIR_ROWS: list[tuple[str, str, Callable[[Entry], Cell | None]]] = [
     ("Same incident (F1)", F1_HELP, lambda e: _scores(e.metrics)),
     (
@@ -283,6 +344,7 @@ CROSSCHECK_ROWS: list[tuple[str, str, Callable[[Entry], Cell | None]]] = [
 ROWS = {
     "photo_judge": PHOTO_ROWS,
     "crosscheck": CROSSCHECK_ROWS,
+    "crop_photo": CROP_ROWS,
     "pair_judge": PAIR_ROWS,
     "screen": SCREEN_ROWS,
 }
@@ -343,7 +405,7 @@ def build_tables(results: Results) -> list[Table]:
                 intro=intro,
                 not_meaning=NOT_MEANING[task],
                 dataset=dataset,
-                provenance_note=PROVENANCE[dataset.provenance],
+                provenance_note=TASK_PROVENANCE.get(task, PROVENANCE[dataset.provenance]),
                 columns=[Column(e, model_family(e.model_id)) for e in entries],
                 rows=[*rows, *_run_rows(entries)],
                 charts=CHARTS[task](dataset_id, entries),
@@ -582,6 +644,7 @@ def _screen_charts(dataset_id: str, entries: list[Entry]) -> list[Chart]:
 CHARTS: dict[str, Callable[[str, list[Entry]], list[Chart]]] = {
     "photo_judge": _photo_charts,
     "crosscheck": lambda _dataset_id, _entries: [],  # its few counts read best as the table
+    "crop_photo": lambda _dataset_id, _entries: [],  # few photos: the table says it all
     "pair_judge": _pair_charts,
     "screen": _screen_charts,
 }

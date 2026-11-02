@@ -19,6 +19,7 @@ JUDGMENT = {
     "debris": True,
     "tarpaulin": False,
     "house_count_estimate": 3,
+    "crop_field": "none",
     "notes": "Flooded street with damaged roofs.",
 }
 
