@@ -1,0 +1,5 @@
+{% if c.flood_depths %}
+      <section class="keep"><h2>Support data for 1.4: flood depth per incident</h2>
+        <ul>{% for d in c.flood_depths %}<li>{% if d.incident_id %}<a href="/incidents/{{ d.incident_id }}">{{ "incident #" ~ d.incident_id if technical() else "an incident" }}</a>{% else %}<a href="{{ report_href(d.report_ids[0]) }}">report #{{ d.report_ids[0] }}</a>{% endif %}{% if d.place %} ({{ d.place }}){% endif %}: latest {{ d.latest|replace("_", " ") }}, maximum {{ d.max|replace("_", " ") }}</li>{% endfor %}</ul>
+      </section>
+    {% endif %}

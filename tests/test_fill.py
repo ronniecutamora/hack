@@ -351,10 +351,47 @@ def test_simple_mode_asks_the_office_first_with_progress(client, engine):
     ask = page.split('id="ask-title"')[1].split('id="check-title"')[0]
     done = int(re.search(r"(\d) of 8 done", ask).group(1))  # 1.1.3 comes from the reports
     assert ask.index('id="f-1.1.1"') < ask.index('id="f-20.2"') < ask.index('id="f-1.3.1"')
-    assert "For the printout only" in ask
+    assert "Personal details for printing (optional)" in ask
     assert "For the RDANA team on site (optional now)" in page
     v2 = saved_id(fill(client, draft_id, [("1.1.1", "Typhoon"), ("20.2", "Seen.")]))
     assert f"{done + 2} of 8 done" in client.get(f"/drafts/{v2}").text
+
+
+def test_simple_draft_keeps_less_common_actions_and_evidence_in_more(client, engine):
+    incident, first, _ = fisherfolk_incident(engine)
+    add_photo(engine, first)
+    draft_id = generate_nol(client, incident)
+    add_photo(engine, first)  # new evidence makes regeneration available
+    client.get("/?mode=simple")
+    page = client.get(f"/drafts/{draft_id}").text
+    main, more = page.split('<details class="draft-more no-print"', 1)
+    assert "data-simple-flow" in main and "data-simple-approve" in main
+    assert "said by one person only" in main
+    assert f"/drafts/{draft_id}/reject" not in main
+    assert f"/drafts/{draft_id}/reject" in more
+    assert 'action="/drafts/notice-of-loss"' not in main
+    assert 'action="/drafts/notice-of-loss"' in more
+    assert "/drafts#all-drafts" in more and "Evidence annex for the PCIC adjuster" in more
+    assert "Reports behind the fields" in more and "Audit" in more
+    assert "Print draft for checking" in more
+    assert 'data-details-key="fill-personal"' in main
+
+    client.get("/?mode=technical")
+    technical = client.get(f"/drafts/{draft_id}").text
+    assert "data-simple-flow" not in technical and "data-simple-approve" not in technical
+    assert "draft-more" not in technical
+    assert technical.index("Evidence annex for the PCIC adjuster") < technical.index(
+        "Officer decision"
+    )
+    assert f"/drafts/{draft_id}/reject" in technical and "Print draft for checking" in technical
+
+    client.get("/?mode=simple")
+    assert approve(client, draft_id, decided_by="QA", confirm_stale="1").status_code == 303
+    main, more = client.get(f"/drafts/{draft_id}").text.split(
+        '<details class="draft-more no-print"', 1
+    )
+    assert "data-simple-print" in main and "Print final form" in main
+    assert "Print saved version" in more
 
 
 def test_nol_fields_are_filled_and_saved_like_the_rdana_form(client, engine, clock):

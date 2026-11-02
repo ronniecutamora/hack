@@ -86,10 +86,28 @@
     if (!status.dataset.idle) status.dataset.idle = status.textContent;
     const names = new Set();
     form.querySelectorAll("[name^='f.']").forEach((field) => { if (fieldChanged(field)) names.add(field.name); });
-    status.textContent = names.size ? names.size + " unsaved change" + (names.size !== 1 ? "s" : "") + ". " + status.dataset.idle : status.dataset.idle;
-    status.classList.toggle("has-changes", names.size > 0);
-    return names.size;
+    // A refused save re-renders the typed values as defaults. They are still not saved.
+    const refused = form.hasAttribute("data-fill-refused");
+    const unsaved = names.size || (refused ? 1 : 0);
+    status.textContent = refused ? "Changes were not saved. " + status.dataset.idle
+      : names.size ? names.size + " unsaved change" + (names.size !== 1 ? "s" : "") + ". " + status.dataset.idle : status.dataset.idle;
+    status.classList.toggle("has-changes", !!unsaved);
+    if (form.hasAttribute("data-simple-flow")) {
+      const bar = form.querySelector("[data-fill-bar]");
+      if (bar) bar.hidden = !unsaved;
+      document.querySelectorAll("[data-simple-approve], [data-simple-print]").forEach((el) => { el.hidden = !!unsaved; });
+      document.querySelectorAll("[data-approve-wait]").forEach((el) => { el.hidden = !unsaved; });
+    }
+    return unsaved;
   }
+  // Enter in an approval form must not bypass the Save-first state.
+  document.addEventListener("submit", (event) => {
+    if (!event.target.matches("[data-simple-approval]") || !countChanges()) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const save = fillForm().querySelector("[data-fill-bar] button[type=submit]");
+    if (save) save.focus();
+  }, true);
   document.addEventListener("input", (event) => {
     const input = event.target;
     const form = input.closest && input.closest("#fill");
@@ -172,7 +190,7 @@
     if (!dialog || !dialog.showModal || (!unsaved && !empty && !options.length)) { printPaper(); return; }
     dialog.dataset.mode = unsaved ? "unsaved" : (empty ? "gaps" : "ready");
     dialog.querySelector("[data-print-title]").textContent = unsaved
-      ? plural(unsaved, "change") + (unsaved !== 1 ? " are" : " is") + " not saved yet"
+      ? (form.hasAttribute("data-fill-refused") ? "Changes are not saved yet" : plural(unsaved, "change") + (unsaved !== 1 ? " are" : " is") + " not saved yet")
       : empty ? plural(empty, "field") + (empty !== 1 ? " are" : " is") + " still empty" : "Print the form";
     dialog.querySelector("[data-print-unsaved]").hidden = !unsaved;
     gaps.hidden = !!unsaved || !empty;

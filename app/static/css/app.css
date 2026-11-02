@@ -1009,6 +1009,11 @@ input[type=email]:focus, input[type=date]:focus { outline: none; border-color: v
 .fill-moved { display: block; width: fit-content; max-width: 100%; height: auto; padding: var(--space-1) var(--space-3); white-space: normal; }
 .fill-rest { margin: var(--space-5) 0; border-top: 1px solid var(--md-sys-color-outline-variant); }
 .fill-rest > summary { font: var(--md-sys-typescale-title-medium); color: var(--md-sys-color-on-surface); }
+.fill-personal { margin-top: var(--space-4); }
+.fill-personal > summary, .draft-more > summary { font: var(--md-sys-typescale-title-medium); color: var(--md-sys-color-primary); }
+.draft-more { margin: var(--space-5) 0; border-top: 1px solid var(--md-sys-color-outline-variant); }
+.draft-more > section, .draft-more > form { margin-top: var(--space-4); }
+[data-simple-approve][hidden], [data-simple-print][hidden], [data-approve-wait][hidden], .fill-bar[hidden] { display: none; }
 
 /* The label row: the label, then its "?" (an M3 icon button: 48px target, 24px icon), which
    opens the field's help. A phone shows the help as a bottom sheet; a wider window as a popover

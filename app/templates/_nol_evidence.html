@@ -1,0 +1,50 @@
+{% from "_links.html" import report_href %}
+{% from "_trust.html" import signal_chips %}
+{% from "_paper.html" import measured %}
+<section>
+  <h2>Evidence annex for the PCIC adjuster</h2>
+  <p class="muted">{% if technical() %}Every report in incident #{{ c.incident_id }}, oldest first. Photo judgments are by the agent LLM; SAM 3.1 measurements are {{ c.sam_label }}.{% else %}Every report about this loss, oldest first. Ulat judged each photo and measured it; the measurements are {{ c.sam_label }}.{% endif %}{% if c.sam_caveat %} {{ c.sam_caveat|plain }}{% endif %} Names and contact details (phone numbers, emails, handles, account names) are removed from the excerpts and the agent's photo notes. Photo links work until raw media are deleted after the retention period; the judgments and measurements stay.</p>
+  <p class="muted">{{ "SAM 3.1 overlay" if technical() else "Measured photo" }}: {{ GLOSSARY.outline[1] }}</p>
+  <div class="table-wrap">
+  <table class="stack">
+    <thead><tr><th>Report</th><th>Photo evidence</th><th>What the reporter said</th><th>Trust</th></tr></thead>
+    <tbody>
+    {% for e in c.annex %}
+      <tr class="keep" id="annex-{{ e.report_id }}">
+        <td data-label="Report"><a href="{{ report_href(e.report_id, c.incident_id) }}">{{ "#" ~ e.report_id if technical() else "Open the report" }}</a><div class="muted">{{ e.at }}</div></td>
+        <td data-label="Photo evidence">
+          {% for p in e.photos %}
+            <div>
+              {% if p.media_id in available_media %}<a href="/media/{{ p.media_id }}" hx-boost="false">photo</a>{% else %}<span class="muted">photo deleted (retention)</span>{% endif %}
+              {% if p.overlay_media_id %} · {% if p.overlay_media_id in available_media %}<a href="/media/{{ p.overlay_media_id }}" hx-boost="false">{{ "SAM overlay" if technical() else "measured photo" }}</a>{% else %}<span class="muted">overlay deleted</span>{% endif %}{% endif %}
+              {% set j = p.judgment %}
+              {% if j %}
+                <ul class="chips">
+                  {% set field = j.crop_field if j.crop_field and j.crop_field != "none" %}
+                  {% if field %}<li class="chip">crop field: {{ field|replace("_", " ") }}</li>{% endif %}
+                  {% if j.roof_damage is defined and not (field and j.roof_damage == "none") %}<li class="chip">roof damage: {{ j.roof_damage }}</li>{% endif %}
+                  {% if j.floodwater %}<li class="chip">floodwater</li>{% endif %}
+                  {% if j.debris %}<li class="chip">debris</li>{% endif %}
+                  {% if j.tarpaulin %}<li class="chip">tarpaulin</li>{% endif %}
+                  {% if j.fallen_tree %}<li class="chip warn">fallen tree (needs confirmation)</li>{% endif %}
+                </ul>
+                {% if j.notes %}<div class="muted">{{ "Agent" if technical() else "Ulat" }}: {{ j.notes }}</div>{% endif %}
+              {% else %}<div class="muted">Not judged.</div>{% endif %}
+              {% set m = measured(p.measurement) %}
+              {% if m %}<div class="muted">{{ "SAM 3.1 measured" if technical() else "Measured" }} ({{ c.sam_label }}): {{ m }}</div>{% endif %}
+            </div>
+          {% else %}<span class="muted">No photo.</span>{% endfor %}
+        </td>
+        <td data-label="What the reporter said">{% for x in e.excerpts %}<div><span class="muted">{{ x.source }}:</span> “{{ x.text }}”</div>{% else %}<span class="muted">No text.</span>{% endfor %}</td>
+        <td data-label="Trust">
+          {{ signal_chips(e, {}) }}
+          {% if c.single_source %}<span class="chip warn">single source</span>{% endif %}
+          {% if e.report_id in c.pending_report_ids %}<span class="chip warn">grouping pending officer review</span>{% endif %}
+          {% if not e.signals and not c.single_source and e.report_id not in c.pending_report_ids %}<span class="muted">No trust signals.</span>{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>

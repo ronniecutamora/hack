@@ -1,0 +1,4 @@
+<form class="no-print" method="post" action="{{ regenerate[0] }}">
+        {% for name, value in regenerate[1].items() %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+        <button type="submit"{% if not technical() %} class="button--tonal"{% endif %}>Generate a new version</button>
+      </form>

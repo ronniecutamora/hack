@@ -1,0 +1,8 @@
+<form method="post" action="/drafts/{{ draft.id }}/reject" data-done="Draft rejected">
+          <fieldset><legend>Reject version {{ draft.version }}</legend>
+            <input type="hidden" name="version" value="{{ draft.version }}">
+            <label>Decided by (designation) <input type="text" name="decided_by" maxlength="{{ decided_by_max }}" value="{{ current_officer() }}"></label>
+            <label>Reason (required) <textarea name="reason" required minlength="{{ reason_min }}" maxlength="{{ reason_max }}" rows="2"></textarea></label>
+            <button type="submit" class="button--danger">{{ "Reject" if technical() else "Reject: something is wrong" }}</button>
+          </fieldset>
+        </form>

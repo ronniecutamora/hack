@@ -1,0 +1,8 @@
+<section class="no-print">
+    <h2>Audit</h2>
+    <ol>
+    {% for e in events %}
+      <li>{{ e.created_at|manila_time }} · <strong>{{ e.action }}</strong>{% if e.actor %} by {{ e.actor }}{% endif %}{% if e.reason %}: {{ e.reason }}{% endif %}{% if e.detail and e.detail.fields %} <span class="muted">({{ e.detail.fields|length }} field{{ 's' if e.detail.fields|length != 1 }}{% if technical() %}: {{ e.detail.fields|join(", ") }}{% endif %})</span>{% endif %}{% if e.detail and e.detail.carried_fields %} <span class="muted">(kept {{ e.detail.carried_fields|length }} of the office's entries)</span>{% endif %}{% if e.detail and e.detail.superseded_by %} (<a href="/drafts/{{ e.detail.superseded_by }}">{{ "draft #" ~ e.detail.superseded_by if technical() else "the newer version" }}</a>){% endif %}{% if e.detail and e.detail.pending_report_ids %} <span class="chip warn">{% if technical() %}with figures pending grouping review: reports {{ e.detail.pending_report_ids|join(", ") }}{% else %}with {{ e.detail.pending_report_ids|length }} report{{ 's' if e.detail.pending_report_ids|length != 1 }} still to settle{% endif %}</span>{% endif %}</li>
+    {% endfor %}
+    </ol>
+  </section>

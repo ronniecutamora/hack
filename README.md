@@ -280,7 +280,7 @@ submitted by), filled by a deterministic rule over typed report facts, or writte
 Everything else, such as the male/female splits, accessibility, communications, evacuation centers, relief,
 law and order and the overall assessment, is an empty input the officer fills in on the draft (see "Filling in a
 draft" below), and a blank ruled line or empty boxes on the printout. Missing evidence is never turned into "No"
-or "0". Every filled value links to its incidents and reports, with the reporter count,
+or "0". The evidence for each filled value links to its incidents and reports, with the reporter count,
 a "single source" chip and flagged-report chips. A report in an incident links to its place on the incident
 timeline; any other report links to `/reports?around=<id>`, which shows the reports around it however old it is.
 
@@ -297,6 +297,11 @@ regenerating keeps the officer's entries and says under each one if the reports 
 starts with **What you need to fill in** (event name, type and date, the overall assessment and its justification,
 who submits it; for a Notice of Loss the date, type of policy, loss time, area, harvest date and underwriter) with a
 progress line, then the values to check, with the questions for the RDANA team on site folded away.
+Personal details for the printout are optional and start folded. With JavaScript, Simple mode offers one next
+action: **Save changes** while stored fields have unsaved edits, **Approve for filing** after saving, and **Print
+final form** after approval. Opening **More options and evidence** gives the saved printout, rejection, earlier
+drafts, audit, linked reports and, when needed, regeneration. Safety warnings remain visible. With JavaScript off,
+Save and Approve remain available as ordinary forms; save edits before approving.
 
 **Help on every field.** A "?" beside each label (both views, never on paper) opens a short explanation: what to
 enter, an example, and where it comes from. It is a bottom sheet on a phone and a popover beside the button on a
@@ -850,8 +855,8 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-11-02 | Spark and SAM check each other on every photo (`app/crosscheck.py`): a table of rules pairs each Spark judgment with the SAM 3.1 measurement that should back it. When Spark sees floodwater or a partly damaged roof that SAM cannot outline, the report gets a trust signal, and Simple mode's Review asks "Is there floodwater?" with the photo and its outline side by side; the answer is the existing signal review, with what the officer saw as its note. Two more rules are measured only. `scripts.eval_crosscheck` scores every rule for free from the cached photo runs (results file, README and `/accuracy`): Spark 1.3 and SAM disagreed on 22 of 65 labeled photos, the hand label sided with Spark in all 22, and Review asked about 0. The outline is explained where it is shown (Reports, the Notice of Loss annex, Review) |
 | 2026-11-02 | Voice Transcribe hears Biñan's streets: `scripts/build_places.py` queries OpenStreetMap (Overpass) for Biñan's named streets, subdivisions, sitios and landmarks, clips them to the barangay polygons, normalizes "St." and "Brgy.", drops ordinary-word, numbered and private-home names and writes `app/data/binan_places.json` (560 names, with its query and data date; ODbL, credited below); the bot sends the barangays first, then those names up to the API's 500-keyword, 30-character limits (found by testing; the docs give none). `scripts.eval_transcribe` gained the two list sizes and a false-insertions count: with 471 OSM names WER was 19.1% against 20.3% for the barangays alone, with 0 false insertions, so the long list ships; no note names a street, so its benefit is not measured yet |
 | 2026-11-02 | PCIC rice claims through the same pipeline: the rice Claim for Indemnity (RC-CAS-01, Rev. 2017/FEB; rice has no separate Notice of Loss) as a second commodity entry with all 17 items in the paper's bilingual numbering and wording, "?" help with sources, the farmer's identity and CIC number never stored, and a printout in RC-CAS-01's layout (audited field by field); its 20-day, before-harvest deadline row with source; new crop facts (`crop_stage`, `crop_damage`) and Taglish rice words in the facts prompt; the photo judge says whether a rice field is flooded, lodged or not visibly damaged, with a 19-photo kill test in the results file (SAM could not outline flooded fields, so no field water share is shown); drafts, Home's to-do, the help and the guide name each claim from data; which claims an office drafts is data with a source per line (`app/data/pcic_lines.json`: fisheries on, rice off for Biñan until a source shows a rice area) and one setting, `PCIC_COMMODITIES`; two example rice reports in the demo load only with rice on, pinned outside Biñan; the eval spend ledger now upgrades an older database instead of failing after a paid call |
-
 | 2026-11-02 | Photo evidence wording: the fisheries draft refers to the optional separate photo evidence page without claiming it was included; existing generated drafts display the corrected wording without rewriting their saved snapshots, and fisheries and rice use the same page name |
+| 2026-11-02 | Simple draft workflow: RDANA, fisheries and rice show the next action for the saved or edited state, fold optional print-only personal details and group rejection, version history, regeneration, audit and evidence under More; Technical mode keeps its original layout and both views keep the same officer actions |
 
 ### Third-party code and assets
 
