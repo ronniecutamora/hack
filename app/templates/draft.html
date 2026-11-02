@@ -45,13 +45,15 @@
     {% for section in c.sections %}
       <section class="rdana-section">
         <h2>{% if section.number %}{{ section.number }}. {% endif %}{{ section.title }}</h2>
+        {# One table per sub-heading, the sub-heading as its <caption> (not a row spanning it). #}
+        {% set ns = namespace(groups=[]) %}
+        {% for f in section.fields %}{% if f.heading or not ns.groups %}{% set _ = ns.groups.append({"head": f if f.heading else none, "fields": []}) %}{% endif %}{% if not f.heading %}{% set _ = ns.groups[-1].fields.append(f) %}{% endif %}{% endfor %}
+        {% for g in ns.groups %}
         <div class="table-wrap">
         <table class="form-table">
+          {% if g.head %}<caption id="f-{{ g.head.key }}">{{ g.head.number }} {{ g.head.label }}</caption>{% else %}<caption class="visually-hidden">{% if section.number %}{{ section.number }}. {% endif %}{{ section.title }}</caption>{% endif %}
           <tbody>
-          {% for f in section.fields %}
-            {% if f.heading %}
-              <tr class="keep"><th colspan="2" id="f-{{ f.key }}">{{ f.number }} {{ f.label }}</th></tr>
-            {% else %}
+          {% for f in g.fields %}
               {% set selected = (f.value or "").split(", ") %}
               <tr class="keep" id="f-{{ f.key }}">
                 <td class="field-label"><strong>{{ f.number }}</strong>{% if f.sic %} <span class="muted">(sic)</span>{% endif %} {{ f.label }}{% if f.required %} <span class="muted">(required)</span>{% endif %}</td>
@@ -75,11 +77,11 @@
                   {% endif %}
                 </td>
               </tr>
-            {% endif %}
           {% endfor %}
           </tbody>
         </table>
         </div>
+        {% endfor %}
         {% if section.note %}<p class="muted">Note: {{ section.note }}</p>{% endif %}
       </section>
     {% endfor %}
