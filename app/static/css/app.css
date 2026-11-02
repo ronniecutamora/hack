@@ -731,6 +731,7 @@ td.field-label { width: 38%; }
 .queue__count { margin: 0; font: var(--md-sys-typescale-title-medium); color: var(--md-sys-color-on-surface-variant); }
 .queue__count span { font-variant-numeric: tabular-nums; }
 .queue__new { margin: 0; }
+.queue__new[hidden], .queue__count[hidden] { display: none; }
 .queue { list-style: none; margin: 0; padding: 0; }
 .queue__who { margin: var(--space-4) 0 0; }
 .q {
@@ -766,6 +767,7 @@ td.field-label { width: 38%; }
 .q__answer.button--tonal { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
 .q__other > summary { list-style: none; cursor: pointer; }
 .q__other > summary::-webkit-details-marker { display: none; }
+.q__other > summary::before { content: none; }
 .q__other[open] > summary { margin-bottom: var(--space-2); }
 .q__other form { display: grid; gap: var(--space-2); }
 .q__other select { width: 100%; min-height: var(--target); }
