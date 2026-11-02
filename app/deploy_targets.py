@@ -20,6 +20,10 @@ SNAPSHOT_SUBDIR = "snapshots"
 DEMO_IMAGES_SUBDIR = "demo-images"
 MODEL_CACHE_SUBDIR = "model_cache"  # = DATA_DIR/model_cache, the app's cache dir
 
+# The Modal class in deploy/modal_app.py: its web app, and the admin method the deploy CLI calls
+# (deploy/admin_call.py looks it up by this name).
+WEB_CLASS = "Web"
+
 SHARED_KEYS = ("META_API_KEY", "BASETEN_API_KEY", "FIREWORKS_API_KEY")
 REQUIRED_KEYS = (
     "META_API_KEY",

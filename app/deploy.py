@@ -7,11 +7,15 @@
     uv run python -m app.deploy snapshots    --target staging
     uv run python -m app.deploy restore      --target staging app-20261030T101500000000Z.db
     uv run python -m app.deploy logs | stop  --target staging
+    uv run python -m app.deploy reseed       --target staging   # fresh demo; --dry-run first
+    uv run python -m app.deploy screen       --target staging   # set aside old non-reports
 
 Production needs --yes on every command that changes it. Secret values are read from .env and
 handed to Modal through a private temp file; they are never printed, logged or put on a command
 line. Generated values (webhook secret, passcode, session secret) are appended to .env, which is
-git-ignored, and only their names are printed.
+git-ignored, and only their names are printed. `reseed` and `screen` run inside the target's live
+container (app.admin, through deploy/admin_call.py) and pin a snapshot before they change
+anything; `--dry-run` changes nothing and needs no --yes.
 """
 
 import argparse
@@ -39,12 +43,18 @@ from app.deploy_targets import (
     TARGETS,
     Target,
 )
-from app.snapshots import RESTORE_REQUEST, SNAPSHOT_PREFIX, SNAPSHOT_SUFFIX
+from app.snapshots import RESTORE_REQUEST, is_snapshot_file_name
 from app.telegram_webhook import webhook_path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 ENV_FILE = REPO_ROOT / ".env"
 MODAL_ENTRYPOINT = "deploy.modal_app"
+ADMIN_CALL = "deploy.admin_call"
+# Admin commands that run in the live container (app.admin.COMMANDS), with their help text.
+ADMIN_COMMANDS = {
+    "reseed": "replace the synthetic demo with a fresh --anchor-now load (real reports kept)",
+    "screen": "set aside stored messages that are not reports (the free rule, no model)",
+}
 
 
 class DeployError(RuntimeError):
@@ -89,6 +99,29 @@ def modal_bin() -> str:
     if not found:
         raise DeployError("the modal CLI is not installed: pip install modal; modal setup")
     return found
+
+
+def modal_python() -> str:
+    """The Python the Modal CLI runs under (it has the modal package; this project does not):
+    MODAL_PYTHON, or the interpreter on the modal script's #! line."""
+    if found := os.environ.get("MODAL_PYTHON"):
+        return found
+    with open(modal_bin(), "rb") as handle:
+        first = handle.readline().decode("utf-8", "replace").strip()
+    words = first.removeprefix("#!").split() if first.startswith("#!") else []
+    if words and Path(words[0]).name == "env":
+        words = words[1:]
+    if words and "python" in Path(words[0]).name:
+        return words[0]
+    raise DeployError("cannot tell the modal CLI's Python: set MODAL_PYTHON to it")
+
+
+def admin(target: Target, command: str, *, dry_run: bool) -> int:
+    """Run an admin command in the target's live container; its lines print as they return."""
+    args = [modal_python(), "-m", ADMIN_CALL, target.app, command]
+    if dry_run:
+        args.append("--dry-run")
+    return subprocess.run(args, cwd=REPO_ROOT, check=False).returncode
 
 
 def run_modal(args: Sequence[str], *, check: bool = True, capture: bool = False, **kwargs):
@@ -186,10 +219,7 @@ def seed_assets(target: Target, source: Path, out: Callable[[str], None] = print
 
 def restore(target: Target, snapshot: str, out: Callable[[str], None] = print) -> None:
     """Ask the next container to restore `snapshot`, then restart the app."""
-    if (
-        not (snapshot.startswith(SNAPSHOT_PREFIX) and snapshot.endswith(SNAPSHOT_SUFFIX))
-        or "/" in snapshot
-    ):
+    if not is_snapshot_file_name(snapshot):
         raise DeployError(f"not a snapshot name: {snapshot} (see the snapshots command)")
     with tempfile.TemporaryDirectory() as tmp:
         request = Path(tmp) / RESTORE_REQUEST
@@ -281,10 +311,18 @@ def main(argv: list[str] | None = None) -> int:
     back.add_argument("snapshot")
     command("logs", "stream the app's logs")
     command("stop", "stop the app (final snapshot first); deploy again to start it")
+    for name, help_text in ADMIN_COMMANDS.items():
+        command(name, help_text).add_argument(
+            "--dry-run", action="store_true", help="show what it would change; change nothing"
+        )
     args = parser.parse_args(argv)
     target = TARGETS[args.target]
 
-    read_only = args.command in ("snapshots", "logs") or getattr(args, "action", "") == "info"
+    read_only = (
+        args.command in ("snapshots", "logs")
+        or getattr(args, "action", "") == "info"
+        or getattr(args, "dry_run", False)
+    )
     if target.needs_confirmation and not read_only and not args.yes:
         print(f"{args.command} changes {target.name}: run again with --yes", file=sys.stderr)
         return 2
@@ -306,6 +344,8 @@ def main(argv: list[str] | None = None) -> int:
             run_modal(["app", "logs", target.app])
         elif args.command == "stop":
             run_modal(["app", "stop", target.app])
+        elif args.command in ADMIN_COMMANDS:
+            return admin(target, args.command, dry_run=args.dry_run)
     except DeployError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

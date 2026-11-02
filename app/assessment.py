@@ -5,6 +5,7 @@ Run in the background by the bot after each message, and from the command line:
     uv run python -m app.assessment --pending
     uv run python -m app.assessment --all --llm muse-spark-open
     uv run python -m app.assessment --screen     # the free screening rule only, no model call
+    uv run python -m app.assessment --screen --dry-run   # what it would set aside, no change
 
 Model calls are cached, so re-assessing (after a location pin arrives, or to compare LLMs) costs
 nothing for unchanged inputs. No database transaction is held across a model call: a write
@@ -674,20 +675,24 @@ def resumable_report_ids(engine: Engine, limit: int) -> tuple[list[int], int]:
     return list(reversed(newest)), total
 
 
-def screen_existing(engine: Engine) -> list[int]:
+def screen_existing(engine: Engine, *, dry_run: bool = False) -> list[int]:
     """Apply the free screening rule to every stored report (no model call): the messages
     sent before the filter existed ("test", "hahaha") leave their incidents and counts. A report
-    being assessed right now is skipped; its own assessment applies the rule. Idempotent."""
+    being assessed right now is skipped; its own assessment applies the rule. Idempotent.
+    Returns the ids set aside; with `dry_run`, the ids it would set aside, changing nothing."""
     with Session(engine, expire_on_commit=False) as session:
-        session.connection().exec_driver_sql("BEGIN IMMEDIATE")
+        if not dry_run:
+            session.connection().exec_driver_sql("BEGIN IMMEDIATE")
         dropped = []
         for report in session.exec(
             select(Report).where(counted(), Report.status != STATUS_ASSESSING).order_by(Report.id)
         ).all():
             if (screening := rule_screened(session, report)) is not None:
-                screen_out(session, report, screening)
+                if not dry_run:
+                    screen_out(session, report, screening)
                 dropped.append(report.id)
-        session.commit()
+        if not dry_run:
+            session.commit()
     return dropped
 
 
@@ -718,8 +723,9 @@ async def _cli(args: argparse.Namespace) -> int:
     engine = make_engine(settings)
     init_db(engine)
     if getattr(args, "screen", False):
-        dropped = screen_existing(engine)
-        print(f"screened out {len(dropped)} report(s) as not reports: {dropped or '-'}")
+        dropped = screen_existing(engine, dry_run=args.dry_run)
+        verb = "would screen out" if args.dry_run else "screened out"
+        print(f"{verb} {len(dropped)} report(s) as not reports: {dropped or '-'}")
         return 0
     recorder = make_recorder(engine)
     transcriber = make_transcriber(settings, recorder)
@@ -753,6 +759,9 @@ def main(argv: list[str] | None = None) -> int:
         "--screen", action="store_true", help="the free screening rule on every report, no model"
     )
     parser.add_argument("--llm", choices=list(LLM_BACKENDS), help="override AGENT_LLM")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="with --screen: list what it would set aside"
+    )
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s %(message)s")
     return asyncio.run(_cli(parser.parse_args(argv)))
 

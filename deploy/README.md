@@ -47,11 +47,61 @@ uv run python -m app.deploy logs --target staging                   # stream log
 uv run python -m app.deploy snapshots --target staging              # list database snapshots
 uv run python -m app.deploy restore --target staging app-20261030T101500000000Z.db   # restore one, restart
 uv run python -m app.deploy stop --target staging                   # stop (final snapshot); deploy again to start
+
+# Admin, in the live container (snapshot first; --dry-run shows the plan and changes nothing, no --yes needed)
+uv run python -m app.deploy reseed --target staging --dry-run       # fresh synthetic demo; real reports kept
+uv run python -m app.deploy reseed --target staging
+uv run python -m app.deploy screen --target staging --dry-run       # set aside old "test" / "hahaha" messages
+uv run python -m app.deploy screen --target staging
 ```
 
 The first start on an empty volume seeds the synthetic demo by running `python -m app.demo load --anchor-now`
 in the container (18 reports through the real pipeline, about 2 minutes, $0.03 of model calls with the uploaded
 cache on 2026-10-30); later starts restore the newest snapshot instead.
+
+## Admin commands (reseed, screen)
+
+`reseed` and `screen` change the live database, so they run **inside the target's one live container**, in the
+app's own process: `app.deploy` calls the `admin` method of the deployed `Web` class
+([modal_app.py](modal_app.py), through [admin_call.py](admin_call.py) under the Modal CLI's Python; set
+`MODAL_PYTHON` if it cannot find it). With `max_containers=1` a call can only run in (or wait for) the container
+that holds the lease; it never starts a second SQLite writer. Not `modal run` (an ephemeral copy of the app, a
+second container and writer) and not `modal container exec` (a second process outside the lease and the snapshot
+lock). One admin command runs at a time; the output is counts and ids, never message text.
+
+- **Snapshot first.** Before any change the command pins a snapshot (`app-<time>Z-before-reseed.db` /
+  `-before-screen.db`) and prints its name. Pinned snapshots are never pruned and never restored by a start on
+  their own; after the change a regular snapshot makes it durable at once.
+- **`reseed`** ([app/reseed.py](../app/reseed.py)) replaces only the synthetic demo (`channel = "demo"`): its
+  reports, reporters, photos, assessments, grouping decisions, the incidents only demo reports touch, the drafts
+  that cite only demo reports (with their events), officer actions on demo reports and their model calls. The
+  fresh demo is the first seed's load (`python -m app.demo load --anchor-now`, the uploaded model cache, about 2
+  minutes, $0 to $0.05) in a scratch directory, so it never groups with or flags against real reports; its rows
+  get ids above every existing id, then one transaction swaps old for new and checks that every real report and
+  its rows are unchanged, or rolls back. It **refuses, listing ids**, when an incident has both demo and real
+  reports (move the real report out with Keep separate first), when a reporter sent both, or while a demo report
+  is being assessed. An incident a real grouping decision or officer action points at is kept, emptied and
+  retired; a draft that cites real reports too is kept as it was decided (it shows as out of date). The old
+  demo's photo files stay on the volume (about 5 MB per reseed), so restoring the pinned snapshot shows them.
+- **`screen`** runs the free not-a-report rule (`python -m app.assessment --screen`) over every stored message,
+  for the ones that arrived before the screen existed. With nothing to set aside it changes nothing and takes no
+  snapshot. An officer can restore any message from the Set aside list.
+- **Undo:** `uv run python -m app.deploy restore --target staging app-<time>Z-before-reseed.db` (the name it
+  printed). The container restarts on the snapshot; the replaced database is kept as `app.db.before-restore`.
+  Real reports that arrived after the snapshot are in that kept file, not in the restored one, so undo soon.
+
+## Before a demo
+
+A fisheries Notice of Loss is due 2 days after the first report. Right after a reseed the demo's latest report
+is an hour old and its earlier fisheries report about 26 hours old (scenario r05 and r18), so its countdown stays
+live for about 22 hours. Reseed the morning of a demo:
+
+1. `uv run python -m app.deploy reseed --target production --dry-run`: read the plan (no refusal, real report
+   count as expected).
+2. `uv run python -m app.deploy reseed --target production --yes`; note the snapshot name it prints.
+3. `curl -s https://<workspace>--ulat.modal.run/health` answers ok; sign in and open Home: the to-do list shows
+   the Notices of Loss "due in …", not "overdue", and the overview shows the demo reports from the last days.
+4. Optionally `uv run python -m app.deploy screen --target production --dry-run`, then `--yes` if it lists any.
 
 **Officer access:** the passcode is `STAGING_OFFICER_PASSCODE` / `PRODUCTION_OFFICER_PASSCODE` in `.env`. Read it
 there; never paste it into the repo, an issue or a chat log. Changing it (then `secrets` and `deploy`) signs
@@ -65,8 +115,8 @@ every session out.
 3. Optionally `uv run python -m app.deploy stop --target production --yes`. The volume and snapshots stay.
 
 A bad deploy without a data problem: `modal app rollback --strategy recreate ulat` redeploys the previous version, and the new
-container restores the latest snapshot. A data problem: `restore` a snapshot from before it (the replaced
-database is kept on the container as `app.db.before-restore` until the next restart).
+container restores the latest snapshot. A data problem: `restore` a snapshot from before it, such as the pinned one an admin command
+printed (the replaced database is kept on the container as `app.db.before-restore` until the next restart).
 
 ## Durability
 

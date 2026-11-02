@@ -14,6 +14,10 @@ finished snapshot files:
    SNAPSHOT_KEEP spaced at least half an interval apart are kept (so a burst of reports does not
    push the older history out), plus the newest of each of the last SNAPSHOT_KEEP_DAILY days.
 
+**Pinned snapshots** (`pin()`): an admin command (app.admin) takes one before it changes the
+data, named after it (app-…Z-before-reseed.db). Retention never prunes it and a start never
+restores it by itself; `python -m app.deploy restore` can name it to undo the change.
+
 Loss window: a crash that skips the shutdown snapshot loses the database writes since the last
 snapshot: at most about SNAPSHOT_SOON_S of acknowledged reports, and at most one interval
 (default 2 minutes) of everything else (assessments, officer actions). Media files are written
@@ -55,9 +59,14 @@ logger = logging.getLogger(__name__)
 SNAPSHOT_PREFIX = "app-"
 SNAPSHOT_SUFFIX = ".db"
 LEASE_NAME = "LEASE.json"
+_STAMP = rf"{re.escape(SNAPSHOT_PREFIX)}\d{{8}}T\d{{12}}Z"
 SNAPSHOT_NAME = re.compile(
-    rf"{re.escape(SNAPSHOT_PREFIX)}\d{{8}}T\d{{12}}Z{re.escape(SNAPSHOT_SUFFIX)}"
+    rf"{_STAMP}{re.escape(SNAPSHOT_SUFFIX)}"
 )  # what snapshot_name() writes; anything else in the folder is left alone
+# A kept copy taken before an admin change (`pin()`, e.g. app-…Z-before-reseed.db): never pruned
+# and never restored on its own (snapshots() lists only SNAPSHOT_NAME), only when a RESTORE
+# request names it. Its name records what it was taken before.
+PINNED_NAME = re.compile(rf"{_STAMP}-[a-z]+(?:-[a-z]+)*{re.escape(SNAPSHOT_SUFFIX)}")
 RESTORE_REQUEST = "RESTORE"  # holds a snapshot file name: restore that one at the next start
 LEASE_WAIT_S = 45.0  # Modal gives a stopping container 30 s for its exit handler
 LEASE_POLL_S = 2.0
@@ -84,8 +93,15 @@ class LocalVolume:
         pass
 
 
-def snapshot_name(when: datetime) -> str:
-    return f"{SNAPSHOT_PREFIX}{when:%Y%m%dT%H%M%S%fZ}{SNAPSHOT_SUFFIX}"
+def snapshot_name(when: datetime, label: str | None = None) -> str:
+    """A regular snapshot's name, or with `label` a pinned one's (PINNED_NAME)."""
+    tail = f"-{label}" if label else ""
+    return f"{SNAPSHOT_PREFIX}{when:%Y%m%dT%H%M%S%fZ}{tail}{SNAPSHOT_SUFFIX}"
+
+
+def is_snapshot_file_name(name: str) -> bool:
+    """A name `restore` may ask for: a regular or a pinned snapshot, never a path."""
+    return bool(SNAPSHOT_NAME.fullmatch(name) or PINNED_NAME.fullmatch(name))
 
 
 def snapshot_time(path: Path) -> datetime:
@@ -324,6 +340,35 @@ class SnapshotStore:
                 self._write_lease(released=False)
             self.volume.commit()
             return final
+
+    def holds_lease(self) -> bool:
+        """This container is the writer: it is open and no other container took the lease."""
+        with self._lock:
+            return not self.closed and not self._lost_lease()
+
+    def pin(self, label: str) -> Path:
+        """A kept snapshot of the live database, taken now and committed to the volume, for an
+        admin change to be undone with `restore` (PINNED_NAME: never pruned, never restored on
+        its own). Raises when this container no longer holds the lease (its database is not
+        the one that counts) or has closed."""
+        name = snapshot_name(self.clock(), label)
+        if not PINNED_NAME.fullmatch(name):
+            raise ValueError(f"not a snapshot label: {label!r}")
+        with self._lock:
+            if self.closed or self._lost_lease():
+                raise RuntimeError("this container does not hold the database lease")
+            if not self.db_path.exists():
+                raise FileNotFoundError(f"no database at {self.db_path}")
+            self.dir.mkdir(parents=True, exist_ok=True)
+            tmp = self.dir / f".{name}.tmp"
+            copy_database(self.db_path, tmp, source_read_only=False)
+            _fsync(tmp)
+            final = self.dir / name
+            os.replace(tmp, final)
+            self._write_lease(released=False)
+            self.volume.commit()
+        logger.info("pinned snapshot %s", name)
+        return final
 
     def request(self) -> None:
         """Ask for a snapshot soon: something that must survive a crash was just written (a

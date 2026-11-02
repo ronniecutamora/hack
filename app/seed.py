@@ -30,35 +30,46 @@ SEED_TIMEOUT_S = 30 * 60
 _SCRUBBED = ("DATABASE_PATH", "SNAPSHOT_DIR", "TELEGRAM_MODE", "ALLOWED_HOSTS", "OFFICER_PASSCODE")
 
 
+def run_demo_load(settings: Settings, images_dir: Path, work: Path) -> bool:
+    """Run `python -m app.demo load --anchor-now` with `work` (a directory named "demo") as its
+    DATA_DIR, reading the volume's demo photos and sharing the deploy's model cache. A database
+    already at work/app.db is loaded into (app.reseed prepares one). Returns whether it
+    produced work/app.db."""
+    if not images_dir.is_dir():
+        logger.error("no demo images at %s: run python -m app.deploy seed-assets", images_dir)
+        return False
+    settings.cache_dir.mkdir(parents=True, exist_ok=True)
+    (work / "images").symlink_to(images_dir, target_is_directory=True)
+    (work / "model_cache").symlink_to(settings.cache_dir, target_is_directory=True)
+    env = {k: v for k, v in os.environ.items() if k not in _SCRUBBED}
+    env["DATA_DIR"] = str(work)
+    logger.info("loading the synthetic demo (python -m app.demo load --anchor-now)")
+    result = subprocess.run(
+        [sys.executable, "-m", "app.demo", "load", "--anchor-now"],
+        cwd=REPO_ROOT,
+        env=env,
+        timeout=SEED_TIMEOUT_S,
+        capture_output=True,
+        text=True,
+    )
+    for line in (result.stdout + result.stderr).splitlines()[-20:]:
+        logger.info("demo load: %s", line)
+    if result.returncode != 0 or not (work / "app.db").is_file():
+        logger.error("demo load failed (exit %s)", result.returncode)
+        return False
+    return True
+
+
 def seed_demo(settings: Settings, images_dir: Path) -> bool:
     """Load the demo into a scratch dir and install it as this deploy's data. The database must
     not exist yet. Returns False (and leaves an empty database to the app) when it fails."""
     if settings.db_path.exists():
         raise FileExistsError(f"{settings.db_path} exists; seeding would overwrite it")
-    if not images_dir.is_dir():
-        logger.error("no demo images at %s: run python -m app.deploy seed-assets", images_dir)
-        return False
     with tempfile.TemporaryDirectory(prefix="ulat-seed-") as scratch:
         work = Path(scratch) / "demo"  # the demo commands only accept a dir named "demo"
         work.mkdir()
-        settings.cache_dir.mkdir(parents=True, exist_ok=True)
-        (work / "images").symlink_to(images_dir, target_is_directory=True)
-        (work / "model_cache").symlink_to(settings.cache_dir, target_is_directory=True)
-        env = {k: v for k, v in os.environ.items() if k not in _SCRUBBED}
-        env["DATA_DIR"] = str(work)
-        logger.info("seeding the synthetic demo (python -m app.demo load --anchor-now)")
-        result = subprocess.run(
-            [sys.executable, "-m", "app.demo", "load", "--anchor-now"],
-            cwd=REPO_ROOT,
-            env=env,
-            timeout=SEED_TIMEOUT_S,
-            capture_output=True,
-            text=True,
-        )
-        for line in (result.stdout + result.stderr).splitlines()[-20:]:
-            logger.info("demo load: %s", line)
-        if result.returncode != 0 or not (work / "app.db").is_file():
-            logger.error("demo load failed (exit %s); starting empty", result.returncode)
+        if not run_demo_load(settings, images_dir, work):
+            logger.error("seeding failed; starting empty")
             return False
         settings.db_path.parent.mkdir(parents=True, exist_ok=True)
         copy_database(work / "app.db", settings.db_path, source_read_only=False)
