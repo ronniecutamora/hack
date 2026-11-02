@@ -22,7 +22,7 @@ from typing import Any
 from sqlalchemy import Engine, func
 from sqlmodel import Session, SQLModel, create_engine, select
 
-from app.db import make_recorder
+from app.db import add_missing_columns, make_recorder
 from app.meta.base import CallRecord, ModelClient
 from app.models import MANILA, ModelCall
 
@@ -45,6 +45,10 @@ def ledger_engine(data_dir: Path) -> Engine:
     data_dir.mkdir(parents=True, exist_ok=True)
     engine = create_engine(f"sqlite:///{data_dir / LEDGER_NAME}")
     SQLModel.metadata.create_all(engine, tables=[ModelCall.__table__])  # type: ignore[attr-defined]
+    # A ledger made before a ModelCall column existed would fail every write, after the call
+    # was paid for and before its response was cached.
+    with engine.begin() as connection:
+        add_missing_columns(connection, ["modelcall"])
     return engine
 
 

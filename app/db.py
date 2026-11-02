@@ -1,6 +1,8 @@
 """SQLite engine and helpers. The database lives in DATA_DIR/app.db."""
 
-from sqlalchemy import Engine, event, inspect
+from collections.abc import Iterable
+
+from sqlalchemy import Connection, Engine, event, inspect
 from sqlmodel import Session, SQLModel, create_engine
 
 from app import models
@@ -31,6 +33,49 @@ def _enable_wal(dbapi_connection, _record) -> None:
     cursor.close()
 
 
+# Columns added after a table first shipped. Nullable/defaulted additions preserve older DBs.
+COLUMN_ADDITIONS: dict[str, dict[str, str]] = {
+    "report": {
+        "incident_id": "INTEGER REFERENCES incident(id)",
+        "grouping_fingerprint": "VARCHAR",
+        "grouping_error": "VARCHAR",
+        "grouping_needs_officer": "BOOLEAN NOT NULL DEFAULT 0",
+        "hold_reason": "VARCHAR",
+        "assessing_started_at": "DATETIME",
+        "album": "VARCHAR",
+        "officer_incident_id": "INTEGER REFERENCES incident(id)",
+        "officer_barangay": "VARCHAR",
+        "corrects_report_id": "INTEGER REFERENCES report(id)",
+        "screening": "JSON",
+        "officer_restored": "BOOLEAN NOT NULL DEFAULT 0",
+    },
+    "reporter": {"blocked": "BOOLEAN NOT NULL DEFAULT 0"},
+    "media": {"phash": "VARCHAR"},
+    "photoassessment": {"taken_at": "DATETIME"},
+    "assessment": {"signals": "JSON"},
+    "draft": {"incident_id": "INTEGER REFERENCES incident(id)", "entries": "JSON"},
+    # The agent trace (app.trace); calls logged before it stay NULL ("not recorded").
+    "modelcall": {
+        "report_id": "INTEGER REFERENCES report(id)",
+        "draft_id": "INTEGER REFERENCES draft(id)",
+        "step": "VARCHAR",
+        "subject": "VARCHAR",
+    },
+}
+
+
+def add_missing_columns(connection: Connection, tables: Iterable[str] | None = None) -> None:
+    """Add every COLUMN_ADDITIONS column an existing table lacks (all tables, or just `tables`).
+
+    create_all never alters a table that exists, so any database made before a column was added
+    (the app's, or an eval spend ledger) needs this before the code writes that column."""
+    for table in COLUMN_ADDITIONS if tables is None else tables:
+        columns = {c["name"] for c in inspect(connection).get_columns(table)}
+        for name, sql_type in COLUMN_ADDITIONS[table].items():
+            if name not in columns:
+                connection.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {name} {sql_type}")
+
+
 def init_db(engine: Engine) -> None:
     """Create or upgrade the schema in one write transaction, safe when processes start together.
 
@@ -52,39 +97,7 @@ def init_db(engine: Engine) -> None:
             "AND tbl_name IN ('draft', 'draftevent', 'officeraction')"
         ).all():
             connection.exec_driver_sql(f'DROP TRIGGER IF EXISTS "{name}"')
-        additions = {
-            "report": {
-                "incident_id": "INTEGER REFERENCES incident(id)",
-                "grouping_fingerprint": "VARCHAR",
-                "grouping_error": "VARCHAR",
-                "grouping_needs_officer": "BOOLEAN NOT NULL DEFAULT 0",
-                "hold_reason": "VARCHAR",
-                "assessing_started_at": "DATETIME",
-                "album": "VARCHAR",
-                "officer_incident_id": "INTEGER REFERENCES incident(id)",
-                "officer_barangay": "VARCHAR",
-                "corrects_report_id": "INTEGER REFERENCES report(id)",
-                "screening": "JSON",
-                "officer_restored": "BOOLEAN NOT NULL DEFAULT 0",
-            },
-            "reporter": {"blocked": "BOOLEAN NOT NULL DEFAULT 0"},
-            "media": {"phash": "VARCHAR"},
-            "photoassessment": {"taken_at": "DATETIME"},
-            "assessment": {"signals": "JSON"},
-            "draft": {"incident_id": "INTEGER REFERENCES incident(id)", "entries": "JSON"},
-            # The agent trace (app.trace); calls logged before it stay NULL ("not recorded").
-            "modelcall": {
-                "report_id": "INTEGER REFERENCES report(id)",
-                "draft_id": "INTEGER REFERENCES draft(id)",
-                "step": "VARCHAR",
-                "subject": "VARCHAR",
-            },
-        }
-        for table, additions_by_column in additions.items():
-            columns = {c["name"] for c in inspect(connection).get_columns(table)}
-            for name, sql_type in additions_by_column.items():
-                if name not in columns:
-                    connection.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {name} {sql_type}")
+        add_missing_columns(connection)
         connection.exec_driver_sql(
             "CREATE INDEX IF NOT EXISTS ix_report_incident_id ON report (incident_id)"
         )

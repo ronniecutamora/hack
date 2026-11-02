@@ -212,6 +212,23 @@ def test_ledger_is_separate_from_the_app_database(settings):
         assert [c.model for c in session.exec(select(ModelCall)).all()] == ["earlier"]
 
 
+def test_a_ledger_from_before_the_trace_columns_is_upgraded(settings):
+    """A ledger made before ModelCall gained its trace columns used to fail every write, after
+    the call was paid for and before its response was cached (found re-running 7m's evals)."""
+    import sqlite3
+
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(settings.data_dir / spend.LEDGER_NAME) as old:
+        old.execute(
+            "CREATE TABLE modelcall (id INTEGER PRIMARY KEY, at DATETIME, model VARCHAR, "
+            "latency_ms INTEGER, cached BOOLEAN, cost_estimate FLOAT)"
+        )
+    ledger = spend.SpendLedger(settings.data_dir, 5.0, script="test")
+    ledger.record(CallRecord(model="m", latency_ms=1, cached=False, cost_estimate=0.25))
+    with Session(ledger.engine) as session:
+        assert [c.cost_estimate for c in session.exec(select(ModelCall)).all()] == [0.25]
+
+
 def test_probe_leaves_fakes_alone_and_restores_real_clients(settings):
     real = SparkClient(api_key="k")
     fake = FakeLLM()
