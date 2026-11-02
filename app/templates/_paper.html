@@ -107,7 +107,7 @@
     <span class="paper__num">{{ fd.number }}.</span>
     <span class="paper__label">{{ bilingual(v.label, fd.label_fil) }}:</span>
     {%- if v.options %}
-      <span class="paper__choices" style="--cols: {{ [v.options|length, 4]|min }}">{% for o in v.options %}<span class="paper__opt">{{ paren(o in v.printed) }} {{ o }}{% if o in paper.write_in %}: <span class="paper__line paper__line--other"></span>{% endif %}</span>{% endfor %}</span>
+      <span class="paper__choices" style="--cols: {{ [v.options|length, 4]|min }}">{% for o in v.options %}<span class="paper__opt{% if o in paper.write_in %} paper__opt--write-in{% endif %}">{{ paren(o in v.printed) }} {{ o }}{% if o in paper.write_in %}: <span class="paper__line paper__line--other"></span>{% endif %}</span>{% endfor %}</span>
     {%- else %}
       {{ blank(v, unit=not fd.paper_unit) }}{% if fd.paper_unit %}<span class="paper__unit">{{ fd.paper_unit[0] }} <i>({{ fd.paper_unit[1] }})</i></span>{% endif %}
     {%- endif %}

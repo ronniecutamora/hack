@@ -1212,41 +1212,42 @@ legend.fill-head { display: flex; }
   /* The rice Claim for Indemnity, PCIC RC-CAS-01 (Rev. 2017/FEB): a one-page bilingual form set
      in Cambria (else its metric twin Caladea). Offsets are measured on the A4 scan, less the
      10 mm page margin. */
-  .paper--claim { font: 8.6pt/1.3 Cambria, Caladea, Georgia, "Liberation Serif", serif; }
-  .paper--claim .paper__formid { font-size: 6.6pt; margin: 9mm 24mm 0 0 !important; }
-  .paper__claim-title { text-align: center; font: 700 13pt/1.1 Cambria, Caladea, Georgia, serif; margin-top: 4mm !important; }
+  .paper--claim { font: 8.3pt/1.12 Cambria, Caladea, Georgia, "Liberation Serif", serif; margin: 0 5mm 0 0; }
+  .paper--claim .paper__formid { font-size: 6.6pt; margin: 13.4mm 29mm 0 0 !important; }
+  .paper__claim-title { text-align: center; font: 700 14.3pt/1.1 Cambria, Caladea, Georgia, serif; margin-top: 2.6mm !important; }
   .paper__claim-subtitle { text-align: center; font-weight: 700; font-style: italic; font-size: 9.2pt; }
-  .paper__claim-date { text-align: right; margin: 3mm 23mm 0 0 !important; }
+  .paper__claim-date { text-align: right; margin: 0 20.6mm 0 0 !important; }
   .paper__claim-date .paper__line { min-width: 30mm; }
   .paper__claim-date .paper__caption { font-weight: 700; font-size: 7.4pt; }
   .paper__claim-to { display: grid; grid-template-columns: 9mm 10mm auto; margin: 3mm 0 0 18mm !important; }
-  .paper__claim-request { margin: 4.5mm 0 0 28mm !important; }
-  .paper__claim-section { font-weight: 700; margin: 3.5mm 0 0 18mm !important; display: grid; grid-template-columns: 5mm auto; }
-  .paper__claim-section .paper__secnum { min-width: 0; }
-  .paper__claim-items { list-style: none; margin: 1.8mm 14mm 0 28mm; padding: 0; }
+  .paper__claim-request { margin: 2.1mm 0 0 28mm !important; }
+  .paper__claim-section { font-weight: 700; margin: 2.8mm 0 0 18mm !important; padding-left: 5mm; text-indent: -5mm; }
+  .paper__claim-section .paper__secnum { display: inline-block; min-width: 5mm; text-indent: 0; }
+  .paper__claim-items { list-style: none; margin: 1.8mm 19.4mm 0 28mm; padding: 0; }
   .paper__ci { display: flex; align-items: baseline; gap: 1mm; min-height: 4.4mm; break-inside: avoid; }
-  .paper__ci > .paper__num { flex: none; width: 5mm; }
+  .paper__ci > .paper__num { flex: none; width: 4.5mm; }
   .paper__ci > .paper__label { flex: none; }
   .paper__ci > .paper__line { flex: 1; min-width: 0; min-height: 0; }
   .paper__ci--short > .paper__line { flex: 0 1 auto; width: 100%; max-width: 64mm; }
   .paper__ci--unit > .paper__line { flex: 0 1 auto; width: 100%; max-width: 36mm; }
   .paper__unit { flex: none; font-weight: 700; }
-  .paper__choices { display: grid; grid-template-columns: repeat(var(--cols), auto); column-gap: 7mm; margin-left: 3mm; }
+  .paper__choices { display: grid; grid-template-columns: repeat(var(--cols), max-content); column-gap: 8mm; row-gap: .8mm; margin-left: 3mm; white-space: nowrap; }
+  .paper__choices .paper__opt--write-in { grid-column: span 2; }  /* the paper runs the write-in line under the next column */
   .paper__paren { white-space: pre; }
   .paper__line--other { min-width: 30mm; }
   .paper__claim-sketch { margin-top: 3mm; break-inside: avoid; }
-  .paper__claim-sketch .paper__claim-section { grid-template-columns: 5mm auto; }
   .paper__claim-note { margin: 0 0 0 23mm !important; }
-  .paper__lsp { border-collapse: collapse; margin: 3mm 0 0 28mm; font-weight: 700; }
-  .paper__lsp th, .paper__lsp td { padding: 0 0 .6mm; text-align: left; font-weight: inherit; }
-  .paper__lsp td:first-child { width: 5mm; }
-  .paper__lsp td:nth-child(2) { width: 24mm; }
-  .paper__lsp th:nth-child(n+3), .paper__lsp td:nth-child(n+3) { width: 28.5mm; padding-right: 6mm; text-align: center; }
+  .paper__lsp { width: 140mm; table-layout: fixed; border-collapse: collapse; border: 0; border-radius: 0; background: none; margin: 3mm 0 0 28mm; font: inherit; font-weight: 700; color: #000; }
+  .paper__lsp th, .paper__lsp td { position: static; border: 0; border-radius: 0; background: none; color: #000; font: inherit; padding: 0 0 .95mm; text-align: left; vertical-align: bottom; }
+  .paper__lsp td { font-weight: 400; }
+  .paper__lsp th:first-child, .paper__lsp td:first-child { width: 5mm; }
+  .paper__lsp th:nth-child(2), .paper__lsp td:nth-child(2) { width: 25mm; }
+  .paper__lsp th:nth-child(n+3), .paper__lsp td:nth-child(n+3) { padding-right: 6mm; text-align: center; }
   .paper__line--lot { min-width: 6mm; }
   .paper__line--cell-rule { display: block; min-width: 0; width: 100%; }
-  .paper__claim-thanks { margin: 11mm 0 0 18mm !important; font-weight: 700; }
-  .paper__claim-closing { margin: 3mm 0 0 97mm; font-weight: 700; }
-  .paper__claim-sign { display: inline-flex; flex-direction: column; align-items: center; margin-top: 6mm !important; }
+  .paper__claim-thanks { margin: 9mm 0 0 18mm !important; font-weight: 700; }
+  .paper__claim-closing { margin: 2.3mm 0 0 87mm; font-weight: 700; }
+  .paper__claim-sign { display: inline-flex; flex-direction: column; align-items: center; margin-top: 2.2mm !important; }
   .paper__claim-sign .paper__line--sign { width: 73mm; }
   .paper__claim-sign i { font-weight: 700; }
   /* The photo evidence attachment (optional): a separate sheet, titled as one. */
