@@ -211,8 +211,11 @@
     pending.delete(id);
     busy.add(id);
     const before = capture(region);
+    // The region is the request's source: htmx keeps one request per source and, by default,
+    // replaces a queued one with the next, so a shared source (the body) would drop all but the
+    // first and last of several regions refreshing at once.
     window.htmx.ajax("GET", window.location.pathname + window.location.search, {
-      target: "#" + id, select: "#" + id, swap: "outerHTML ignoreTitle:true",
+      source: region, target: "#" + id, select: "#" + id, swap: "outerHTML ignoreTitle:true",
     }).then(() => {
       const fresh = document.getElementById(id);
       if (fresh && fresh !== region) { restore(fresh, before); markUpdated(); }
