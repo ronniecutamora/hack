@@ -12,9 +12,10 @@
 {% macro legend() %}
   <ul class="legend" aria-label="Map legend">
     <li><span class="pin pin--open" aria-hidden="true">3</span> Open incident (the number is its reports)</li>
-    <li><span class="pin pin--needs_officer" aria-hidden="true">2</span> Needs officer review (square)</li>
+    <li><span class="pin pin--needs_officer" aria-hidden="true">2</span> {{ "Needs officer review" if technical() else "Needs your check" }} (square)</li>
     <li><span class="pin pin--open pin--approx" aria-hidden="true">1</span> Approximate: no GPS in its reports, placed at the barangay centre (dashed, hollow)</li>
     <li><span class="pin pin--outside" aria-hidden="true">!</span> Flagged report pinned outside Biñan (red diamond)</li>
+    <li><span class="pin pin--group" aria-hidden="true">+3</span> Incidents close together: tap to spread them out</li>
     <li><span class="swatch swatch--active" aria-hidden="true"></span> Barangay with active incidents</li>
   </ul>
 {% endmacro %}

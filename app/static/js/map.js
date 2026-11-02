@@ -26,11 +26,39 @@
     return p.kind === "outside" ? 26 : Math.min(44, 26 + 4 * Math.max(0, (p.report_count || 1) - 1));
   }
 
+  // Every pin is a 48 px touch target (Material and WCAG target size), however small it is drawn;
+  // pins closer than that on screen are shown as one group that fans out when tapped.
+  const TARGET = 48;
+
+  function wrap(pin, size) {
+    pin.style.width = pin.style.height = size + "px";
+    return L.divIcon({ html: pin, className: "pin-wrap", iconSize: [TARGET, TARGET], iconAnchor: [TARGET / 2, TARGET / 2], popupAnchor: [0, -size / 2] });
+  }
+
   function icon(p) {
-    const size = pinSize(p);
     const pin = el("span", "pin " + (p.kind === "outside" ? "pin--outside"
       : "pin--" + p.status + (p.approximate ? " pin--approx" : "")), p.kind === "outside" ? "!" : String(p.report_count));
-    return L.divIcon({ html: pin, className: "pin-wrap", iconSize: [size, size], iconAnchor: [size / 2, size / 2], popupAnchor: [0, -size / 2] });
+    return wrap(pin, pinSize(p));
+  }
+
+  function groupIcon(members) {
+    const waiting = members.some((f) => f.properties.status === "needs_officer");
+    return wrap(el("span", "pin pin--group" + (waiting ? " pin--group-waiting" : ""), "+" + members.length), 40);
+  }
+
+  // Greedy grouping in screen pixels at the current zoom, most urgent first, so a pin waiting for
+  // review is never hidden under another one. O(n × groups), fine for a city's incidents.
+  function groupByScreen(map, features) {
+    const urgent = (f) => (f.properties.kind === "outside" ? 0 : f.properties.status === "needs_officer" ? 1 : 2);
+    const groups = [];
+    features.slice().sort((a, b) => urgent(a) - urgent(b)).forEach((f) => {
+      const [lon, lat] = f.geometry.coordinates;
+      const point = map.latLngToContainerPoint([lat, lon]);
+      const near = groups.find((g) => g.point.distanceTo(point) < TARGET);
+      if (near) near.members.push(f);
+      else groups.push({ point, latlng: L.latLng(lat, lon), members: [f] });
+    });
+    return groups;
   }
 
   function describe(p) {
@@ -97,6 +125,46 @@
     let framed = false;
 
     const markers = L.layerGroup().addTo(map);
+    const spider = L.layerGroup().addTo(map);
+    let features = [];
+
+    function marker(f, latlng) {
+      const p = f.properties;
+      return L.marker(latlng, { icon: icon(p), title: describe(p), alt: describe(p), riseOnHover: true,
+        zIndexOffset: p.status === "needs_officer" ? 500 : 0 })
+        .bindPopup(() => popup(p), { maxWidth: 300 });
+    }
+
+    // Fan a group out around its place, each pin on a short leg, a full target apart.
+    function fanOut(group) {
+      spider.clearLayers();
+      const n = group.members.length;
+      const radius = Math.max(TARGET, (n * (TARGET + 6)) / (2 * Math.PI));
+      group.members.forEach((f, i) => {
+        const angle = (2 * Math.PI * i) / n - Math.PI / 2;
+        const at = map.containerPointToLatLng(group.point.add([radius * Math.cos(angle), radius * Math.sin(angle)]));
+        L.polyline([group.latlng, at], { color: "#43474e", weight: 1.5, opacity: 0.7, interactive: false }).addTo(spider);
+        marker(f, at).addTo(spider);
+      });
+    }
+
+    function draw() {
+      markers.clearLayers();
+      spider.clearLayers();
+      groupByScreen(map, features).forEach((g) => {
+        if (g.members.length === 1) {
+          marker(g.members[0], g.latlng).addTo(markers);
+          return;
+        }
+        const label = g.members.length + " incidents close together: tap to spread them out";
+        L.marker(g.latlng, { icon: groupIcon(g.members), title: label, alt: label, riseOnHover: true, zIndexOffset: 600 })
+          .on("click", () => fanOut(g))
+          .addTo(markers);
+      });
+    }
+    map.on("zoomend", draw);
+    map.on("click", () => spider.clearLayers());
+
     async function load() {
       let data;
       try {
@@ -107,15 +175,10 @@
       }
       if (!tilesFailed) say("");
       const active = new Map();
-      markers.clearLayers();
-      data.features.forEach((f) => {
+      features = data.features;
+      features.forEach((f) => {
         const p = f.properties;
         if (p.kind === "incident" && p.barangay) active.set(p.barangay, (active.get(p.barangay) || 0) + 1);
-        const [lon, lat] = f.geometry.coordinates;
-        L.marker([lat, lon], { icon: icon(p), title: describe(p), alt: describe(p), riseOnHover: true,
-          zIndexOffset: p.status === "needs_officer" ? 500 : 0 })
-          .bindPopup(() => popup(p), { maxWidth: 300 })
-          .addTo(markers);
       });
       // Once, on the first load: zoom to the incidents (all inside Biñan). Later updates never
       // move the map under the officer's cursor.
@@ -125,6 +188,7 @@
         map.fitBounds(bounds.pad(0.25), { maxZoom: 16 });
       }
       framed = true;
+      draw();
       boundaries.eachLayer((layer) => {
         const name = layer.feature.properties.name;
         const count = active.get(name) || 0;
