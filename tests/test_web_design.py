@@ -109,7 +109,7 @@ def test_static_assets_are_served_with_a_content_hash(client):
 
 def test_fonts_and_icons_are_self_hosted_with_their_licenses(client):
     css = client.get(static_url("css/app.css")).text
-    assert "font-display: swap" in css and "../vendor/roboto/roboto-latin-wght.woff2" in css
+    assert "font-display: optional" in css and "../vendor/roboto/roboto-latin-wght.woff2" in css
     assert "fonts.googleapis.com" not in css and "fonts.gstatic.com" not in css
     for path in (
         "/static/vendor/roboto/roboto-latin-wght.woff2",

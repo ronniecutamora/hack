@@ -13,12 +13,14 @@
   font-family: "Roboto";
   font-style: normal;
   font-weight: 400 700;
-  font-display: swap;
+  /* Optional: the preloaded font is used when it is ready for the first paint (always from the
+     cache after the first visit), and never swapped in later, so text never moves the page. */
+  font-display: optional;
   src: url("../vendor/roboto/roboto-latin-wght.woff2") format("woff2");
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
-/* Until Roboto loads, a local Arial (or its metric twin Liberation Sans) scaled to Roboto's
-   width and line metrics, so swapping fonts does not move the page (layout shift). Roboto:
+/* When Roboto is not ready in time, a local Arial (or its metric twin Liberation Sans) scaled to
+   Roboto's width and line metrics, so the page looks and wraps nearly the same. Roboto:
    ascender 1900, descender 500, no line gap, per 2048 units; Arial runs 0.3 % narrower. */
 @font-face {
   font-family: "Roboto Fallback";
@@ -782,6 +784,9 @@ table.stack.accuracy__table td:first-child { white-space: normal; }
 .map-layout { display: grid; grid-template-columns: minmax(0, 1fr) 20rem; gap: var(--space-4); align-items: start; }
 @media (max-width: 63.99rem) { .map-layout { grid-template-columns: 1fr; } }
 .map-side h2 { margin-top: 0; }
+/* With scripting on, the map's box is kept while Leaflet loads, so the page below it does not
+   jump; without it the box stays hidden and the page's list carries the incidents. */
+@media (scripting: enabled) { .map[hidden] { display: block; visibility: hidden; } }
 .map { height: min(65vh, 40rem); min-height: 20rem; border-radius: var(--md-sys-shape-corner-medium); border: 1px solid var(--md-sys-color-outline-variant); background: #e8eef3; z-index: 0; }
 .map--compact { height: 20rem; min-height: 16rem; }
 .map-note { margin-top: var(--space-2); }
