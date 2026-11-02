@@ -15,6 +15,11 @@ Privacy (RA 10173): a personal field (names, ages, phone numbers, emails, addres
 lot numbers) is typed into the page for the printout only. Its input has no `name`, so the
 browser never posts it; the server drops it if one arrives anyway, so it is never stored or
 logged. `is_personal` is the one rule.
+
+Every field also carries a short `help` (what to enter, with an example, in plain words) and
+its `help_source`: the official document and page that explains it, or "The form's own label"
+(and where the label is printed) when no document says more. The "?" button beside each label
+shows both; `check_field` refuses a field without them.
 """
 
 from collections.abc import Callable, Iterable, Sequence
@@ -31,6 +36,10 @@ NAME_PREFIX = "f."  # posted field names: "f.<key>", so no field can shadow "off
 RESTORE = "restore"  # a posted "restore=<key>" drops the officer's entry for that field
 EARLIEST = date(2000, 1, 1)  # an older date is a typo on a disaster assessment form
 Present = Callable[[str | None], str | None]  # a generated text as the page's mode words it
+HELP_MAX = 240  # characters of help text, besides its source line
+LABEL_SOURCE = "The form's own label"  # a help_source that cites no document beyond the form
+# Shown under every personal field and in the print checklist.
+PERSONAL_NOTE = "Saved only on this device for printing. Not stored by Ulat."
 
 
 def as_is(text: str | None) -> str | None:
@@ -83,6 +92,8 @@ class Field(Protocol):
     personal: bool
     ask: bool
     hint: str | None
+    help: str | None
+    help_source: str | None
 
     @property
     def editable(self) -> bool: ...
@@ -106,6 +117,15 @@ def check_field(field: Field, where: str) -> None:
         raise ValueError(f"{where}: a {control.kind} control needs options")
     if control.kind == "multi" and any(MULTI_SEPARATOR in o for o in field.options):
         raise ValueError(f"{where}: a multi-choice option may not contain {MULTI_SEPARATOR!r}")
+    if not (field.help or "").strip() or not (field.help_source or "").strip():
+        raise ValueError(f"{where}: every field needs help and a help_source")
+    if len(field.help) > HELP_MAX:
+        raise ValueError(f"{where}: help is {len(field.help)} characters, over {HELP_MAX}")
+
+
+def cites_document(field: Field) -> bool:
+    """Whether a field's help comes from a document beyond the form's own label."""
+    return not (field.help_source or "").startswith(LABEL_SOURCE)
 
 
 class FieldError(ValueError):
@@ -354,6 +374,8 @@ def view(
         "storable": storable(field),
         "ask": field.ask,
         "hint": field.hint,
+        "help": field.help,
+        "help_source": field.help_source,
         "name": posted_name(field),
         "generated": generated,
         "entry": entry,
@@ -371,6 +393,9 @@ def view(
         "label": field.label,
         "sic": getattr(field, "sic", False),
         "required": getattr(field, "required", False),
+        # Worth a word before printing when empty: what the office must answer, or the form
+        # requires, and Ulat keeps (a personal field is a ruled line to write on by design).
+        "needed": storable(field) and (field.ask or getattr(field, "required", False)),
     }
 
 

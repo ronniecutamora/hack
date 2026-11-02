@@ -26,6 +26,7 @@ from app.deadlines import DEADLINES
 from app.fillable import DATE as DATE_CONTROL
 from app.fillable import (
     HECTARES,
+    LABEL_SOURCE,
     LONG,
     PAST_DATE,
     PAST_DATETIME,
@@ -45,7 +46,12 @@ SAM_CONCEPTS = {
 }
 
 
-PRINTED_ONLY = "Printed only, never saved. Type it to print, or the assured writes it on the paper."
+# Where each field's "?" help comes from: the form's own label, or the PCIC document page
+# that explains it.
+BROCHURE = "PCIC Fisheries Insurance general information, 2024 V4 (Sept 2024)"
+NL_LABEL = f"{LABEL_SOURCE} (PCIC FIP CAS Form No. 1, Notice of Loss, Rev. 2022/May)"
+APPLICATION = "PCIC FIP-UPI-01, Application for Fisheries Insurance, Rev. 2025/Sep"
+FARM_PLAN = "PCIC FIP UPI Form No. 2, Fisheries Farm Plan and Budget"
 
 
 @dataclass(frozen=True)
@@ -59,6 +65,8 @@ class NolField:
     personal: bool = False
     hint: str | None = None
     options: tuple[str, ...] = ()
+    help: str | None = None  # the "?" text: what to enter, with an example
+    help_source: str | None = None
 
     @property
     def key(self) -> str:
@@ -69,8 +77,18 @@ class NolField:
         return True
 
 
-def _personal(number: str, label: str, control: Control = TEXT) -> NolField:
-    return NolField(number, label, ask=True, personal=True, hint=PRINTED_ONLY, control=control)
+def _personal(
+    number: str, label: str, help: str, help_source: str, control: Control = TEXT
+) -> NolField:
+    return NolField(
+        number,
+        label,
+        ask=True,
+        personal=True,
+        control=control,
+        help=help,
+        help_source=help_source,
+    )
 
 
 @dataclass(frozen=True)
@@ -139,7 +157,7 @@ PCIC_REGION_IV = Office(
     address="2/F Rizal Commercial Center, J.P. Rizal St. corner MH Del Pilar, Calamba City, Laguna",
     email="ro4@pcic.gov.ph",
     phone="(049) 530-0935 / (049) 536-2129",
-    source="PCIC Fisheries Insurance general information, 2024 V4 (Sept 2024)",
+    source=BROCHURE,
 )
 
 FISHERIES = Commodity(
@@ -168,25 +186,64 @@ FISHERIES = Commodity(
             control=PAST_DATE,
             ask=True,
             hint="The day the notice is signed and filed.",
+            help=(
+                "The day the assured signs this notice. Example: 2026-10-25. PCIC (Philippine "
+                "Crop Insurance Corporation) needs it soon after the loss and before harvest: "
+                "the deadline is on Drafts."
+            ),
+            help_source=f"{BROCHURE}, p. 1: Notice of Loss",
         ),
         NolField(
             "policy_type",
             "Type of Policy",
             ask=True,
             hint="As on the policy, e.g. Fish Cage Insurance or Milkfish Insurance.",
+            help=(
+                "The insurance named on the assured's PCIC policy. Example: Fish Cage "
+                "Insurance or Milkfish Insurance, the two the form itself gives."
+            ),
+            help_source=NL_LABEL,
         ),
     ),
     fields=(
-        _personal("1", "Name of Assured Fisherfolk/Fish Grower"),
-        _personal("2", "Address of Assured"),
+        _personal(
+            "1",
+            "Name of Assured Fisherfolk/Fish Grower",
+            "The assured is the fisherfolk or fish grower the policy insures. Write their full "
+            "name as on the policy. Example: Juan dela Cruz.",
+            f"{BROCHURE}, p. 1: Object of insurance",
+        ),
+        _personal(
+            "2",
+            "Address of Assured",
+            "Where the assured lives: house number and street or sitio, barangay, city, "
+            "province. Example: Purok 2, Malaban, Biñan, Laguna.",
+            f"{APPLICATION}, A.3 Address",
+        ),
         NolField(
             "3",
             "Location of Fisheries Farm/Property",
             "evidence",
             "location",
             control=LONG,
+            help=(
+                "Where the fish cage, pen or pond is. Example: Fish pen off Barangay Malaban, "
+                "Laguna de Bay. Ulat starts with the place the reports give."
+            ),
+            help_source=NL_LABEL,
         ),
-        NolField("4", "Nature/cause of loss", "evidence", "cause"),
+        NolField(
+            "4",
+            "Nature/cause of loss",
+            "evidence",
+            "cause",
+            help=(
+                "What caused the loss, in a few words. Example: Typhoon winds and flood tore "
+                "the pen nets. Losses from disease, pests, theft or an oil spill are not "
+                "covered."
+            ),
+            help_source=f"{BROCHURE}, p. 1: Excluded risks",
+        ),
         NolField(
             "5",
             "Date/time of loss",
@@ -195,6 +252,11 @@ FISHERIES = Commodity(
             control=PAST_DATETIME,
             ask=True,
             hint="When the loss happened. The reports only show when it was first reported.",
+            help=(
+                "When the loss happened, Philippine time. Example: 2026-10-24 23:30. The "
+                "reports only show when it was first reported, which can be later."
+            ),
+            help_source=NL_LABEL,
         ),
         NolField(
             "6",
@@ -204,24 +266,68 @@ FISHERIES = Commodity(
             control=HECTARES,
             ask=True,
             hint="In hectares, from the assured or the farm plan; never measured from photos.",
+            help=(
+                "The area of the cage, pen or pond hit, in hectares. Example: 0.5. Take it "
+                "from the assured or the insured area in the farm plan; Ulat never measures "
+                "it from photos."
+            ),
+            help_source=f"{FARM_PLAN}: Area Insured (has.)",
         ),
-        _personal("7", "Lot Number/s"),
+        _personal(
+            "7",
+            "Lot Number/s",
+            "The lot number or numbers of the farm, as on the assured's papers. Example: Lot 12.",
+            NL_LABEL,
+        ),
         NolField(
             "8",
             "Expected date of harvest (if applicable)",
             control=DATE_CONTROL,
             ask=True,
             hint="Leave empty if there was no stock to harvest.",
+            help=(
+                "When the stock was due for harvest, as in the farm plan. Example: 2026-12-15. "
+                "A loss after that date, or after harvest, is not covered."
+            ),
+            help_source=f"{BROCHURE}, p. 1: Excluded risks",
         ),
-        NolField("9", "Extent of Damage", "evidence", "extent", control=LONG),
-        _personal("10", "Insurance Policy Number"),
+        NolField(
+            "9",
+            "Extent of Damage",
+            "evidence",
+            "extent",
+            control=LONG,
+            help=(
+                "How much was lost, in plain words. Example: Two of three cages torn; most "
+                "tilapia escaped. Adjusters from PCIC and the LGU check the loss before PCIC "
+                "pays (the indemnity)."
+            ),
+            help_source=f"{BROCHURE}, p. 1: Adjustment and settlement of claims",
+        ),
+        _personal(
+            "10",
+            "Insurance Policy Number",
+            "The number on the assured's PCIC insurance policy. Copy it exactly from the policy.",
+            NL_LABEL,
+        ),
         NolField(
             "11",
             "Underwriter",
             ask=True,
             hint="The PCIC underwriter or agent named on the policy, or the office.",
+            help=(
+                "Who issued the policy: the PCIC office or the agent named on it. Example: "
+                "PCIC Regional Office IV."
+            ),
+            help_source=NL_LABEL,
         ),
-        _personal("12", "Contact number", PHONE),
+        _personal(
+            "12",
+            "Contact number",
+            "A phone number where PCIC can reach the assured. Example: 0917 123 4567.",
+            NL_LABEL,
+            PHONE,
+        ),
     ),
     deadline="pcic_fisheries_nl",
     later_deadlines=("pcic_fisheries_ci",),
@@ -244,7 +350,7 @@ FISHERIES = Commodity(
         "one from the LGU fisheries personnel): total loss 90% and above; partial loss over 10% "
         "and below 90%; no loss 10% and below. This draft does not classify the loss."
     ),
-    loss_bands_source="PCIC Fisheries Insurance general information, 2024 V4 (Sept 2024)",
+    loss_bands_source=BROCHURE,
     closing="Very truly yours, / Signature Over Printed Name of the Assured/Claimant",
 )
 

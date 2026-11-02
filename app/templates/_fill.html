@@ -1,10 +1,11 @@
 {# The fillable form (app.fillable views from app.drafts.form_view): one control per field, read
    from the field's definition. A personal field's input has no name: the browser never posts it;
-   app.js keeps it in this tab (sessionStorage) for the printout. #}
+   app.js keeps it in this tab (sessionStorage) for the printout. Every field has a "?" help
+   (its definition's help and help_source) in a native popover: a bottom sheet on a phone. #}
 {% from "_evidence.html" import evidence_refs %}
 {% from "_icons.html" import icon %}
 
-{% macro control(v, locked=false) %}{% set c = v.control %}{% set id = "i-" ~ v.key %}{% set described = ("h-" ~ v.key if v.hint else "") ~ (" e-" ~ v.key if v.error else "") %}
+{% macro control(v, locked=false) %}{% set c = v.control %}{% set id = "i-" ~ v.key %}{% set described = ("h-" ~ v.key if v.hint else "") ~ (" e-" ~ v.key if v.error else "") ~ (" p-" ~ v.key if v.personal else "") %}
   {%- set common %} id="{{ id }}"{% if v.storable %} name="{{ v.name }}"{% else %} data-personal="{{ v.key }}" autocomplete="off"{% endif %}{% if described %} aria-describedby="{{ described|trim }}"{% endif %}{% if v.error %} aria-invalid="true"{% endif %}{% if locked %} disabled{% endif %}{% endset -%}
   {% if c.kind == "long" %}
     <textarea{{ common }} rows="{{ 4 if (v.current|length) > 160 else 2 }}" maxlength="{{ c.max_length }}">{{ v.current }}</textarea>
@@ -27,6 +28,29 @@
   {% endif %}
 {% endmacro %}
 
+{# The "?" beside a field's label, and the help it opens (a popover: Escape or a tap outside
+   closes it, and it works without JavaScript). #}
+{% macro help_button(v) %}{% if v.help %}<button type="button" class="icon-button help-btn" popovertarget="help-{{ v.key }}" aria-label="Help: {{ v.label }}">{{ icon("help") }}</button>{% endif %}{% endmacro %}
+{% macro help_sheet(v) %}{% if v.help %}
+  <div class="help-pop" id="help-{{ v.key }}" popover role="dialog" aria-labelledby="help-{{ v.key }}-title" tabindex="-1">
+    <span class="help-pop__handle" aria-hidden="true"></span>
+    <p class="help-pop__title" id="help-{{ v.key }}-title"><span class="fill-label__num">{{ v.number }}</span> {{ v.label }}</p>
+    <p class="help-pop__text">{{ v.help }}</p>
+    <p class="help-pop__source">Source: {{ v.help_source }}</p>
+    <button type="button" class="button--text help-pop__close" popovertarget="help-{{ v.key }}" popovertargetaction="hide">Close</button>
+  </div>
+{% endif %}{% endmacro %}
+
+{# Personal details: where they are kept, the one-time shared-device warning, and the button
+   that clears them (shown by app.js: without JavaScript nothing is kept). #}
+{% macro personal_panel() %}
+  <div class="fill-private" data-personal-panel>
+    <p class="fill-note">Names, ages and contact details stay on this device only, for printing: Ulat never stores them. They print on the form, and this browser forgets them when the tab closes. Or leave them blank and write them on the paper.</p>
+    <p class="banner warn fill-shared" data-shared-warning hidden>{{ icon("warning") }}<span>On a shared computer, tap Clear personal details when you finish, or close this tab.</span> <button type="button" class="button--text" data-shared-ok>Got it</button></p>
+    <button type="button" class="button--tonal" data-personal-clear hidden>{{ icon("close") }}Clear personal details</button>
+  </div>
+{% endmacro %}
+
 {# The value a field had before the officer's entry, and the generated chips (Technical mode). #}
 {% macro provenance(v) %}{% set g = v.generated %}
   {% if technical() and g.value is not none and not v.entry %}
@@ -37,15 +61,16 @@
 
 {% macro field(v, locked=false) %}{% set c = v.control %}{% set choices = c.kind in ("choice", "multi") %}
   <div class="fill-field{% if v.error %} fill-field--error{% endif %}{% if v.entry %} fill-field--edited{% endif %}{% if v.personal %} fill-field--personal{% endif %}" id="f-{{ v.key }}" data-key="{{ v.key }}">
-    {% if choices %}<fieldset class="fill-group"{% if v.hint %} aria-describedby="h-{{ v.key }}"{% endif %}><legend class="fill-label">{% else %}<label class="fill-label" for="i-{{ v.key }}">{% endif %}
-      <span class="fill-label__num">{{ v.number }}</span>{% if v.sic %} <span class="muted">(sic)</span>{% endif %} <span class="fill-label__text">{{ v.label }}</span>{% if v.required %} <span class="muted">(required)</span>{% endif %}
-    {% if choices %}</legend>{% else %}</label>{% endif %}
+    {% if choices %}<fieldset class="fill-group"{% if v.hint %} aria-describedby="h-{{ v.key }}"{% endif %}><legend class="fill-label fill-head">{% else %}<div class="fill-head"><label class="fill-label" for="i-{{ v.key }}">{% endif %}
+      <span><span class="fill-label__num">{{ v.number }}</span>{% if v.sic %} <span class="muted">(sic)</span>{% endif %} <span class="fill-label__text">{{ v.label }}</span>{% if v.required %} <span class="muted">(required)</span>{% endif %}</span>
+    {% if choices %}{{ help_button(v) }}</legend>{% else %}</label>{{ help_button(v) }}</div>{% endif %}
     {% if not v.editable %}
       <p class="fill-fixed">{{ v.value if v.value is not none else "" }}</p>
     {% else %}
       {% if v.hint and not technical() %}<p class="fill-hint" id="h-{{ v.key }}">{{ v.hint }}</p>{% elif v.hint %}<p class="visually-hidden" id="h-{{ v.key }}">{{ v.hint }}</p>{% endif %}
       {% if v.unmatched is not none %}<p class="fill-from">{{ "From the reports" }}: <strong>{{ v.unmatched|plain }}</strong></p>{% endif %}
       {{ control(v, locked) }}
+      {% if v.personal %}<p class="fill-private-note" id="p-{{ v.key }}">{{ PERSONAL_NOTE }}</p>{% endif %}
     {% endif %}
     {% if choices %}</fieldset>{% endif %}
     {% if v.error %}<p class="error fill-error" id="e-{{ v.key }}" role="alert">{{ icon("error") }}{{ v.error }}</p>{% endif %}
@@ -63,6 +88,7 @@
       {% if technical() and v.generated.note %}<p class="muted">{{ v.generated.note|plain }}</p>{% endif %}
       {{ evidence_refs(v.generated.evidence) }}
     </div>
+    {{ help_sheet(v) }}
   </div>
 {% endmacro %}
 
@@ -91,7 +117,7 @@
     {% for v in mine %}{{ field(v, locked) }}{% endfor %}
     {% if personal %}
       <h3 class="fill-subhead">For the printout only</h3>
-      <p class="fill-note">Names and contact details are never saved by Ulat. Type them here to print them (they stay in this browser tab until it closes), or write them on the paper.</p>
+      {{ personal_panel() }}
       {% for v in personal %}{{ field(v, locked) }}{% endfor %}
     {% endif %}
   </section>
@@ -115,6 +141,7 @@
 
 {# Technical mode: the whole form in its own order and numbering, with provenance chips. #}
 {% macro numbered(form, locked) %}
+  {% if form.fields|selectattr("personal")|list %}{{ personal_panel() }}{% endif %}
   {% for section in form.sections %}
     <section class="fill-section" {% if section.number %}id="s-{{ section.number }}"{% endif %}>
       {% if section.title %}<h2>{% if section.number %}{{ section.number }}. {% endif %}{{ section.title }}</h2>{% endif %}
@@ -135,4 +162,25 @@
     {% if technical() %}{{ numbered(form, locked) }}{% else %}{{ simple(form, locked, rest_title) }}{% endif %}
     {{ save_bar(draft, locked) }}
   </form>
+{% endmacro %}
+
+{# The print button: "Print final form" on an approved version, "Print draft for checking"
+   before. app.js first lists unsaved changes and empty fields the office must answer (the
+   printout shows the saved version), then prints. #}
+{% macro print_action(draft, form) %}{% set final = draft.status == 'approved' %}
+  {% set gaps = form.fields|selectattr("needed")|rejectattr("filled")|list %}
+  <button type="button" class="button--filled" data-print>{{ icon("print") }}{{ "Print final form" if final else "Print draft for checking" }}</button>
+  <dialog class="print-check" id="print-check" aria-labelledby="print-check-title">
+    <h2 id="print-check-title" data-print-title></h2>
+    <div data-print-unsaved hidden><p>The printout shows the saved version {{ draft.version }}. Save first to print them.</p></div>
+    <div data-print-gaps data-count="{{ gaps|length }}" hidden>
+      <p>The office still needs to answer them. They print blank, to fill in by hand.</p>
+      <ul>{% for v in gaps %}<li><a href="#f-{{ v.key }}" data-fill-jump="{{ v.key }}">{{ v.number }} {{ v.label }}</a></li>{% endfor %}</ul>
+    </div>
+    <p class="muted" data-print-personal hidden></p>
+    <div class="print-check__actions">
+      <button type="button" class="button--text" data-print-choice="fill" data-print-back></button>
+      <button type="button" class="button--filled" data-print-choice="print" data-print-go></button>
+    </div>
+  </dialog>
 {% endmacro %}

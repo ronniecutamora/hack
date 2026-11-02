@@ -45,7 +45,8 @@
   // ---------- Fillable forms (app/fillable.py) ----------
   // A personal field (names, contact details) has no name attribute, so the browser never posts
   // it. Its value is kept in this tab only (sessionStorage: gone when the tab closes), per form
-  // (the output, so a saved new version keeps it), and copied into the printout. The save bar
+  // (the output, so a saved new version keeps it), copied into the printout, and cleared by
+  // "Clear personal details". The save bar
   // counts unsaved changes, and printing with unsaved changes says the paper shows the saved
   // version.
   const PERSONAL_PREFIX = "ulat.personal.";
@@ -75,6 +76,7 @@
       if (value !== undefined && !input.value) { input.value = value; input.defaultValue = value; }
     });
     printPersonal(values);
+    form.querySelectorAll("[data-personal-clear]").forEach((button) => { button.hidden = false; });
     countChanges();
   }
   function countChanges() {
@@ -98,6 +100,7 @@
       if (value) values[input.dataset.personal] = value; else delete values[input.dataset.personal];
       writePersonal(form, values);
       printPersonal(values);
+      warnSharedDevice(form);
     }
     countChanges();
   });
@@ -109,6 +112,110 @@
     if (countChanges()) snackbar("Unsaved changes are not on the printout: it shows the saved version. Save first to print them.", "error");
   });
   document.addEventListener("htmx:afterSettle", hydrateFill);
+
+  // A shared computer: say once per tab, at the first personal detail typed, how to clear them.
+  const SHARED_SEEN = "ulat.shared-warning-seen";
+  function sharedSeen() { try { return sessionStorage.getItem(SHARED_SEEN) === "1"; } catch (e) { return false; } }
+  function warnSharedDevice(form) {
+    if (sharedSeen()) return;
+    form.querySelectorAll("[data-shared-warning]").forEach((note) => { note.hidden = false; });
+  }
+  function clearPersonal() {
+    const form = fillForm();
+    if (!form) return;
+    writePersonal(form, {});
+    form.querySelectorAll("[data-personal]").forEach((input) => { input.value = ""; input.defaultValue = ""; });
+    printPersonal({});
+    countChanges();
+    snackbar("Personal details cleared from this device.");
+  }
+
+  // The "?" help: a native popover (Escape and a tap outside close it). On a wide window it
+  // opens beside its button, kept inside the window; on a phone the stylesheet makes it a
+  // bottom sheet. Focus moves into it so a screen reader reads it; closing returns focus.
+  const WIDE = window.matchMedia("(min-width: 37.5rem)");
+  function placeHelp(pop) {
+    const button = document.querySelector('.help-btn[popovertarget="' + CSS.escape(pop.id) + '"]');
+    if (!WIDE.matches || !button) { pop.classList.remove("is-placed"); pop.style.left = pop.style.top = ""; return; }
+    const at = button.getBoundingClientRect();
+    const gap = 8, width = pop.offsetWidth, height = pop.offsetHeight;
+    let top = at.bottom + 4;
+    if (top + height > innerHeight - gap) top = Math.max(gap, at.top - height - 4);
+    pop.style.left = Math.min(Math.max(gap, at.right - width), innerWidth - width - gap) + "px";
+    pop.style.top = top + "px";
+    pop.classList.add("is-placed");
+  }
+  document.addEventListener("toggle", (event) => {
+    const pop = event.target;
+    if (!pop.classList || !pop.classList.contains("help-pop") || event.newState !== "open") return;
+    placeHelp(pop);
+    pop.focus({ preventScroll: true });
+  }, true);
+  const replaceOpenHelp = () => document.querySelectorAll(".help-pop.is-placed:popover-open").forEach(placeHelp);
+  window.addEventListener("resize", replaceOpenHelp);
+  document.addEventListener("scroll", replaceOpenHelp, { capture: true, passive: true });
+
+  // Printing: "Print final form" or "Print draft for checking". The paper shows the saved
+  // version, so unsaved changes come first ("Save first"); then the fields the office must
+  // answer that are still empty ("Fill them"); otherwise it prints straight away.
+  const plural = (n, word) => n + " " + word + (n !== 1 ? "s" : "");
+  function openPrintCheck() {
+    const dialog = document.getElementById("print-check");
+    const form = fillForm();
+    const unsaved = form ? countChanges() : 0;
+    const gaps = dialog && dialog.querySelector("[data-print-gaps]");
+    const empty = gaps ? Number(gaps.dataset.count) : 0;
+    if (!dialog || !dialog.showModal || (!unsaved && !empty)) { window.print(); return; }
+    dialog.dataset.mode = unsaved ? "unsaved" : "gaps";
+    dialog.querySelector("[data-print-title]").textContent = unsaved
+      ? plural(unsaved, "change") + (unsaved !== 1 ? " are" : " is") + " not saved yet"
+      : plural(empty, "field") + (empty !== 1 ? " are" : " is") + " still empty";
+    dialog.querySelector("[data-print-unsaved]").hidden = !unsaved;
+    gaps.hidden = !!unsaved;
+    dialog.querySelector("[data-print-back]").textContent = unsaved ? "Save first" : (empty !== 1 ? "Fill them" : "Fill it");
+    dialog.querySelector("[data-print-go]").textContent = unsaved ? "Print without them" : "Print anyway";
+    const blank = form ? [...form.querySelectorAll("[data-personal]")].filter((input) => !input.value.trim()).length : 0;
+    const personal = dialog.querySelector("[data-print-personal]");
+    personal.hidden = !blank;
+    personal.textContent = blank ? plural(blank, "personal detail") + (blank !== 1 ? " are" : " is") + " blank: they print as lines to write on." : "";
+    dialog.returnValue = "";
+    dialog.showModal();
+  }
+  function jumpToField(key) {
+    const field = document.getElementById("f-" + key);
+    if (!field) return;
+    for (let at = field.closest("details"); at; at = at.parentElement && at.parentElement.closest("details")) at.open = true;
+    field.scrollIntoView({ block: "center" });
+    const input = field.querySelector("input:not([type=hidden]), textarea");
+    if (input) input.focus({ preventScroll: true });
+  }
+  document.addEventListener("close", (event) => {
+    const dialog = event.target;
+    if (dialog.id !== "print-check") return;
+    if (dialog.returnValue === "print") setTimeout(() => window.print(), 0);  // after the dialog is gone
+    else if (dialog.returnValue === "fill" && dialog.dataset.mode === "unsaved") { const form = fillForm(); if (form) form.requestSubmit(); }
+    else if (dialog.returnValue === "fill") { const first = dialog.querySelector("[data-fill-jump]"); if (first) jumpToField(first.dataset.fillJump); }
+  }, true);
+  document.addEventListener("click", (event) => {
+    const target = event.target.closest ? event.target : null;
+    if (!target) return;
+    if (target.closest("[data-print]")) { openPrintCheck(); return; }
+    const choice = target.closest("[data-print-choice]");
+    if (choice) { choice.closest("dialog").close(choice.dataset.printChoice); return; }
+    const jump = target.closest("[data-fill-jump]");
+    if (jump) {
+      event.preventDefault();
+      const dialog = jump.closest("dialog");
+      if (dialog) { dialog.returnValue = ""; dialog.close(); }
+      jumpToField(jump.dataset.fillJump);
+      return;
+    }
+    if (target.closest("[data-personal-clear]")) { clearPersonal(); return; }
+    if (target.closest("[data-shared-ok]")) {
+      try { sessionStorage.setItem(SHARED_SEEN, "1"); } catch (e) { /* shown again next time */ }
+      document.querySelectorAll("[data-shared-warning]").forEach((note) => { note.hidden = true; });
+    }
+  });
 
   // ---------- Live updates ----------
   // The server sends which topics changed (reports, incidents, drafts, spend) over SSE
@@ -188,12 +295,13 @@
     return field.value !== field.defaultValue;
   }
 
-  // The officer is working here: focus is inside (other than the region itself), or a field differs
-  // from what the server rendered.
+  // The officer is working here: focus is inside (other than the region itself), a popover in it
+  // is open (a field's help being read), or a field differs from what the server rendered.
   function inUse(region) {
     const active = document.activeElement;
     if (active && active !== document.body && active !== region && region.contains(active)
       && active.getAttribute("tabindex") !== "-1") return true;
+    try { if (region.querySelector(":popover-open")) return true; } catch (e) { /* no popover support */ }
     return Array.from(region.querySelectorAll("input, textarea, select")).some(fieldChanged);
   }
 

@@ -88,6 +88,7 @@ from app.drafts import (
 )
 from app.eval_results import RESULTS_PATH
 from app.facts import fact_lines
+from app.fillable import PERSONAL_NOTE
 from app.gazetteer import BARANGAYS, BY_NAME
 from app.geo import GEO_SOURCES, boundaries_geojson
 from app.incidents import IncidentService
@@ -214,6 +215,7 @@ templates.env.globals["nav_current"] = nav_current
 templates.env.globals["more_current"] = more_current
 templates.env.globals["static_url"] = static_url
 templates.env.globals["technical"] = technical
+templates.env.globals["PERSONAL_NOTE"] = PERSONAL_NOTE
 templates.env.globals["destinations"] = destinations
 templates.env.globals["technical_only"] = technical_only
 templates.env.globals["GLOSSARY"] = GLOSSARY

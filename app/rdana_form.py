@@ -19,7 +19,7 @@ mode) and whether it is personal (typed for the printout only, never stored). Op
 transcription of a question leaves out are read from the same scan.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from app.fillable import (
     AGE,
@@ -28,6 +28,7 @@ from app.fillable import (
     COUNT,
     DAYS,
     EMAIL,
+    LABEL_SOURCE,
     LONG,
     MULTI,
     PAST_DATETIME,
@@ -61,9 +62,14 @@ class FormField:
     personal: bool = False  # identifies a person: typed for the printout, never stored
     hint: str | None = None
     locked: bool = False  # set by the draft itself (its barangay), not typed
+    help: str | None = None  # the "?" text: from HELP below
+    help_source: str | None = None
+    numbered: bool = True  # False under "Submitted by", which the form does not number
 
     @property
     def number(self) -> str:
+        if not self.numbered:
+            return ""
         return self.printed or self.key
 
     @property
@@ -165,7 +171,6 @@ SECTIONS: tuple[FormSection, ...] = (
                     control=control,
                     ask=True,
                     personal=True,
-                    hint="Printed only, never saved. Type it to print, or write it on the paper.",
                 )
                 for key, label, control in (
                     ("1.3.1", "Name", TEXT),
@@ -877,11 +882,7 @@ SECTIONS: tuple[FormSection, ...] = (
                 ask=True,
                 personal=personal,
                 control=control,
-                hint=(
-                    "Printed only, never saved. Type it to print, or write it on the paper."
-                    if personal
-                    else None
-                ),
+                numbered=False,
             )
             for key, label, personal, control in (
                 ("name", "NAME", True, TEXT),
@@ -894,6 +895,333 @@ SECTIONS: tuple[FormSection, ...] = (
         ),
     ),
 )
+
+
+# ---------- The "?" help of every field ----------
+# What to enter and an example, in plain words, with its source. The SOP's body explains the
+# procedure, not each field, so most help only says what the form's own label asks (with the
+# Annex I page that prints it); a few fields cite the note or heading printed on the form, or
+# the SOP section that governs them. Never an invented rule.
+SOP = "NDRRMC Memo 107 s.2021, RDANA SOP"
+# The first field printed on each page of Annex I (PDF pages of the SOP), in form order.
+ANNEX_PAGES = (("1.1.1", 13), ("6.3", 14), ("13.2", 15), ("20.2", 16))
+NOTE_2 = f"{SOP}, Annex I, PDF p. 13: the note under section 2"
+HEADING_20 = f"{SOP}, Annex I, PDF p. 15: the heading of section 20"
+REPORTING = f"{SOP}, sec. 7.5.2: completed forms go to the EOC"
+
+# key: (help, source); None as the source means the form's own label.
+HELP: dict[str, tuple[str, str | None]] = {
+    "1.1.1": (
+        "The name your office uses for this response, as on its other reports. Example: Typhoon "
+        "Kristine response.",
+        None,
+    ),
+    "1.1.2": (
+        "The kind of disaster, in a few words. Example: Typhoon and flood. Ulat starts with the "
+        "hazards the reports name.",
+        None,
+    ),
+    "1.1.3": (
+        "When the disaster struck, Philippine time. Example: 2026-10-24 22:00. The reports only "
+        "show when people first reported it, which can be later.",
+        None,
+    ),
+    "1.2.1": (
+        "The region of the place assessed. The same for every Biñan form: Region IV-A "
+        "(CALABARZON).",
+        None,
+    ),
+    "1.2.2": ("The province of the place assessed. The same for every Biñan form: Laguna.", None),
+    "1.2.3": (
+        "The city or municipality of the place assessed. The same for every Biñan form: City of "
+        "Biñan.",
+        None,
+    ),
+    "1.2.4": (
+        "The barangay this form covers. Set by the draft: there is one RDANA form per barangay.",
+        None,
+    ),
+    "1.2.5": (
+        "The sitio or purok assessed, as people there call it. Example: Purok 3, near the "
+        "barangay hall.",
+        None,
+    ),
+    "1.2.6": (
+        "Where the assessment was made, as latitude, longitude. Example: 14.3512, 121.0900. "
+        "Ulat starts with the middle of the reports' map pins.",
+        None,
+    ),
+    "1.2.7": (
+        "When the team made this RDANA (Rapid Damage Assessment and Needs Analysis), Philippine "
+        "time. Example: 2026-10-26 09:30. The completed form then goes to the EOC (Emergency "
+        "Operations Center).",
+        REPORTING,
+    ),
+    "1.3.1": (
+        "The full name of the official or resident you interviewed. Example: Juan dela Cruz.",
+        None,
+    ),
+    "1.3.2": ("The age in years of the person you interviewed. Example: 52.", None),
+    "1.3.3": (
+        "The office or group of the person you interviewed. Example: Barangay Malaban council.",
+        None,
+    ),
+    "1.3.4": ("The position of the person you interviewed. Example: Barangay captain.", None),
+    "1.3.5": ("A phone number for the person you interviewed. Example: 0917 123 4567.", None),
+    "1.3.6": ("An email address for the person you interviewed, if they have one.", None),
+    "1.4": (
+        "A few sentences on what happened and where: the damage, who was hit, which places. "
+        "Ulat writes a first version from the reports; change it freely.",
+        None,
+    ),
+    "2.1": (
+        "How many families the disaster hit here. Example: 120. Families who had to leave home "
+        "(displaced) are counted here too.",
+        NOTE_2,
+    ),
+    "2.2": (
+        "How many people the disaster hit here. Example: 540. People who had to leave home "
+        "(displaced) are counted here too.",
+        NOTE_2,
+    ),
+    "2.2a": (
+        "How many of the affected people are children, by age group. Example: Age 0-2: 14; Age "
+        "3-5: 22.",
+        None,
+    ),
+    "2.2b": (
+        "How many of the affected people are persons with disability (PWD). Example: 6.",
+        None,
+    ),
+    "2.2c": ("How many of the affected people are elderly. Example: 31.", None),
+    "2.3": (
+        "Displaced families staying in evacuation centers (ECs). Example: 45. They are also "
+        "counted in 2.1, affected families.",
+        NOTE_2,
+    ),
+    "2.4": (
+        "Displaced people staying in evacuation centers (ECs). Example: 180. They are also "
+        "counted in 2.2, affected persons.",
+        NOTE_2,
+    ),
+    "2.5": (
+        "Displaced families staying outside evacuation centers, such as with relatives. "
+        "Example: 12. Also counted in 2.1.",
+        NOTE_2,
+    ),
+    "2.6": (
+        "Displaced people staying outside evacuation centers, such as with relatives. Example: "
+        "50. Also counted in 2.2.",
+        NOTE_2,
+    ),
+    "2.7": (
+        "How many males are missing. Example: 1. Write 0 only if you checked and none are; "
+        "leave it empty if unknown.",
+        None,
+    ),
+    "2.8": ("How many females are missing. Example: 0, if you checked and none are.", None),
+    "2.9": ("How many people are missing in all: males and females together. Example: 1.", None),
+    "2.10": ("How many males were injured. Example: 3.", None),
+    "2.11": ("How many females were injured. Example: 2.", None),
+    "2.12": ("How many people were injured in all: males and females together. Example: 5.", None),
+    "2.13": ("How many males died. Example: 0, if you checked and none did.", None),
+    "2.14": ("How many females died. Example: 0, if you checked and none did.", None),
+    "2.15": ("How many people died in all: males and females together. Example: 0.", None),
+    "3.1": ("Can people and vehicles get to the community now? Choose Yes or No.", None),
+    "3.2": (
+        "Tick every way the community can be reached now. Example: Foot and Boat, when the "
+        "roads are under water.",
+        None,
+    ),
+    "3.3": (
+        "Are any roads or bridges damaged? Yes or No. Ulat starts with Yes when the reports say "
+        "so.",
+        None,
+    ),
+    "3.3.1": (
+        "If roads or bridges are damaged: are they partly passable, not passable at all, or other?",
+        None,
+    ),
+    "3.4": ("Tick the most urgent needs to reach the community. Example: Debris clearing.", None),
+    "4.1": (
+        "Is there electricity now? Choose one. Example: Partial, if only some puroks have power.",
+        None,
+    ),
+    "4.2": ("Tick the damage to power you saw. Example: Fallen electric posts.", None),
+    "4.3": (
+        "How many days the fuel in the community will last, counted from the day of the survey. "
+        "Example: 3.",
+        None,
+    ),
+    "4.4": ("The power supplies needed and how many. Example: Generators: 2; Diesel: 40 L.", None),
+    "5.1": ("Tick the mobile networks that work. Example: Globe/TM.", None),
+    "5.2": ("Tick the radio and TV services that work. Example: Radio - AM.", None),
+    "5.3": ("Tick the other ways to communicate that work. Example: VHF Radio.", None),
+    "5.4": ("Tick the most urgent communication needs. Example: Charging station.", None),
+    "6.1": ("Is there an evacuation center in the community? Yes or No.", None),
+    "6.2": ("Does the evacuation center have a designated camp manager? Yes or No.", None),
+    "6.3": (
+        "One line per evacuation center: name, address, GPS, families and people inside. "
+        "Example: Malaban Elementary School, 14.35, 121.09, 40 families, 160 people.",
+        None,
+    ),
+    "6.4": (
+        "Tick the protection against abuse or violence in the community or the centers. "
+        "Example: VAWC Desk (Violence Against Women and Children).",
+        None,
+    ),
+    "6.5": (
+        "Tick the facilities that work in the evacuation areas. Example: Lighting, Cooking Areas.",
+        None,
+    ),
+    "7.1": ("Has the community or evacuation center received help? Yes or No.", None),
+    "7.2": (
+        "One line per group that gave help: name, contact, what and how much, from and to which "
+        "dates, families served. Give an office's contact, not a person's.",
+        None,
+    ),
+    "8.1": (
+        "Is search, rescue or retrieval needed? Yes, No or Do not know. Ulat starts with Yes "
+        "when the reports ask for rescue.",
+        None,
+    ),
+    "8.2": (
+        "Tick the kinds of search and rescue needed. Example: Water, for people trapped by the "
+        "flood.",
+        None,
+    ),
+    "9.1": ("Is law and order a problem? Yes, No or Do not know.", None),
+    "9.2": ("Tick the threats in the community. Example: Looting.", None),
+    "9.3": (
+        "Tick the security forces present. Example: Barangay Tanod (BPSO), Police (PNP).",
+        None,
+    ),
+    "10.1": (
+        "How many houses were destroyed beyond repair, and tick their share of all houses. "
+        "Example: 8, and <25%.",
+        None,
+    ),
+    "10.2": (
+        "How many houses were damaged but can be repaired (walls, roofs), and tick their share "
+        "of all houses. Example: 35, and 26-50%.",
+        None,
+    ),
+    "10.3": (
+        "Tick the most urgent shelter needs. Example: Tarpaulins, Galvanized iron sheets.",
+        None,
+    ),
+    "11.1": ("Can people get food where they are now? Yes or No.", None),
+    "11.2": ("Tick where people get food now. Example: Local market, Humanitarian aid.", None),
+    "11.3": ("Is the local market open? Yes or No.", None),
+    "11.4": ("Is there a food warehouse in the area? Yes or No.", None),
+    "11.5": ("Tick the most urgent food needs. Example: Food pack, Rice.", None),
+    "12.1": ("Can people get water to drink? Yes or No.", None),
+    "12.2": ("Can people get water for washing and cooking? Yes or No.", None),
+    "12.3": ("Tick where the drinking water comes from. Example: Piped water system.", None),
+    "12.4": ("Do households have their own water containers with a lid? Yes or No.", None),
+    "12.5": ("Tick the most urgent water needs. Example: Water Distribution/Delivery.", None),
+    "13.1": ("Can people use working toilets? Yes or No.", None),
+    "13.2": ("Are there separate toilets and baths for women and men? Yes or No.", None),
+    "13.3": (
+        "Do families have enough hygiene supplies, such as soap and sanitary pads? Yes or No.",
+        None,
+    ),
+    "13.4": ("Tick the most urgent sanitation needs. Example: Hygiene kits.", None),
+    "14.1": ("Can people get health services? Yes, No or Do not know.", None),
+    "14.2": (
+        "Tick the health facilities and services that work. Example: Barangay health station.",
+        None,
+    ),
+    "14.3": (
+        "Tick the main health problems. Example: Diarrhea/dehydration, Skin infections.",
+        None,
+    ),
+    "14.4": ("Are the medicines and medical supplies enough? Adequate or Inadequate.", None),
+    "14.5": ("Tick the most urgent health needs. Example: Medicines.", None),
+    "15.1": ("Is there information on babies fed only breast milk? Yes or No.", None),
+    "15.2": (
+        "Have infant milk or baby bottles been handed out since the disaster? Yes or No.",
+        None,
+    ),
+    "15.3": (
+        "Tick the nutrition programs still running without a break. Example: Vitamin A.",
+        None,
+    ),
+    "15.4": ("Tick the most urgent nutrition needs. Example: Food supplements.", None),
+    "16.1": (
+        "Are there cases of violence caused by the disaster or by people leaving home, reported "
+        "or not? Yes, No or Do not know.",
+        None,
+    ),
+    "16.2": (
+        "Tick the vulnerable people present who need help. Example: Pregnant/Lactating, PWD.",
+        None,
+    ),
+    "16.3": ("Is there a way to report abuse or other protection incidents? Yes or No.", None),
+    "16.4": ("Tick the most urgent protection services needed. Example: Social Services.", None),
+    "17.1": ("How many classrooms are used as evacuation centers. Example: 4.", None),
+    "17.2": ("How many children stay in evacuation centers. Example: 60.", None),
+    "17.3": ("How many classrooms were destroyed beyond repair. Example: 1.", None),
+    "17.4": ("How many classrooms were damaged but can be repaired. Example: 3.", None),
+    "17.5": (
+        "Tick the most urgent school needs. Example: Replacement of Learning Materials.",
+        None,
+    ),
+    "18.1": (
+        "How most people here earn a living. Example: Fishing and fish pens on Laguna de Bay. "
+        "Ulat starts with the livelihood losses the reports name.",
+        None,
+    ),
+    "18.2": ("Tick the most urgent livelihood needs. Example: Cash for Work.", None),
+    "19.1": (
+        "Does the community get the information it needs from the government or aid groups? "
+        "Yes, No or Do not know.",
+        None,
+    ),
+    "19.2": ("Tick what the affected people most want to know. Example: What aid is coming.", None),
+    "19.3": ("Tick where people get their information. Example: AM/FM radio, Social media.", None),
+    "20.1": (
+        "Your own conclusion as the assessor, from what you saw: do not ask the person you "
+        "interviewed. Choose the one that fits best.",
+        HEADING_20,
+    ),
+    "20.2": (
+        "Why you chose that answer in 20.1, in two or three sentences, from what you saw and "
+        "heard. Example: Many roofs blown off; families still in the school.",
+        HEADING_20,
+    ),
+    "submitted.name": ("The full name of the person submitting this form.", None),
+    "submitted.designation": ("The submitter's position. Example: CDRRMO Head.", None),
+    "submitted.organization": ("The submitter's office. Example: Biñan City DRRM Office.", None),
+    "submitted.team": (
+        "The name or number of the RDANA team that made the assessment. Example: Team Alpha.",
+        None,
+    ),
+    "submitted.contact": ("A phone number for the submitter. Example: 0917 123 4567.", None),
+    "submitted.email": ("An email address for the submitter, ideally the office's.", None),
+}
+
+
+def _label_source(page: int) -> str:
+    return f"{LABEL_SOURCE} ({SOP}, Annex I, PDF p. {page})"
+
+
+def _with_help(sections: tuple[FormSection, ...]) -> tuple[FormSection, ...]:
+    """The sections with each field's help and source from HELP (a missing one fails the check)."""
+    starts, page, out = dict(ANNEX_PAGES), ANNEX_PAGES[0][1], []
+    for section in sections:
+        fields = []
+        for f in section.fields:
+            page = starts.get(f.key, page)
+            if not f.heading and f.key in HELP:
+                text, source = HELP[f.key]
+                f = replace(f, help=text, help_source=source or _label_source(page))
+            fields.append(f)
+        out.append(replace(section, fields=tuple(fields)))
+    return tuple(out)
+
+
+SECTIONS = _with_help(SECTIONS)
 
 
 def all_fields() -> list[FormField]:
@@ -912,7 +1240,11 @@ def _check() -> None:
             raise ValueError(f"RDANA field {f.key}: {f.mode} field needs a rule")
         if f.mode == "fixed" and not f.value:
             raise ValueError(f"RDANA field {f.key}: fixed field needs a value")
-        check_field(f, f"RDANA field {f.key}")
+        if not f.heading:
+            check_field(f, f"RDANA field {f.key}")
+    stale = set(HELP) - set(keys)
+    if stale:
+        raise ValueError(f"help for fields the form does not have: {sorted(stale)}")
 
 
 _check()

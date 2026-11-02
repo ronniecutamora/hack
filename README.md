@@ -260,13 +260,28 @@ starts with **What you need to fill in** (event name, type and date, the overall
 who submits it; for a Notice of Loss the date, type of policy, loss time, area, harvest date and underwriter) with a
 progress line, then the values to check, with the questions for the RDANA team on site folded away.
 
+**Help on every field.** A "?" beside each label (both views, never on paper) opens a short explanation: what to
+enter, an example, and where it comes from. It is a bottom sheet on a phone and a popover beside the button on a
+wider screen (a native popover: Escape or a tap outside closes it, and it works without JavaScript). The text is data
+on each field (`help` and `help_source` in `app/rdana_form.py` and `app/nol_form.py`), checked at start-up (every
+field has one, at most 240 characters). Sources are the official documents: where one explains a field (the note
+under RDANA section 2, the heading of section 20, SOP section 7.5.2, the PCIC fisheries brochure, the PCIC
+application form and farm plan), the help cites its page or section; otherwise it only says what the form's own
+label asks and cites the Annex I page that prints it. 9 of the 108 RDANA fields and 7 of the 14 Notice of Loss
+fields cite a document; the rest cite the form's own label.
+
 **Personal fields are never stored (RA 10173).** Names, ages, phone numbers, emails, addresses, lot and policy
 numbers (RDANA 1.3 persons interviewed, "submitted by" name and contact; the assured's details on a Notice of Loss)
 are typed into the page for the printout only: their inputs have no `name`, so the browser never posts them, they
-stay in that browser tab (sessionStorage) until it closes, and the server drops any that arrive. Left empty, they
-print as blank lines to write by hand.
+stay in that browser tab (sessionStorage, per form, so they survive a reload and a saved new version) until it
+closes, and the server drops any that arrive. Each says "Saved only on this device for printing. Not stored by
+Ulat."; the first one typed in a tab shows a shared-computer warning, and **Clear personal details** wipes them at
+once. Left empty, or with JavaScript off, they print as blank lines to write by hand.
 
-**Printing.** The draft page's Print button prints the paper form alone (`app/templates/_paper.html`): A4, black on
+**Printing.** Fill the whole form on screen, then print it: **Print final form** on an approved version, **Print
+draft for checking** before. The printout is the saved version, so the button first says if changes are not saved
+yet (Save first, or print without them), then lists the office's questions that are still empty ("3 fields are still
+empty": fill them, or print anyway); otherwise it prints at once. It prints the paper form alone (`app/templates/_paper.html`): A4, black on
 white, the form's own numbering and order, filled values, ruled blank lines and empty boxes for what is still
 empty, and a status line (DRAFT, NOT APPROVED or APPROVED, with the version, date and initials). The app bar,
 navigation, buttons, hints, provenance notes, evidence links, the annex and the trace never print.
@@ -710,6 +725,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-11-02 | Live updates that keep every word true: Home's heading and hint ("What needs you" or "All caught up") are redrawn in the same live region as the to-do list, from one template, so they never contradict the cards below them; the Technical overview keeps an empty to-do region on the page, so to-dos that arrive later appear without a reload; focus on a page heading survives a live redraw; and several sections refreshing on one change each get their update (htmx had dropped all but the first and last when they shared one request source). Checked in a real browser under Xvfb: an empty Home turns into "What needs you" when a report arrives and back when it is settled, and a section with focus inside waits behind its "New updates" notice. The count on Review is its own quiet live region in the navigation (`NavItem.badge_live` names its topics), so it follows the review queue on every page, Help included |
 | 2026-11-02 | Safe admin commands for a deployed app (`app/admin.py`, `app/reseed.py`): `python -m app.deploy reseed` swaps the aged synthetic demo for a fresh `--anchor-now` load so the filing countdowns are live again, and `screen` sets aside messages stored before the not-a-report screen existed. Both run inside the target's one live container (a method of the Modal class, so never a second SQLite writer), pin a snapshot first that is never pruned and print its name for `restore`, take `--dry-run` (no change, no `--yes`), need `--yes` on production and print counts and ids only. The reseed loads the new demo in a scratch database whose ids count on above every live id, then swaps it in one transaction that refuses (listing ids) an incident or reporter that mixes demo and real reports, keeps incidents and drafts that real rows point at, and rolls back unless every real report and its rows are unchanged |
 | 2026-11-02 | Fillable RDANA form and Notice of Loss (`app/fillable.py`): every field a typed input defined as data (control, the paper form's own options, hint, asked-first, personal), validated on the server; saving makes an append-only version with an "edited" audit of field keys; approval names the exact version; regeneration carries the officer's entries and flags evidence that moved under them; Simple mode's "What you need to fill in" with progress; personal fields typed for the printout only, never posted or stored; a print view that is the paper form alone (A4, ruled blanks, DRAFT/APPROVED status line); no "not in reports" placeholders left |
+| 2026-11-02 | Fill the whole form on screen, then print it; a "?" help on every field: each RDANA and Notice of Loss field carries a short help (what to enter, an example) and its source as data, read from the official PDFs (the RDANA SOP's Annex I note and headings and section 7.5.2, the PCIC fisheries brochure, application form and farm plan) or, where no document explains it, the form's own label with its Annex I page; a test and the start-up check refuse a field without one. The "?" is a 48 px icon button with a native popover (a bottom sheet on a phone, beside the button on wider screens; Escape and a tap outside close it; hidden in print). Personal details say they are kept on this device only, warn once about shared computers and have a Clear personal details button. Print final form (approved) and Print draft for checking first flag unsaved changes and the office's empty fields |
 
 ### Third-party code and assets
 

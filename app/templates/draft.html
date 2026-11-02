@@ -3,14 +3,14 @@
 {% from "_links.html" import report_href %}
 {% from "_icons.html" import icon %}
 {% from "_help.html" import whats_this %}
-{% from "_fill.html" import form_for with context %}
+{% from "_fill.html" import form_for, print_action with context %}
 {% from "_paper.html" import rdana as paper_rdana, nol as paper_nol %}
 {% block title %}{% if draft.kind == 'rdana' %}RDANA draft · {{ draft.barangay }} v{{ draft.version }}{% elif nol %}Notice of Loss draft · {{ "incident #" ~ draft.incident_id if technical() else (draft.barangay or "place unknown") }} v{{ draft.version }}{% else %}Damaged houses v{{ draft.version }}{% endif %}{% endblock %}
 {% block content %}
 <div id="live-draft" data-live="drafts reports incidents">
   {# With a fillable form, the printout is the paper form alone (_paper.html), not this page. #}
   <div class="{{ 'screen-only' if form }}">
-  <p class="no-print toolbar"><a class="button button--text" href="/drafts">{{ icon("arrow_back") }}Drafts</a> <button type="button" onclick="window.print()">{{ icon("print") }}Print</button>{% if draft.kind == 'damaged_houses' %} <a class="button button--text" href="/drafts/{{ draft.id }}.csv" download hx-boost="false">{{ icon("download") }}Download this version as CSV</a>{% endif %}</p>
+  <div class="no-print toolbar"><a class="button button--text" href="/drafts">{{ icon("arrow_back") }}Drafts</a> {% if form %}{{ print_action(draft, form) }}{% else %}<button type="button" onclick="window.print()">{{ icon("print") }}Print</button>{% endif %}{% if draft.kind == 'damaged_houses' %} <a class="button button--text" href="/drafts/{{ draft.id }}.csv" download hx-boost="false">{{ icon("download") }}Download this version as CSV</a>{% endif %}</div>
 
   {% if draft.status == 'approved' %}
     <p class="banner ok keep"><strong>{{ "APPROVED FOR FILING, NOT FILED" if nol else "APPROVED" }}</strong> {{ draft.decided_at|manila_time }}{% if draft.decided_by %} by {{ draft.decided_by }}{% endif %}{% if draft.decision_reason %} · {{ draft.decision_reason }}{% endif %}. This version is frozen.{% if nol %} {{ c.not_filed }} The filing clock keeps running.{% endif %}</p>

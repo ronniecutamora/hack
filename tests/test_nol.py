@@ -480,11 +480,14 @@ def test_a_new_commodity_needs_one_definition_and_no_code_change(client, engine,
         name="test crop",
         title="NOTICE OF LOSS (Test Crop)",
         preamble_form="This is to file a NOTICE OF LOSS with the following particulars:",
-        fields=(
-            NolField("1", "Name of Farmer"),
-            NolField("2", "Location of Farm", "evidence", "location"),
-            NolField("3", "Cause", "evidence", "cause"),
-            NolField("4", "Extent", "evidence", "extent"),
+        fields=tuple(
+            replace(f, help=f"What {f.label} asks.", help_source="The form's own label (test)")
+            for f in (
+                NolField("1", "Name of Farmer"),
+                NolField("2", "Location of Farm", "evidence", "location"),
+                NolField("3", "Cause", "evidence", "cause"),
+                NolField("4", "Extent", "evidence", "extent"),
+            )
         ),
         deadline="test_crop_nl",
         later_deadlines=(),
