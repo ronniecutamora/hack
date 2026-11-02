@@ -34,12 +34,14 @@ from app.demo.images import jobs_for, photo_paths
 from app.demo.scenario import (
     ScenarioReport,
     anchor_shift,
+    for_commodities,
     load_scenario,
     received_at,
     validate,
 )
 from app.intake import IntakeService
 from app.models import CHANNEL_DEMO, Report, manila_time, utcnow
+from app.pcic_lines import enabled
 
 MANIFEST_NAME = "manifest.json"
 CHANNEL = CHANNEL_DEMO
@@ -83,8 +85,8 @@ async def _ingest_one(
         main = await intake.ingest_text(report.reporter, report.text, channel=CHANNEL)
     assert main.id is not None
     ids = [main.id]
-    if report.barangay is not None:
-        lat, lon = pick_point(report.barangay, report.key, place=report.place)
+    if report.point is not None or report.barangay is not None:
+        lat, lon = report.point or pick_point(report.barangay, report.key, place=report.place)
         pin = await intake.ingest_location(report.reporter, lat, lon, channel=CHANNEL)
         assert pin.id is not None
         if pin.id not in ids:
@@ -241,6 +243,7 @@ def load_command(
         for problem in problems:
             print(f"  - {problem}")
         return 1
+    reports = office_reports(reports, settings, print)
     missing = missing_images(reports, data_dir)
     if missing:
         print(f"Missing {len(missing)} image(s) for: {', '.join(missing)}.")
@@ -268,6 +271,23 @@ def load_command(
     found = ", ".join(summary["barangays"]) or "-"
     print(f"Barangays found: {found}.")
     return 0
+
+
+def office_reports(
+    reports: list[ScenarioReport], settings: Settings, say: Callable[[str], None]
+) -> list[ScenarioReport]:
+    """The scenario reports for the PCIC claims this office drafts (PCIC_COMMODITIES), saying
+    which example reports are left out and how to include them."""
+    keys = {c.key for c in enabled(settings)}
+    kept = for_commodities(reports, keys)
+    skipped = sorted({r.requires for r in reports if r not in kept and r.requires})
+    if skipped:
+        on = ",".join([*sorted(keys), *skipped])
+        say(
+            f"Skipped {len(reports) - len(kept)} example report(s) for PCIC claims this office "
+            f"does not draft ({', '.join(skipped)}); set PCIC_COMMODITIES={on} to load them."
+        )
+    return kept
 
 
 def clear_demo_data(settings: Settings, data_dir: Path) -> None:

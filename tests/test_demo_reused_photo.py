@@ -73,7 +73,7 @@ def test_r18_is_its_own_fish_pen_place_not_the_san_antonio_roof_reports():
 
 
 def test_the_other_stories_are_unchanged():
-    assert [r.key for r in SCENARIO] == [f"r{n:02d}" for n in range(1, 19)]
+    assert [r.key for r in SCENARIO] == [f"r{n:02d}" for n in range(1, 21)]
     assert all(r.photo_from is None for r in SCENARIO if r.key != "r18")
 
 

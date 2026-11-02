@@ -178,7 +178,7 @@ def test_no_labeled_real_report_and_no_demo_report_is_dropped_by_the_rule():
     assert len(real) == 30
     assert [m["id"] for m in real if rule_screen(m["text"], Attachments())] == []
     scenario = load_scenario(SCENARIO_PATH)
-    assert len(scenario) == 18
+    assert len(scenario) == 20
     assert [r.key for r in scenario if rule_screen(r.text, Attachments())] == []
 
 

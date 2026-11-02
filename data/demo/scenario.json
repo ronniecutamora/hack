@@ -170,5 +170,30 @@
     "barangay": "San Antonio",
     "place": "sanantonio-lakeshore-fishpens",
     "photo_from": "r05"
+  },
+  {
+    "key": "r19",
+    "reporter": "demo-18",
+    "day": 2,
+    "hour": 10,
+    "text": "Halimbawang ulat lang po ito (example). Dito po sa Example Farm, palayan sa isang bayan sa tabi ng Laguna de Bay. Lubog po ang palay namin mula pa noong bagyo, mga isang ektarya po ang nakalubog. Namumulaklak na po sana yung palay. Nakaseguro po kami sa PCIC.",
+    "photo_prompt": "A wide, flat irrigated rice field after a typhoon, brown floodwater covering most of the young rice plants so only the leaf tips show, a raised earth dike (pilapil) with a few coconut trees and a small nipa hut in the distance.",
+    "requires": "rice",
+    "point": [
+      14.2238,
+      121.3561
+    ]
+  },
+  {
+    "key": "r20",
+    "reporter": "demo-19",
+    "day": 4,
+    "hour": 9,
+    "text": "Halimbawang ulat lang po (example). Update po sa Example Farm sa tabi ng Laguna de Bay: humupa na po ang tubig sa palayan pero nadapa po yung palay, mga 60 porsyento po ang sira. Kailan po kaya pupunta ang taga-PCIC para tingnan?",
+    "requires": "rice",
+    "point": [
+      14.2238,
+      121.3561
+    ]
   }
 ]

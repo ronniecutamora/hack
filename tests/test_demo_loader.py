@@ -10,7 +10,7 @@ from sqlmodel import Session, select
 from app.assessment import AssessmentService
 from app.config import Settings
 from app.db import init_db, make_engine
-from app.demo import DemoDirError, require_demo_dir
+from app.demo import SCENARIO_PATH, DemoDirError, require_demo_dir
 from app.demo.geo import pick_point
 from app.demo.images import images_command, jobs_for
 from app.demo.loader import CHANNEL, MANIFEST_NAME, _ingest_one, load_command
@@ -114,6 +114,15 @@ async def test_loader_uses_shared_place_and_keeps_unpinned_reports_unpinned(tmp_
         assert (row.lat, row.lon) == pick_point(report.barangay, report.key, place=report.place)
     assert distance_m((rows[0].lat, rows[0].lon), (rows[1].lat, rows[1].lon)) <= 60
     assert rows[2].lat is None and rows[2].lon is None
+
+
+async def test_an_example_report_is_pinned_at_its_point_outside_the_city(tmp_path):
+    settings = demo_settings(tmp_path)
+    engine = engine_for(settings)
+    (farm,) = [r for r in load_scenario(SCENARIO_PATH) if r.key == "r20"]
+    await _ingest_one(IntakeService(settings, engine), engine, farm, photo=None)
+    (row,) = reports(engine)
+    assert (row.lat, row.lon) == farm.point and barangay_at(row.lat, row.lon) is None
 
 
 def test_loader_ingests_backdates_assesses_and_manifests(tmp_path):

@@ -8,6 +8,12 @@ be pinned (ambiguous or placeless) leave ``barangay`` null on purpose. A shared
 ``photo_from`` resends another report's photo file byte for byte (a reused-photo
 fake), so no new image is generated for it.
 
+A report with ``requires`` (a PCIC commodity key, e.g. "rice") loads only when the office
+drafts that claim (app.pcic_lines: PCIC_COMMODITIES). No source places rice farms in a Biñan
+barangay, so the rice reports are a labeled example ("Example Farm"): they name no Biñan
+barangay and carry a fixed synthetic ``point`` [lat, lon] that must lie outside every Biñan
+barangay polygon (the pin is flagged "outside Biñan", honestly).
+
 Times are fixed offsets from a fictional landfall. ``anchor_shift`` moves them all by
 the same amount so the latest report lands just before a chosen moment (the demo
 loader's ``--anchor-now``), keeping every gap between reports.
@@ -19,6 +25,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from app.gazetteer import BY_NAME, find_in_text
+from app.geo import barangay_at
+from app.nol_form import COMMODITIES
 
 # Fixed fictional landfall all scenario times are measured from (naive UTC, like Report).
 LANDFALL_AT = datetime(2026, 10, 3, 17, 0)
@@ -42,6 +50,12 @@ class ScenarioReport:
     corrects: str | None = None  # key of the earlier report this one corrects
     place: str | None = None  # shared synthetic location anchor within the barangay
     photo_from: str | None = None  # key of a report whose photo this one resends
+    requires: str | None = None  # a PCIC commodity key: loads only when the office drafts it
+    point: tuple[float, float] | None = None  # [lat, lon] of an example place outside the city
+
+    def __post_init__(self) -> None:
+        if self.point is not None:  # JSON gives a list
+            object.__setattr__(self, "point", tuple(self.point))
 
 
 # --anchor-now puts the latest report this long before the load time.
@@ -66,6 +80,11 @@ def load_scenario(path: Path) -> list[ScenarioReport]:
     return [ScenarioReport(**item) for item in json.loads(path.read_text(encoding="utf-8"))]
 
 
+def for_commodities(reports: list[ScenarioReport], commodities: set[str]) -> list[ScenarioReport]:
+    """The reports that load for an office drafting these PCIC claims (commodity keys)."""
+    return [r for r in reports if r.requires is None or r.requires in commodities]
+
+
 def validate(reports: list[ScenarioReport]) -> list[str]:
     """Check the scenario contract; return a list of problems (empty means valid)."""
     errors: list[str] = []
@@ -86,6 +105,10 @@ def validate(reports: list[ScenarioReport]) -> list[str]:
             errors.append(f"{r.key}: unknown barangay {r.barangay!r}")
         if r.place is not None and (not r.place.strip() or r.barangay is None):
             errors.append(f"{r.key}: place needs a nonempty name and a barangay pin")
+        if r.requires is not None and r.requires not in COMMODITIES:
+            errors.append(f"{r.key}: requires unknown commodity {r.requires!r}")
+        if r.point is not None:
+            errors.extend(_validate_example(r))
         if r.corrects is not None and r.corrects not in by_key:
             errors.append(f"{r.key}: corrects unknown report {r.corrects!r}")
         if r.photo_from is not None:
@@ -101,6 +124,21 @@ def validate(reports: list[ScenarioReport]) -> list[str]:
         errors.append("need reports in at least 4 different barangays")
     errors.extend(_validate_series(reports))
     errors.extend(_validate_story_beats(reports, by_key))
+    return errors
+
+
+def _validate_example(r: ScenarioReport) -> list[str]:
+    """An example place stays out of the city: no barangay pin, none named, a point outside."""
+    errors = []
+    if r.requires is None:
+        errors.append(f"{r.key}: an example point is only for a report that requires a claim")
+    if r.barangay is not None or r.place is not None:
+        errors.append(f"{r.key}: an example point cannot also pin a barangay or place")
+    if find_in_text(r.text).barangays:
+        errors.append(f"{r.key}: an example report must not name a Biñan barangay")
+    # The same polygon test as the "pin outside Biñan" trust signal (app.trust).
+    if r.point is None or len(r.point) != 2 or barangay_at(*r.point) is not None:
+        errors.append(f"{r.key}: the example point must be [lat, lon] outside every barangay")
     return errors
 
 
@@ -152,9 +190,10 @@ def _validate_story_beats(
         target = by_key.get(r.corrects or "")
         if target is not None and received_at(r) < received_at(target):
             errors.append(f"{r.key}: a correction must come after {r.corrects}")
-    if not any(len(find_in_text(r.text).barangays) >= 2 for r in reports if not r.barangay):
+    unpinned = [r for r in reports if r.barangay is None and r.point is None]
+    if not any(len(find_in_text(r.text).barangays) >= 2 for r in unpinned):
         errors.append("need an unpinned report naming two barangays")
-    if not any(r.barangay is None and not find_in_text(r.text).barangays for r in reports):
+    if not any(not find_in_text(r.text).barangays for r in unpinned):
         errors.append("need a report with no place at all")
     if not any("fish cage" in r.text.lower() or "fish pen" in r.text.lower() for r in reports):
         errors.append("need a fisherfolk report about damaged fish cages/pens")

@@ -50,6 +50,7 @@ from app.demo.loader import (
     clear_demo_data,
     feed_one,
     missing_images,
+    office_reports,
 )
 from app.demo.scenario import ScenarioReport, load_scenario, received_at, validate
 from app.incidents import IncidentService
@@ -442,6 +443,7 @@ def replay_command(
     if problems:
         say("Scenario is invalid:\n" + "\n".join(f"  - {p}" for p in problems))
         return 1
+    reports = office_reports(reports, settings, say)
     missing = missing_images(reports, data_dir)
     if missing:
         say(f"Missing {len(missing)} image(s) for: {', '.join(missing)}.")

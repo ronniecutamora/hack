@@ -3,15 +3,18 @@ from dataclasses import replace
 import pytest
 
 from app.demo import SCENARIO_PATH
+from app.demo.loader import office_reports
 from app.demo.scenario import (
     LANDFALL_AT,
     STREET_SERIES,
     ScenarioReport,
+    for_commodities,
     load_scenario,
     received_at,
     validate,
 )
 from app.gazetteer import BY_NAME, find_in_text
+from app.geo import barangay_at
 
 SCENARIO = load_scenario(SCENARIO_PATH)
 BY_KEY = {r.key: r for r in SCENARIO}
@@ -163,3 +166,42 @@ def test_place_requires_a_name_and_a_pin(place, barangay):
 def _without_corrections():
     base = [r for r in SCENARIO if r.corrects is None]
     return [r for r in base if "mali" not in r.text.lower()]
+
+
+# --- example rice reports (slice 7m) -------------------------------------------------------------
+
+
+def test_the_rice_demo_reports_are_an_honest_example_that_loads_only_with_rice_on(settings):
+    scenario = SCENARIO
+    rice = [r for r in scenario if r.requires == "rice"]
+    assert len(rice) == 2 and all(r.point is not None for r in rice)
+    for r in rice:
+        assert r.barangay is None and barangay_at(*r.point) is None
+        assert "Example Farm" in r.text and "example" in r.text.lower()
+    assert sum(r.photo_prompt is not None for r in rice) == 1
+    said = []
+    assert office_reports(scenario, settings, said.append) == [
+        r for r in scenario if r.requires is None
+    ]
+    assert said == [
+        "Skipped 2 example report(s) for PCIC claims this office does not draft (rice); "
+        "set PCIC_COMMODITIES=fisheries,rice to load them."
+    ]
+    assert for_commodities(scenario, {"fisheries", "rice"}) == scenario
+    rice_on = settings.model_copy(update={"pcic_commodities": ["fisheries", "rice"]})
+    assert office_reports(scenario, rice_on, said.append) == scenario
+
+
+@pytest.mark.parametrize(
+    ("change", "problem"),
+    [
+        ({"barangay": "Malaban"}, "cannot also pin a barangay"),
+        ({"point": (14.3511, 121.0900)}, "outside every barangay"),  # inside Malaban
+        ({"text": "Lubog ang palay sa Casile."}, "must not name a Biñan barangay"),
+        ({"requires": None}, "only for a report that requires a claim"),
+        ({"requires": "corn"}, "requires unknown commodity"),
+    ],
+)
+def test_the_validator_keeps_example_reports_out_of_the_city(change, problem):
+    broken = [replace(r, **change) if r.key == "r19" else r for r in SCENARIO]
+    assert any(problem in p for p in validate(broken)), validate(broken)
