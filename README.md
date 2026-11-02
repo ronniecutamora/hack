@@ -132,6 +132,15 @@ Measured on labeled sets with real (cached) model calls, not mocks. Every number
 | muse-spark-1.3 | Synthetic Biñan-style photos (synthetic) | 40 | 0.84 | 0.90 | 0.79 | 0.91 | 1.00 | 0.96 | 0.44 | 2026-10-30 |
 | muse-spark-open | Synthetic Biñan-style photos (synthetic) | 40 | 0.79 | 0.95 | 0.76 | 1.00 | 1.00 | 0.96 | 0.44 | 2026-10-30 |
 
+**Spark and SAM 3.1 check each other** on every photo. When Spark sees floodwater or a partly damaged roof that SAM cannot outline, the report gets a trust signal and Review asks the officer; the other disagreements are only measured (each cell: times it fired, then whose answer matched the hand label). muse-spark-1.3: they disagreed on 22 of 65 photos, and Review asked about 0; muse-spark-open: they disagreed on 23 of 65 photos, and Review asked about 0.
+
+| Model | Dataset | n | Disagreed | Asked the officer | Floodwater: Spark sees it, SAM outlines none (asks) | Floodwater: SAM outlines it, Spark sees none (measured only) | Partly damaged roof: SAM outlines no roof (asks) | Severe roof damage: SAM outlines no roof (measured only) | Date |
+|---|---|---|---|---|---|---|---|---|---|
+| muse-spark-1.3 | Real typhoon photos (real) | 25 | 1 | 0 of 25 | 0 (Spark 0, SAM 0) | 0 (Spark 0, SAM 0) | 0 (Spark 0, SAM 0) | 1 (Spark 1, SAM 0) | 2026-11-02 |
+| muse-spark-open | Real typhoon photos (real) | 25 | 1 | 0 of 25 | 0 (Spark 0, SAM 0) | 0 (Spark 0, SAM 0) | 0 (Spark 0, SAM 0) | 1 (Spark 1, SAM 0) | 2026-11-02 |
+| muse-spark-1.3 | Synthetic Biñan-style photos (synthetic) | 40 | 21 | 0 of 40 | 0 (Spark 0, SAM 0) | 21 (Spark 21, SAM 0) | 0 (Spark 0, SAM 0) | 1 (Spark 1, SAM 0) | 2026-11-02 |
+| muse-spark-open | Synthetic Biñan-style photos (synthetic) | 40 | 22 | 0 of 40 | 0 (Spark 0, SAM 0) | 22 (Spark 22, SAM 0) | 0 (Spark 0, SAM 0) | 2 (Spark 1, SAM 1) | 2026-11-02 |
+
 **Incident pair judge** ("is this new report the same incident?", merge threshold 0.85; below it, or unsure, goes to the officer):
 
 | Model | Dataset | n | Precision | Recall | F1 | Officer review rate | Date |
@@ -163,6 +172,14 @@ Read these numbers with their caveats:
 - **The pair set is synthetic and too easy to separate the models.** Both score 1.00 on 64 hand-written pairs. Real reports will be messier; the officer-review path for unsure and low-confidence pairs stays.
 - **Fallen trees are the weak spot on real photos** (F1 0.57 on Spark 1.3, 0.33 on Spark Open), as the 2026-10-27 kill test found. The dashboard therefore asks for confirmation of fallen trees.
 - **SAM calls the lake "floodwater".** On the synthetic lakeshore scenes, SAM's floodwater precision is 0.28: Laguna de Bay itself, fish-pen water and an irrigated paddy are masked as floodwater. For a lakeshore city, the SAM floodwater mask is evidence for the officer; the LLM's judgment (floodwater F1 0.90 / 0.95 there) decides.
+- **When Spark and SAM disagree, the hand label sided with Spark every time.** They disagreed on 22 of the 65
+  photos (Spark 1.3): on 21 synthetic lakeshore photos SAM outlined the lake, a canal or a wet road as
+  floodwater where Spark saw none, and on 1 severely damaged house SAM outlined no roof. So the check asks the
+  officer only the other way round, when Spark sees floodwater or a partly damaged roof that SAM cannot outline,
+  and that happened on 0 of 65 photos: on these sets it costs the officer nothing. Its benefit, catching a Spark
+  judgment the photo does not support, is ⚠️ not measured yet: no labeled photo has one. The officer's answer
+  never changes the counts (they keep Spark's judgment); it clears the flag or keeps the report marked doubtful,
+  like every trust signal.
 - **Spark Open is close to Spark 1.3** on photos and equal on pairs, which is what the open-weight mode needs.
 - **The screen kept every real report** on 60 synthetic Telegram-style messages (30 reports, many very short or
   typo-heavy, and 30 non-reports): 0 real reports wrongly filtered, recall 1.00, precision 0.94. The free rule
@@ -207,7 +224,7 @@ not-a-report screen's verdict, asked for messages that state nothing, costs a mo
 | Rate limit | Each pseudonymous reporter is checked *before* a file is downloaded. Over the limit, the bot replies (Tagalog / English) to try later and to call 911 for emergencies. A late pin or caption that joins the sender's last report is not a new report and is not limited | 20 reports per hour, 60 per 24 h (`REPORTS_PER_HOUR`, `REPORTS_PER_DAY`) |
 | Spend cap | Model costs logged in the last 24 h are checked before every assessment. Over the cap, new reports are stored as `held` and assessed later by `python -m app.assessment --pending` | $10 (`DAILY_SPEND_CAP_USD`) |
 | Block list | `python -m app.trust block <pseudonym-prefix>` (and `unblock`). Messages are still stored as `held` for the officer but never reach a model | — |
-| Trust signals | Rule-based flags on each report, shown as red / amber / gray chips: **photo reused** by another reporter (SHA-256 or a 64-bit difference hash, so resized or recompressed copies match), **old photo** (EXIF capture time), **pin outside Biñan**, **pin and text name different barangays** | Photo older than 3 days (`PHOTO_MAX_AGE_DAYS`) |
+| Trust signals | Rule-based flags on each report, shown as red / amber / gray chips: **photo reused** by another reporter (SHA-256 or a 64-bit difference hash, so resized or recompressed copies match), **old photo** (EXIF capture time), **pin outside Biñan**, **pin and text name different barangays**, and **Spark and SAM disagree** on a photo (Spark sees floodwater or a partly damaged roof that SAM 3.1 cannot outline; `app/crosscheck.py`), which Simple mode's Review asks as "Is there floodwater?" with the photo and its outline side by side | Photo older than 3 days (`PHOTO_MAX_AGE_DAYS`) |
 | Corroboration | Each incident shows how many *different* reporters it has; one reporter is labeled **single source** | — |
 
 Reporter ids and trust signals never enter a model prompt. Raw media of held reports follows the
@@ -612,7 +629,8 @@ uv run python -m scripts.eval_transcribe /path/to/recordings   # WER (raw and cl
 uv run python -m scripts.eval_vision /path/to/photos --sam [--llm muse-spark-open]  # labels.csv + images/
 uv run python -m scripts.make_vision_set /path/to/vision-synthetic   # 40 labeled Muse Image photos from data/eval/vision_scenes.json (~$0.40, idempotent)
 # Record a full run in data/eval/results.json (README tables: uv run python -m app.eval_results)
-uv run python -m scripts.eval_vision /path/to/vision-synthetic --sam --record data/eval/results.json --dataset synthetic-40
+uv run python -m scripts.eval_vision /path/to/vision-synthetic --sam --record data/eval/results.json --dataset synthetic-40 --out out.json
+uv run python -m scripts.eval_crosscheck /path/to/vision-synthetic --results out.json --model muse-spark-1.3 --record data/eval/results.json --dataset synthetic-40   # free: reuses the run's outputs
 uv run python -m scripts.eval_dedupe --judge muse-spark-open --record data/eval/results.json
 uv run python -m scripts.eval_screen --spend-cap 0.30 --record data/eval/results.json   # 60 synthetic messages; --cached-only never pays
 uv run python -m scripts.eval_transcribe /path/to/test-audio --only 3-10 --record data/eval/results.json --dataset voice-notes-8
@@ -761,6 +779,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-11-02 | Print fidelity: every printed element of the RDANA form and the Notice of Loss audited against the official scans (62 RDANA labels and section titles and 27 options put back into the paper's own words, the old wording still read from saved entries); the printout now follows each form's layout (Annex I's boxes, columns, tables, matrix, title bar and page breaks from a layout table in `app/rdana_form.py`; the PCIC letter's captions, ruled lines and signature block); Ulat's additions removed except one stamp line with the page count in the page margin; an optional, off-by-default "Include the photo evidence page" prints the Notice of Loss photos and measurements as a separate attachment |
 | 2026-11-02 | Simple mode's Review as a one-question queue (`app/questions.py`, `_queue.html`): one item at a time with "1 of n", Skip and Back, the report as it came in and one question with one or two big buttons, built from one table of question kinds (possible duplicate with both reports side by side, unknown place with the likely barangays, a photo or pin to double-check, a fallen tree only when a photo or the words suggest one), each answer posting the existing officer action with its audit; Undo in the snackbar before an answer is sent; live updates add new questions at the end ("2 new") without replacing the one being read; initials asked once and kept in the signed session, never shown in Simple mode when known; rarer actions under "More options"; Home's to-do, the Review badge and the queue share one count; Drafts and Reports in plainer words with the history and event details folded away; before/after button counts per screen and screenshots in the slice report |
 | 2026-11-02 | US English everywhere: every page, bot reply, form help, README line, comment and private name now uses US spelling (center, color, labeled, canceled, gray, neighbor, acknowledgment, -ize; about 190 words in 56 files), and `tests/test_us_english.py` fails on any British form from its word list, with the few kept forms named and explained (ARIA and asyncio names, the cached photo schema name `DamageJudgement`, and the Muse Image prompts whose hash names the stored photos) |
+| 2026-11-02 | Spark and SAM check each other on every photo (`app/crosscheck.py`): a table of rules pairs each Spark judgment with the SAM 3.1 measurement that should back it. When Spark sees floodwater or a partly damaged roof that SAM cannot outline, the report gets a trust signal, and Simple mode's Review asks "Is there floodwater?" with the photo and its outline side by side; the answer is the existing signal review, with what the officer saw as its note. Two more rules are measured only. `scripts.eval_crosscheck` scores every rule for free from the cached photo runs (results file, README and `/accuracy`): Spark 1.3 and SAM disagreed on 22 of 65 labeled photos, the hand label sided with Spark in all 22, and Review asked about 0. The outline is explained where it is shown (Reports, the Notice of Loss annex, Review) |
 
 ### Third-party code and assets
 
@@ -828,6 +847,7 @@ app/
   geo.py, data/        Point-in-barangay lookup on COD-AB boundaries; photo EXIF GPS
   transcript_cleanup.py  Removes repeated-word artifacts from transcripts
   facts.py, photo.py   Fact extraction; photo judgment, SAM measurement and evidence overlay
+  crosscheck.py        Spark and SAM check each other on every photo: the rules, as data, and their trust signals
   assessment.py        Assesses a report and maps it to a barangay (python -m app.assessment)
   incidents.py         Candidates, deterministic rollups, audited grouping and rebuild CLI
   counting.py          Per-barangay evidence and the no-double-counting rule
@@ -859,6 +879,7 @@ scripts/
   build_icons.py       Builds the Material Symbols icon sprite from a list of icon names
   eval_transcribe.py   Voice Transcribe WER and place names per setting, on recordings outside the repo
   eval_vision.py       Photo judge and SAM vs hand labels, per agent LLM
+  eval_crosscheck.py   How often Spark and SAM disagree and whom the hand label sides with (free, from eval_vision's outputs)
   eval_facts.py        Fact extraction from voice notes vs hand labels, per agent LLM
   eval_dedupe.py       Cached pair-judge P/R/F1, review rate and per-pair misses
 deploy/                Modal app (modal_app.py) and the deploy guide (README.md)
