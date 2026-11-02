@@ -20,6 +20,7 @@ class NavItem(NamedTuple):
     technical: bool = False  # only in Technical mode
     technical_label: str | None = None  # its name in Technical mode, when that differs
     badge: str | None = None  # a count shown on it (a key of the page's nav counts)
+    badge_live: str = ""  # the live topics (app.live.TOPICS) that count depends on
 
     def label_for(self, technical: bool) -> str:
         return (self.technical_label or self.label) if technical else self.label
@@ -27,7 +28,7 @@ class NavItem(NamedTuple):
 
 NAV: tuple[NavItem, ...] = (
     NavItem("/", "Home", "home", technical_label="Overview"),
-    NavItem("/review", "Review", "fact_check", badge="review"),
+    NavItem("/review", "Review", "fact_check", badge="review", badge_live="reports incidents"),
     NavItem("/incidents", "Incidents", "flood"),
     NavItem("/drafts", "Drafts", "description"),
     NavItem("/reports", "Reports", "forum", primary=False),

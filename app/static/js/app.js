@@ -48,6 +48,8 @@
   // and swaps in its own fresh copy (htmx `select`), so there is one render path per page.
   // A region the officer is working in (focus inside, or a field changed) is never swapped:
   // it shows a "New updates" notice instead, and its typed values survive a requested refresh.
+  // A region marked data-live-quiet (a count on the navigation) never shows that notice: it holds
+  // nothing to work in, and a failed refresh simply waits for the next change.
 
   const POLL_MS = 20000;          // fallback polling of GET /events/token
   const SSE_FAILURES = 3;         // consecutive stream errors before falling back to polling
@@ -133,7 +135,7 @@
   }
 
   function showNotice(region) {
-    if (region.querySelector(":scope > .live-notice")) return;
+    if (region.hasAttribute("data-live-quiet") || region.querySelector(":scope > .live-notice")) return;
     const notice = document.createElement("div");
     notice.className = "live-notice no-print";
     notice.setAttribute("role", "status");

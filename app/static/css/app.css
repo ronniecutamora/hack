@@ -570,6 +570,7 @@ button:disabled, button[aria-busy="true"] { cursor: progress; opacity: .62; }
 /* The count on a destination (M3 large badge): on the icon in the bar and the rail, at the
    end of the row in the drawer and the More sheet. */
 .nav__item { position: relative; }
+.badge-slot { display: contents; }  /* the badge's live region: the badge places itself as before */
 .badge {
   display: inline-grid; place-items: center; min-width: 1rem; height: 1rem; padding: 0 .25rem; border-radius: .5rem;
   background: var(--md-sys-color-error); color: var(--md-sys-color-on-error); font: 500 .6875rem/1 var(--md-ref-typeface);

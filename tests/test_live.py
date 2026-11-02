@@ -249,3 +249,34 @@ def test_pages_carry_the_render_time_tokens_and_mark_live_regions(client):
         assert region in html, path
         assert "data-live-tokens=" in html and tokens["reports"] in html
         assert "data-live-status" in html and "htmx.min.js" in html
+
+
+LIVE_PAGES = (
+    "/", "/review", "/incidents", "/reports", "/reports/set-aside", "/drafts", "/map",
+    "/damaged-houses", "/help",
+)  # fmt: skip
+
+
+def test_every_live_region_has_a_unique_id_and_listens_to_known_topics(client):
+    for mode in ("simple", "technical"):
+        client.get(f"/?mode={mode}")
+        for path in LIVE_PAGES:
+            page = client.get(path).text
+            regions = re.findall(r'<[a-z]+\b[^>]*\bid="([^"]+)"[^>]*\bdata-live="([^"]*)"', page)
+            assert regions, (mode, path)
+            ids = [region_id for region_id, _topics in regions]
+            assert len(ids) == len(set(ids)), (mode, path, ids)
+            for region_id, topics in regions:
+                assert topics.split() and set(topics.split()) <= set(TOPICS), (path, region_id)
+                live_region(page, region_id)  # well formed: it closes
+
+
+def test_the_review_badge_is_a_quiet_live_region_on_every_page(client, settings):
+    """The count on Review follows the queue on any page, Help included (no other live region)."""
+    page = client.get("/help").text
+    badge = live_region(page, "live-badge-review")
+    assert 'data-live="reports incidents" data-live-quiet' in badge
+    assert 'class="badge"' not in badge  # nothing waits: an empty slot, ready for a count
+    add_fallen_tree(settings)
+    badge = live_region(client.get("/help", headers=LIVE_REFRESH).text, "live-badge-review")
+    assert re.search(r'data-badge="review"><span class="visually-hidden">: </span>1<', badge)
