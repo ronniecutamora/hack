@@ -55,6 +55,7 @@ from app.bot import build_application, start_upkeep, stop_upkeep
 from app.config import Settings, get_settings
 from app.dashboard import (
     active_incidents,
+    ago,
     incident_trust,
     nav_counts,
     overview,
@@ -131,6 +132,8 @@ from app.modes import (
 from app.nav import NAV, destinations, more_current, nav_current, technical_only
 from app.nol import deadline_table
 from app.nol_form import COMMODITIES, commodity_for_kind
+from app.questions import PLACE_LISTED_REASON, current, plan, questions
+from app.questions import photos as question_photos
 from app.rdana import RDANA_DEADLINE, EventInput
 from app.review import (
     ACTION_LABELS,
@@ -141,6 +144,7 @@ from app.review import (
     TREE_VERDICTS,
     ReviewError,
     ReviewService,
+    officer_name,
     queue,
     review_cards,
     timeline,
@@ -236,6 +240,8 @@ templates.env.globals["BARANGAY_NAMES"] = sorted(b.name for b in BARANGAYS)
 templates.env.globals["ACTION_LABELS"] = ACTION_LABELS
 templates.env.globals["SIGNAL_VERDICTS"] = SIGNAL_VERDICTS
 templates.env.globals["TREE_VERDICTS"] = TREE_VERDICTS
+templates.env.globals["PLACE_LISTED_REASON"] = PLACE_LISTED_REASON
+templates.env.globals["plan_questions"] = plan
 templates.env.globals["REVIEW_LIMITS"] = {
     "officer": OFFICER_MAX,
     "note": NOTE_MAX,
@@ -795,20 +801,40 @@ def create_app(
         )
 
     def review_page(
-        request: Request, *, form: dict | None = None, status_code: int = 200
+        request: Request,
+        *,
+        form: dict | None = None,
+        initials_error: str | None = None,
+        status_code: int = 200,
     ) -> HTMLResponse:
+        params = request.query_params
         with Session(request.app.state.engine) as session:
             cards = queue(session)
             related = related_incidents(
                 session, [c.assessment for c in cards if c.assessment is not None]
             )
-        params = request.query_params
+            # Simple mode asks one question at a time (app.questions); Technical lists the cards.
+            asked = [] if technical() else questions(session, cards)
+            shown = {q.card.report.id for q in asked} | {
+                q.compare.id for q in asked if q.compare is not None
+            }
+            photos = question_photos(session, shown) if asked else {}
+        at = params.get("at")
+        if form and asked:  # a refused answer: show its question, with the error
+            at = next((q.key for q in asked if q.card.report.id == form["report_id"]), at)
         action = params.get("done", "")
         done = DONE_MESSAGES.get(action)
         if done and not technical():  # Simple mode names no report or incident numbers
             done = PLAIN_DONE.get(action)
+        now = request.app.state.drafts.clock()
         context = {
             "cards": cards,
+            "questions": asked,
+            "current": current(asked, at),
+            "photos": photos,
+            "ago": lambda when: ago(when, now),
+            "ask_initials": not current_officer.get() or params.get("initials") == "change",
+            "initials_error": initials_error,
             "related_incidents": related,
             "review_form": form,
             # After a redirect: what the last action did (ids are digits or the line is dropped).
@@ -834,6 +860,19 @@ def create_app(
     @app.get("/review", response_class=HTMLResponse)
     def review(request: Request) -> HTMLResponse:
         return review_page(request)
+
+    @app.post("/initials", response_model=None)
+    async def initials(request: Request) -> RedirectResponse | HTMLResponse:
+        """Review asks once for the officer's initials when the sign-in had none, and keeps
+        them for the session: every answer after that records them (app.review's audit)."""
+        form = await form_fields(request)
+        try:
+            officer = officer_name(form.get("officer"))
+        except ReviewError as exc:
+            return review_page(request, initials_error=str(exc), status_code=exc.status_code)
+        response = RedirectResponse("/review", status_code=303)
+        auth.set_initials(response, request, officer)
+        return response
 
     @app.post("/reports/{report_id:int}/review/{action}", response_model=None)
     async def review_action(

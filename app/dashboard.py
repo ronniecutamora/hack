@@ -21,8 +21,9 @@ from app.models import (
     Report,
     utcnow,
 )
-from app.modes import plain_reason
+from app.modes import plain_reason, technical
 from app.nol_form import commodity_for_kind
+from app.questions import plan, summary
 from app.review import ReviewCard, queue
 from app.screening import counted
 from app.trace import ModelFamily, model_family
@@ -172,8 +173,9 @@ def model_usage(session: Session, now: datetime | None = None) -> list[ModelUsag
 
 def nav_counts(session: Session) -> dict[str, int]:
     """The counts on navigation destinations (NavItem.badge): the /review queue, counted by
-    that page's own helper."""
-    return {"review": len(queue(session))}
+    that page's own helpers (Simple mode's Review asks questions, Technical mode lists reports)."""
+    cards = queue(session)
+    return {"review": len(cards) if technical() else len(plan(cards))}
 
 
 def overview(session: Session, drafts: DraftService, now: datetime) -> dict[str, Any]:
@@ -274,6 +276,18 @@ def ago(at: datetime, now: datetime) -> str:
 def _review_item(cards: list[ReviewCard]) -> TodoItem | None:
     if not cards:
         return None
+    if not technical():  # Review asks one question at a time: count those, as its "1 of n" does
+        asked = plan(cards)
+        n = len(asked)
+        return TodoItem(
+            REVIEW,
+            f"{n} quick question{'s' if n != 1 else ''} about reports",
+            summary(asked),
+            "/review",
+            "Answer",
+            "fact_check",
+            "warn",
+        )
     reasons: dict[str, int] = {}
     for card in cards:
         for reason in card.reasons:

@@ -720,6 +720,67 @@ td.field-label { width: 38%; }
 .history--agent { border-left: 4px solid var(--md-sys-color-primary); }
 @media print { .review-actions, .officer-actions { display: none !important; } }
 
+/* ---------- Simple mode's Review: one question at a time (app/templates/_queue.html) ----------
+   The question is the one big thing on the screen: the report sits above it the way it arrived
+   (a chat message), the answers below it are full-width 56 px buttons in thumb reach, and
+   everything else (Skip, Back, More options) is quiet text. */
+
+.queue-page { max-width: 40rem; }
+.queue__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-3); }
+.queue__head h1 { margin-right: auto; }
+.queue__count { margin: 0; font: var(--md-sys-typescale-title-medium); color: var(--md-sys-color-on-surface-variant); }
+.queue__count span { font-variant-numeric: tabular-nums; }
+.queue__new { margin: 0; }
+.queue { list-style: none; margin: 0; padding: 0; }
+.queue__who { margin: var(--space-4) 0 0; }
+.q {
+  padding: var(--space-4); border-radius: var(--md-sys-shape-corner-extra-large);
+  background: var(--md-sys-color-surface-container-low);
+}
+.q--in { animation: q-in 220ms var(--md-sys-motion-standard); }
+@keyframes q-in { from { opacity: 0; transform: translateX(1.5rem); } }
+@media (prefers-reduced-motion: reduce) { .q--in { animation: none; } }
+.q__evidence { display: grid; gap: var(--space-3); }
+.q--compare .q__evidence { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
+.msg { margin: 0; min-width: 0; }
+.msg__label { margin: 0 0 var(--space-1) var(--space-2); font: var(--md-sys-typescale-label-medium); color: var(--md-sys-color-on-surface-variant); }
+/* The report as it came in: a received chat bubble (tail at the top left). */
+.msg__bubble {
+  overflow: hidden; border-radius: 4px var(--md-sys-shape-corner-large) var(--md-sys-shape-corner-large) var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-surface-container-lowest); box-shadow: var(--md-sys-elevation-1);
+}
+@media (prefers-color-scheme: dark) { .msg__bubble { background: var(--md-sys-color-surface-container-high); } }
+.msg__photo { display: block; }
+.msg__photo img { display: block; width: 100%; height: auto; max-height: 15rem; object-fit: cover; }
+.q--compare .msg__photo img { max-height: 9rem; aspect-ratio: 4 / 3; }
+.msg__text { margin: 0; padding: var(--space-3) var(--space-3) 0; font: var(--md-sys-typescale-body-large); overflow-wrap: anywhere; }
+.q--compare .msg__text { font: var(--md-sys-typescale-body-medium); display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
+.msg__voice { color: var(--md-sys-color-on-surface-variant); }
+.msg__meta { margin: 0; padding: var(--space-1) var(--space-3) var(--space-2); text-align: right; font: var(--md-sys-typescale-body-small); color: var(--md-sys-color-on-surface-variant); }
+.q__ask { margin: var(--space-5) 0 var(--space-1); font: var(--md-sys-typescale-headline-small); text-wrap: balance; }
+.q__ask:focus { outline: none; }
+.q__why { margin: 0 0 var(--space-4); font: var(--md-sys-typescale-body-medium); color: var(--md-sys-color-on-surface-variant); }
+.q__answers { display: grid; gap: var(--space-2); }
+.q__answers form { margin: 0; }
+.q__answer { width: 100%; min-height: 3.5rem; margin: 0; font: var(--md-sys-typescale-title-medium); }
+.q__answer.button--tonal { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
+.q__other > summary { list-style: none; cursor: pointer; }
+.q__other > summary::-webkit-details-marker { display: none; }
+.q__other[open] > summary { margin-bottom: var(--space-2); }
+.q__other form { display: grid; gap: var(--space-2); }
+.q__other select { width: 100%; min-height: var(--target); }
+.q__nav { display: flex; justify-content: space-between; margin: var(--space-3) calc(-1 * var(--space-2)) 0; }
+.q__nav .button { margin: 0; min-height: var(--target); }
+.q__nav [hidden] { display: inline-flex; visibility: hidden; }
+.q__more { margin-top: var(--space-2); border-top: 1px solid var(--md-sys-color-outline-variant); }
+.q__more > summary { min-height: var(--target); display: flex; align-items: center; font: var(--md-sys-typescale-label-large); color: var(--md-sys-color-primary); cursor: pointer; }
+.ask-once { max-width: 26rem; }
+.ask-once form { display: grid; gap: var(--space-3); }
+.ask-once input { font-size: 1.25rem; text-transform: uppercase; }
+.snackbar__action { min-height: var(--target); margin: 0; padding-inline: .75rem; background: transparent; color: var(--md-sys-color-inverse-primary); }
+.snackbar__action[hidden] { display: none; }
+@media (max-width: 22.5rem) { .q { padding: var(--space-3); } .q--compare .q__evidence { grid-template-columns: 1fr; } }
+
 /* ---------- Agent trace (app/templates/_trace.html) ---------- */
 .trace { margin-top: var(--space-2); }
 .trace > summary { color: var(--md-sys-color-on-surface); }

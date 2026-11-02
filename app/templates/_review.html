@@ -9,8 +9,11 @@
   {% set values = form["values"] if mine else {} %}
   {% if mine %}<p class="error" role="alert" id="review-error-{{ card.report.id }}-{{ action }}">{{ form.error }}</p>{% endif %}
   <input type="hidden" name="next" value="{{ back }}">
-  <label>Your initials <input type="text" name="officer" required maxlength="{{ REVIEW_LIMITS.officer }}" autocomplete="off" value="{{ values.get('officer') or current_officer() }}" placeholder="e.g. JDC, CDRRMO"{% if mine %} aria-invalid="true" aria-describedby="review-error-{{ card.report.id }}-{{ action }}"{% endif %}></label>
-  <label>{{ note_label }} <textarea name="note" rows="2" maxlength="{{ REVIEW_LIMITS.note }}"{% if note_required %} required minlength="{{ REVIEW_LIMITS.place_reason }}"{% endif %}>{{ values.get('note', '') }}</textarea></label>
+  {# Simple mode asks for the initials once (at sign-in or on Review) and never shows the field
+     again; Technical mode keeps it visible on every form. An optional note is Technical only. #}
+  {% if not technical() and current_officer() %}<input type="hidden" name="officer" value="{{ current_officer() }}">
+  {% else %}<label>Your initials <input type="text" name="officer" required maxlength="{{ REVIEW_LIMITS.officer }}" autocomplete="off" value="{{ values.get('officer') or current_officer() }}" placeholder="e.g. JDC, CDRRMO"{% if mine %} aria-invalid="true" aria-describedby="review-error-{{ card.report.id }}-{{ action }}"{% endif %}></label>{% endif %}
+  {% if technical() or note_required %}<label>{{ note_label }} <textarea name="note" rows="2" maxlength="{{ REVIEW_LIMITS.note }}"{% if note_required %} required minlength="{{ REVIEW_LIMITS.place_reason }}"{% endif %}>{{ values.get('note', '') }}</textarea></label>{% endif %}
 {% endmacro %}
 
 {% macro _open(card, form, actions, default=false) -%}
@@ -18,12 +21,14 @@
 {%- endmacro %}
 
 {# The action forms alone: used on review cards and, collapsed, on every incident timeline report. #}
-{% macro review_actions(card, back, form=none) %}
+{# `groups` limits the sections: Simple mode's Review asks the signal and tree questions itself
+   and folds only grouping, place and sender under "More options". #}
+{% macro review_actions(card, back, form=none, groups=("grouping", "signals", "tree", "sender")) %}
   {% set r = card.report %}
   {% set base = "/reports/" ~ r.id ~ "/review/" %}
   {# After an action the page returns to this report (data-return-anchor) and confirms it (data-done). #}
   <div class="review-actions">
-    {% if r.status == "assessed" %}
+    {% if r.status == "assessed" and "grouping" in groups %}
     <details class="review-group"{{ _open(card, form, ("merge", "keep", "place"), card.grouping) }}>
       <summary>{{ "Grouping and place" if technical() else "Same flood as another report? Wrong barangay?" }}</summary>
       <div class="decision-forms">
@@ -71,7 +76,7 @@
       </div>
     </details>
     {% endif %}
-    {% if card.signals %}
+    {% if card.signals and "signals" in groups %}
     <details class="review-group"{{ _open(card, form, ("signal",), card.open_signals|length > 0) }}>
       <summary>{{ "Trust signals" if technical() else "Something to double-check" }}</summary>
       {% for key, s, verdict in card.signals %}
@@ -92,6 +97,8 @@
       {% endfor %}
     </details>
     {% endif %}
+    {# Simple mode never asks about a fallen tree nothing suggested; Technical mode always can. #}
+    {% if "tree" in groups and (technical() or card.tree_suggested) %}
     <details class="review-group"{{ _open(card, form, ("tree",), card.tree_suggested and card.tree_verdict is none) }}>
       <summary>Fallen tree{% if card.tree_verdict is not none %} ({{ "confirmed" if card.tree_verdict else "ruled out" }}){% elif card.tree_suggested %} (suggested, not confirmed){% endif %}</summary>
       <form method="post" action="{{ base }}tree" data-return-anchor="report-{{ r.id }}" data-done="Fallen tree answer recorded">
@@ -104,6 +111,8 @@
         </fieldset>
       </form>
     </details>
+    {% endif %}
+    {% if "sender" in groups %}
     <details class="review-group"{{ _open(card, form, ("block", "unblock")) }}>
       <summary>{% if technical() %}Reporter <code>{{ card.reporter }}</code>{% else %}The sender{% endif %}{% if card.blocked %} (blocked){% endif %}</summary>
       {% set action = "unblock" if card.blocked else "block" %}
@@ -115,6 +124,7 @@
         </fieldset>
       </form>
     </details>
+    {% endif %}
   </div>
 {% endmacro %}
 

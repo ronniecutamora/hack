@@ -417,6 +417,7 @@
     if (!region) return;
     if (busy.has(id)) { again.add(id); return; }
     if (document.hidden && !requested) { pending.add(id); return; }
+    if (region.dataset.liveMerge === "queue") { refreshQueue(region); return; }
     if (!requested && inUse(region)) { pending.add(id); showNotice(region); return; }
     pending.delete(id);
     busy.add(id);
@@ -568,25 +569,35 @@
   const SNACKBAR_MS = 6000;
   const SNACKBAR_ERROR_MS = 10000;
   const snack = document.querySelector("[data-snackbar]");
+  const snackAction = snack && snack.querySelector("[data-snackbar-action]");
   let snackTimer = null;
+  let snackRun = null;  // what the snackbar's action button does (Undo), while it shows
 
   function hideSnackbar() {
     clearTimeout(snackTimer);
+    snackRun = null;
+    if (snackAction) snackAction.hidden = true;
     if (!snack || !snack.classList.contains("is-open")) return;
     snack.classList.remove("is-open", "snackbar--error");
     // Emptied after it fades, so a screen reader never meets a stale message.
     snackTimer = setTimeout(() => { snack.querySelector("[data-snackbar-text]").textContent = ""; }, 200);
   }
 
-  function snackbar(text, tone) {
+  // `action` is {label, run}: one text button (M3 allows one), shown for as long as the message.
+  function snackbar(text, tone, action) {
     if (!snack || !text) return;
     clearTimeout(snackTimer);
     snack.classList.toggle("snackbar--error", tone === "error");
     snack.classList.add("is-open");
     snack.querySelector("[data-snackbar-text]").textContent = text;
+    snackRun = action ? action.run : null;
+    if (snackAction) { snackAction.hidden = !action; snackAction.textContent = action ? action.label : ""; }
     snackTimer = setTimeout(hideSnackbar, tone === "error" ? SNACKBAR_ERROR_MS : SNACKBAR_MS);
   }
-  document.addEventListener("click", (event) => { if (event.target.closest("[data-snackbar-close]")) hideSnackbar(); });
+  document.addEventListener("click", (event) => {
+    if (event.target.closest("[data-snackbar-close]")) hideSnackbar();
+    if (event.target.closest("[data-snackbar-action]") && snackRun) { const run = snackRun; hideSnackbar(); run(); }
+  });
 
   // ---------- Page navigation without reloads (htmx boost on <body>) ----------
   // Links and forms load the next page's #shell (navigation and content); the app bar, the live
@@ -751,6 +762,181 @@
       htmxPopstate.call(window, event);
     };
   });
+
+  // ---------- Review queue (Simple mode: app/templates/_queue.html) ----------
+  // One question at a time. An answer is a plain form; here it waits behind the snackbar's Undo
+  // for as long as the snackbar shows, then posts like the form would (same fields, same
+  // endpoint), and the next question is on screen at once. Leaving the page or answering the
+  // next question sends a waiting answer straight away. A live refresh never replaces the
+  // question being read: questions answered elsewhere drop out, new ones join the end with a
+  // quiet "2 new" chip.
+  const UNDO_MS = SNACKBAR_MS;
+  const answered = new Set();   // keys answered on this page: hidden even while a refresh lists them
+  let waiting = null;           // { form, item, body, timer }
+  let queueBusy = false;
+  const queueList = () => document.querySelector("[data-queue]");
+  const questions = () => {
+    const list = queueList();
+    return list ? Array.from(list.querySelectorAll(":scope > [data-q]")).filter((li) => !answered.has(li.dataset.key)) : [];
+  };
+  const onScreen = () => questions().find((li) => !li.hidden);
+
+  function syncQueue(focus) {
+    const list = queueList();
+    if (!list) return;
+    const left = questions();
+    let shown = onScreen();
+    list.querySelectorAll(":scope > [data-q]").forEach((li) => { if (li !== shown) li.hidden = true; });
+    if (!shown && left.length) { shown = left[0]; shown.hidden = false; }
+    const region = list.closest("[data-live]");
+    const empty = region.querySelector("[data-q-empty]");
+    if (empty) empty.hidden = left.length > 0;
+    const count = region.querySelector(".queue__count");
+    if (count) count.hidden = !left.length;
+    const pos = region.querySelector("[data-q-pos]"), total = region.querySelector("[data-q-total]");
+    if (pos) pos.textContent = String(left.indexOf(shown) + 1);
+    if (total) total.textContent = String(left.length);
+    const fresh = left.filter((li) => li.hasAttribute("data-q-new"));
+    const chip = region.querySelector("[data-q-new]");
+    if (chip) { chip.hidden = !fresh.length; chip.textContent = fresh.length + " new"; }
+    if (!shown) return;
+    if (shown.hasAttribute("data-q-new")) shown.removeAttribute("data-q-new");
+    const at = left.indexOf(shown);
+    const back = shown.querySelector('[data-q-go="prev"]'), skip = shown.querySelector('[data-q-go="next"]');
+    if (back) back.hidden = at === 0;
+    if (skip) skip.hidden = left.length < 2;
+    if (focus) {
+      const ask = shown.querySelector(".q__ask");
+      ask.setAttribute("tabindex", "-1");
+      ask.focus({ preventScroll: true });
+      const top = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--sticky-top")) || 0;
+      const box = region.getBoundingClientRect();
+      if (box.top < top) window.scrollBy(0, box.top - top);
+    }
+  }
+
+  function showQuestion(li) {
+    if (!li) { syncQueue(false); return; }
+    questions().forEach((el) => { el.hidden = el !== li; });
+    li.classList.remove("q--in"); void li.offsetWidth; li.classList.add("q--in");
+    syncQueue(true);
+    try { window.history.replaceState(window.history.state, "", "/review?at=" + encodeURIComponent(li.dataset.key)); } catch (e) { /* no history */ }
+  }
+
+  document.addEventListener("click", (event) => {
+    const go = event.target.closest && event.target.closest("[data-q-go]");
+    if (!go || !queueList()) return;
+    event.preventDefault();
+    const left = questions(), at = left.indexOf(onScreen());
+    showQuestion(go.dataset.qGo === "prev" ? left[Math.max(0, at - 1)] : left[(at + 1) % left.length]);
+  });
+
+  document.addEventListener("submit", (event) => {
+    const form = event.target;
+    if (!form.matches || !form.matches("[data-answer]") || !form.closest("[data-queue]")) return;
+    event.preventDefault();
+    sendWaiting();
+    const item = form.closest("[data-q]");
+    const left = questions(), at = left.indexOf(item);
+    answered.add(item.dataset.key);
+    waiting = { form, item, body: new URLSearchParams(new FormData(form)), timer: setTimeout(sendWaiting, UNDO_MS) };
+    showQuestion(left[at + 1] || left.find((li) => li !== item) || null);
+    snackbar(form.dataset.done || "Saved", "", { label: "Undo", run: undoAnswer });
+  });
+
+  function undoAnswer() {
+    if (!waiting) return;
+    clearTimeout(waiting.timer);
+    const item = waiting.item;
+    waiting = null;
+    answered.delete(item.dataset.key);
+    if (item.isConnected) showQuestion(item);
+    snackbar("Undone. Nothing was saved.");
+  }
+
+  function refused(html) {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const alert = doc.querySelector("#main [role=alert], #main .error");
+    return (alert && alert.textContent.trim()) || "The server did not save it.";
+  }
+
+  function sendWaiting() {
+    if (!waiting) return;
+    const w = waiting;
+    waiting = null;
+    clearTimeout(w.timer);
+    if (snackRun === undoAnswer) { snackRun = null; if (snackAction) snackAction.hidden = true; }
+    const key = w.item.dataset.key;
+    const failed = (message) => {
+      answered.delete(key);
+      if (w.item.isConnected) showQuestion(w.item);
+      snackbar("Not saved: " + message, "error");
+    };
+    fetch(w.form.action, { method: "POST", body: w.body, credentials: "same-origin", keepalive: true, headers: { Accept: "text/html" } })
+      .then((response) => response.text().then((html) => {
+        if (/\/login(\?|$)/.test(new URL(response.url, window.location.href).pathname + "?")) { signIn(); return; }
+        if (!response.ok) { failed(refused(html)); return; }
+        const fresh = new DOMParser().parseFromString(html, "text/html").getElementById("live-review");
+        const region = document.getElementById("live-review");
+        if (fresh && region) mergeQueue(region, fresh);
+      }))
+      .catch(() => failed("no connection. Check your signal; the question is back on screen."));
+  }
+  window.addEventListener("pagehide", sendWaiting);
+  document.addEventListener("visibilitychange", () => { if (document.hidden) sendWaiting(); });
+  document.addEventListener("htmx:beforeRequest", (event) => { if (event.detail.boosted) sendWaiting(); });
+
+  function mergeQueue(region, fresh) {
+    const mine = region.querySelector("[data-queue]"), theirs = fresh.querySelector("[data-queue]");
+    if (!mine || !theirs) {
+      // No question on screen here (or none left): the fresh copy is the page, unless the
+      // officer is typing in it (the initials).
+      if (!waiting && !inUse(region) && (!mine || !questions().length)) {
+        const node = document.importNode(fresh, true);
+        region.replaceWith(node);
+        if (window.htmx) window.htmx.process(node);
+        answered.forEach((key) => { if (!document.getElementById(key)) answered.delete(key); });
+        syncQueue(false);
+      }
+      return;
+    }
+    const listed = new Set(Array.from(theirs.children).map((li) => li.dataset.key));
+    const shown = onScreen();
+    Array.from(mine.children).forEach((li) => {
+      const keep = listed.has(li.dataset.key) || li === shown || (waiting && waiting.item === li);
+      if (!keep) { li.remove(); answered.delete(li.dataset.key); }
+    });
+    Array.from(theirs.children).forEach((li) => {
+      if (document.getElementById(li.dataset.key)) return;
+      const node = document.importNode(li, true);
+      node.hidden = true;
+      if (mine.children.length) node.setAttribute("data-q-new", "");
+      mine.append(node);
+      if (window.htmx) window.htmx.process(node);
+    });
+    syncQueue(false);
+    markUpdated();
+  }
+
+  function refreshQueue(region) {
+    if (queueBusy) return;
+    queueBusy = true;
+    fetch("/review", { cache: "no-store", credentials: "same-origin", headers: { "HX-Request": "true" } })
+      .then((response) => {
+        if (response.status === 401) { signIn(); return null; }
+        return response.ok ? response.text() : null;
+      })
+      .then((html) => {
+        if (!html) return;
+        const fresh = new DOMParser().parseFromString(html, "text/html").getElementById(region.id);
+        const now = document.getElementById(region.id);
+        if (fresh && now) mergeQueue(now, fresh);
+      })
+      .catch(() => { /* the next change tries again */ })
+      .finally(() => { queueBusy = false; });
+  }
+  document.addEventListener("ulat:page", () => syncQueue(false));
+  syncQueue(false);
 
   if (window.htmx) {
     const config = window.htmx.config;

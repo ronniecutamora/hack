@@ -16,7 +16,10 @@ photos and texts are personal data under RA 10173.
   local workflow and the tests). Anywhere else the app refuses to start without one.
 
 The initials are a convenience that prefills the review forms; with one shared passcode they are
-self-declared, like the typed initials they replace, not proof of who acted.
+self-declared, like the typed initials they replace, not proof of who acted. An officer who
+signed in without them is asked once on Review (`set_initials`): the session cookie is signed
+again with them and the same expiry. A localhost dev server without a login keeps them in a
+plain cookie instead (nothing to sign there, and nothing it grants).
 """
 
 import base64
@@ -36,10 +39,12 @@ from fastapi import Request
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 
 from app.config import Settings
+from app.review import OFFICER_MAX
 
 logger = logging.getLogger(__name__)
 
 SESSION_COOKIE = "ulat_session"
+DEV_OFFICER_COOKIE = "ulat_officer"  # the initials on a localhost dev server without a login
 LOGIN_PATH = "/login"
 # The only routes reachable without a session. The webhook checks Telegram's own secret header.
 PUBLIC_PATHS = frozenset({"/health", LOGIN_PATH, "/logout"})
@@ -103,11 +108,14 @@ class SessionSigner:
         self.ttl_s = ttl_s
         self._clock = clock
 
+    def now(self) -> int:
+        return int(self._clock())
+
     def _mac(self, payload: str) -> str:
         return _b64(hmac.new(self._key, payload.encode("ascii"), hashlib.sha256).digest())
 
-    def issue(self, officer: str) -> str:
-        expires = int(self._clock()) + self.ttl_s
+    def issue(self, officer: str, expires_at: int | None = None) -> str:
+        expires = expires_at or int(self._clock()) + self.ttl_s
         payload = _b64(json.dumps({"o": officer, "exp": expires}, separators=(",", ":")).encode())
         return f"{payload}.{self._mac(payload)}"
 
@@ -242,6 +250,32 @@ class OfficerAuth:
             samesite="lax",
         )
 
+    def set_initials(self, response: Response, request: Request, officer: str) -> None:
+        """Remember the officer's initials for the rest of this session (Review asks once)."""
+        session = self.session(request) if self.enabled else None
+        if session is not None:
+            response.set_cookie(
+                SESSION_COOKIE,
+                self.signer.issue(officer, session.expires_at),
+                max_age=max(1, session.expires_at - self.signer.now()),
+                path="/",
+                httponly=True,
+                secure=self.https(request),
+                samesite="lax",
+            )
+        elif not self.enabled:
+            response.set_cookie(
+                DEV_OFFICER_COOKIE, officer, path="/", httponly=True, samesite="lax"
+            )
+
+    def officer(self, request: Request, session: OfficerSession | None) -> str:
+        """The initials this request acts under: the session's, or the dev server's cookie."""
+        if session is not None:
+            return session.officer
+        if self.enabled:
+            return ""
+        return " ".join(request.cookies.get(DEV_OFFICER_COOKIE, "").split())[:OFFICER_MAX]
+
     def sign_out(self, response: Response, request: Request) -> None:
         response.delete_cookie(
             SESSION_COOKIE, path="/", httponly=True, secure=self.https(request), samesite="lax"
@@ -275,7 +309,7 @@ def install_login_gate(app, auth: OfficerAuth) -> None:
         request.state.officer_session = session
         if auth.enabled and session is None and not is_public(request.url.path):
             return auth.challenge(request)
-        token = current_officer.set(session.officer if session else "")
+        token = current_officer.set(auth.officer(request, session))
         try:
             return await call_next(request)
         finally:

@@ -1,20 +1,48 @@
 {% extends "base.html" %}
 {% from "_review.html" import review_card %}
+{% from "_queue.html" import question_item, initials_prompt %}
 {% from "_help.html" import hint %}
-{% block title %}Needs review{% endblock %}
+{% from "_icons.html" import icon %}
+{% block title %}{{ "Needs review" if technical() else "Review" }}{% endblock %}
 {% block content %}
+{% if technical() %}
   <header>
     <h1>Needs review</h1>
-    {% if technical() %}<p class="muted">What the agent could not settle: uncertain or failed duplicate checks, unknown places, trust signals and fallen trees. Every action is recorded with your initials, and an automatic re-check never undoes it.</p>
-    {% else %}{{ hint("Ulat could not settle these alone. Open a card, choose an answer and save it. Your initials are recorded, and Ulat never undoes your choice.") }}{% endif %}
+    <p class="muted">What the agent could not settle: uncertain or failed duplicate checks, unknown places, trust signals and fallen trees. Every action is recorded with your initials, and an automatic re-check never undoes it.</p>
   </header>
   {% if done %}<p class="banner ok" role="status" data-flash>{{ done }}</p>{% endif %}
   <div id="live-review" data-live="reports incidents">
     {% if not cards %}
-      <p class="empty">{{ "Nothing waits for review. New uncertain groupings, trust signals and fallen trees appear here as they arrive." if technical() else "Nothing waits for your check. When Ulat is unsure about a report, it shows up here." }}</p>
+      <p class="empty">Nothing waits for review. New uncertain groupings, trust signals and fallen trees appear here as they arrive.</p>
     {% else %}
-      <p><strong data-kpi="review_total">{{ cards|length }}</strong> report{{ "s" if cards|length != 1 }} waiting{% set grouping = cards|selectattr("grouping")|list|length %}{% if grouping %}, {{ grouping }} {{ "for grouping (their figures are pending, not in the totals)" if technical() else "may repeat another report (they are not counted until you decide)" }}{% endif %}.</p>
+      <p><strong data-kpi="review_total">{{ cards|length }}</strong> report{{ "s" if cards|length != 1 }} waiting{% set grouping = cards|selectattr("grouping")|list|length %}{% if grouping %}, {{ grouping }} for grouping (their figures are pending, not in the totals){% endif %}.</p>
       {% for card in cards %}{{ review_card(card, "/review", review_form) }}{% endfor %}
     {% endif %}
   </div>
+{% else %}
+  {# One live region; app.js merges a refresh into it (new questions join the end) instead of
+     replacing the question being read. #}
+  <div id="live-review" class="queue-page" data-live="reports incidents" data-live-merge="queue">
+    <header class="queue__head">
+      <h1>Review</h1>
+      {% if questions and not ask_initials %}
+      <p class="queue__count" aria-live="polite"><span data-q-pos>{{ current + 1 }}</span> of <span data-q-total data-kpi="review_total">{{ questions|length }}</span></p>
+      <span class="chip info queue__new" data-q-new hidden></span>
+      {% endif %}
+    </header>
+    {% if done %}<p class="banner ok" role="status" data-flash>{{ done }}</p>{% endif %}
+    {% if not questions %}
+      <div class="empty empty--done" data-q-empty>{{ icon("task_alt") }}<p><strong>All done.</strong> Nothing waits for you.</p><p><a class="button" href="/">Back to Home</a></p></div>
+    {% elif ask_initials %}
+      {{ initials_prompt(initials_error) }}
+      <p class="muted">{{ questions|length }} quick question{{ "s" if questions|length != 1 }} wait{{ "s" if questions|length == 1 }} for you.</p>
+    {% else %}
+      <ol class="queue" data-queue aria-label="Questions, one at a time">
+        {% for q in questions %}{{ question_item(q, loop.index0, questions, current, photos, ago, review_form) }}{% endfor %}
+      </ol>
+      <div class="empty empty--done" data-q-empty hidden>{{ icon("task_alt") }}<p><strong>All done.</strong> Nothing waits for you.</p><p><a class="button" href="/">Back to Home</a></p></div>
+      <p class="queue__who muted">Answering as {{ current_officer() }} · <a href="/review?initials=change">Not you?</a></p>
+    {% endif %}
+  </div>
+{% endif %}
 {% endblock %}

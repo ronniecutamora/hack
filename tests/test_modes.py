@@ -93,6 +93,7 @@ def seed(client, settings, judge) -> dict[str, int]:
     )
     assert uncertain.grouping_needs_officer
     traced = asyncio.run(assessed(settings, engine, user=222))
+    client.post("/initials", data={"officer": "JDC"})  # Simple mode's Review asks once
     return {"incident": incident, "uncertain": uncertain.id, "traced": traced}
 
 
@@ -159,7 +160,10 @@ def test_technical_pages_still_show_the_trace_models_costs_and_ids(client, setti
     assert 'class="accuracy' in client.get("/accuracy").text
 
 
-def test_both_modes_offer_exactly_the_same_officer_actions(settings, clock):
+def test_both_modes_offer_the_same_officer_actions(settings, clock):
+    """Simple mode words and folds the actions differently (Review asks one question with
+    hidden fields; the initials are asked once), but every action is still there, posting to
+    the same place, except a fallen tree nothing suggested: Simple mode never asks that."""
     seen = {}
     for mode in ("simple", "technical"):
         own = settings.model_copy(update={"data_dir": settings.data_dir / mode})
@@ -169,11 +173,14 @@ def test_both_modes_offer_exactly_the_same_officer_actions(settings, clock):
             seen[mode] = {p: forms(client.get(p).text) for p in paths if p != "/accuracy"}
     assert seen["simple"].keys() == seen["technical"].keys()
     for path in seen["simple"]:
-        # The first-run guide is Simple mode's own; everything else is identical.
+        # The first-run guide is Simple mode's own.
         simple, technical = (
-            {f for f in seen[mode][path] if f[0] != "/help/guide"} for mode in seen
+            {a for a, _ in seen[mode][path] if a != "/help/guide"} for mode in seen
         )
-        assert simple == technical, path
+        assert simple == {a for a in technical if not a.endswith("/review/tree")}, path
+        for action, fields in seen["simple"][path]:
+            if "/review/" in action and fields:  # (a merge with no incident to pick has none)
+                assert "officer" in fields, (path, action)  # the audit still says who
     assert any(action.endswith("/review/keep") for action, _ in seen["simple"]["/review"])
 
 
@@ -182,12 +189,12 @@ def test_home_lists_what_needs_the_officer_most_urgent_first(client, settings, j
     page = client.get("/").text
     titles = re.findall(r'<h2 class="todo__title">(.*?)</h2>', page)
     assert titles[0] == "De La Paz fisheries: Notice of Loss"  # due in 18 hours: first
-    assert titles[1] == "1 report needs your check"
+    assert titles[1] == "1 quick question about reports"
     assert "barangays have new reports for the RDANA form" in titles[2] or "RDANA" in titles[2]
     assert "due in 18h 0m" in page
     assert re.search(r'href="/drafts#nol-fisheries-\d+">Make the draft</a>', page)
-    assert 'href="/review">Review</a>' in page
-    assert "May be the same flood as another report" in page
+    assert 'href="/review">Answer</a>' in page
+    assert "1 may be the same flood as another report" in page
 
     client.post(
         "/drafts/notice-of-loss", data={"commodity": "fisheries", "incident_id": ids["incident"]}
@@ -230,7 +237,7 @@ def test_homes_heading_is_redrawn_with_the_live_to_do_list(client, settings):
     report = add_fallen_tree(settings)  # the bot, in another process
     region = live_region(client.get("/", headers=LIVE_REFRESH).text, "live-todo")
     assert home_heading(region) == "What needs you"
-    assert "Most urgent first" in region and "1 report needs your check" in region
+    assert "Most urgent first" in region and "1 quick question about reports" in region
     assert "All caught up" not in region and "Nothing waits for you" not in region
 
     client.post(f"/reports/{report}/review/tree", data={"verdict": "absent", "officer": "JDC"})

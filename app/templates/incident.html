@@ -32,7 +32,15 @@
   </ul>
   <p class="muted">{{ incident.latest_facts.get("caveat", "Totals may double-count reports; officer verification required.") }}</p>
   {% set back = "/incidents/" ~ incident.id %}
-  {% if review %}
+  {% if review and not technical() %}
+    {# Simple mode: the questions are answered on Review, one at a time, not here as forms. #}
+    {% set asked = plan_questions(review) %}
+    <section class="card review-panel" id="review" aria-labelledby="review-title">
+      <h2 id="review-title">Needs your check</h2>
+      <p>{{ asked|length }} quick question{{ "s" if asked|length != 1 }} about reports in this incident.</p>
+      <p><a class="button" href="/review?at={{ asked[0].key }}">Answer {{ "it" if asked|length == 1 else "them" }}</a></p>
+    </section>
+  {% elif review %}
     <section class="review-panel" id="review" aria-labelledby="review-title">
       <h2 id="review-title">{{ "Officer review" if technical() else "Needs your check" }} <span class="muted">({{ review|length }} report{{ "s" if review|length != 1 }})</span></h2>
       <p class="muted">{{ "The agent could not settle these." if technical() else "Ulat could not settle these alone." }} Every action is recorded with your initials, and a later automatic re-check never undoes it.</p>
@@ -61,7 +69,8 @@
       {% if technical() %}{{ agent_trace(item.trace, r.id) }}{% endif %}
       {% if r.grouping_error %}<p class="error">{{ r.grouping_error if technical() else "Ulat could not check whether this report repeats another one." }}</p>{% endif %}
       {% if item.card %}
-        {% if item.card.needs_review %}<p><a href="#review-{{ r.id }}">{% if technical() %}Waiting for officer review: {{ item.card.reasons|join(", ") }}{% else %}Needs your check: {{ item.card.reasons|map("plain_reason")|join(", ")|lower }}{% endif %}</a></p>
+        {% if item.card.needs_review and not technical() %}<p><a href="/review?at={{ plan_questions([item.card])[0].key }}">Needs your check: answer on Review</a></p>
+        {% elif item.card.needs_review %}<p><a href="#review-{{ r.id }}">{% if technical() %}Waiting for officer review: {{ item.card.reasons|join(", ") }}{% else %}Needs your check: {{ item.card.reasons|map("plain_reason")|join(", ")|lower }}{% endif %}</a></p>
         {% else %}<details class="officer-actions"{% if review_form and review_form.report_id == r.id %} open{% endif %}><summary>{{ "Officer actions for report #" ~ r.id if technical() else "Change the grouping, the place or the sender" }}</summary>{{ review_actions(item.card, back, review_form) }}</details>{% endif %}
       {% endif %}
     </li>
