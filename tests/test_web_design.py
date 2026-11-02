@@ -1,6 +1,7 @@
 """Dashboard layout: app bar, navigation, the page shell, static assets and print rules."""
 
 import re
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -117,6 +118,38 @@ def test_fonts_and_icons_are_self_hosted_with_their_licenses(client):
         "/static/vendor/material-symbols/LICENSE",
     ):
         assert client.get(path).status_code == 200, path
+
+
+APP = Path(__file__).resolve().parent.parent / "app"
+
+
+def test_an_element_marked_hidden_stays_hidden_where_its_class_sets_display():
+    """A class rule with `display: flex` beats the browser's own [hidden] rule, so an element
+    that starts hidden (Review's "All done" under a waiting question) needs a `[hidden]` rule."""
+    css = re.sub(r"/\*.*?\*/", "", (APP / "static" / "css" / "app.css").read_text(), flags=re.S)
+    shown, kept_hidden = set(), set()
+    for selectors, body in re.findall(r"([^{}]+)\{([^{}]*)\}", css):
+        for selector in (s.strip() for s in selectors.split(",")):
+            if (m := re.fullmatch(r"\.([\w-]+)\[hidden\]", selector)) and "display: none" in body:
+                kept_hidden.add(m.group(1))
+            elif (m := re.fullmatch(r"\.([\w-]+)", selector)) and re.search(
+                r"display: (?!none)", body
+            ):
+                shown.add(m.group(1))
+    leaks = [
+        f"{template.name}: {tag}"
+        for template in sorted((APP / "templates").rglob("*.html"))
+        for tag in re.findall(r"<[a-z][^<>]*>", template.read_text(encoding="utf-8"))
+        if re.search(r"\shidden(?=[\s>])", tag)
+        and (
+            classes := set(re.search(r'class="([^"]*)"', tag)[1].split())
+            if 'class="' in tag
+            else set()
+        )
+        & shown
+        and not classes & kept_hidden
+    ]
+    assert leaks == [], leaks
 
 
 def test_print_rules_hide_the_dashboard_chrome(client):

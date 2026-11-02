@@ -525,6 +525,7 @@ button:disabled, button[aria-busy="true"] { cursor: progress; opacity: .62; }
   .todo__action { grid-column: 1 / -1; width: 100%; margin-top: var(--space-2); }
 }
 .empty--done { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); }
+.empty--done[hidden] { display: none; }  /* the queue's "All done" until the last answer */
 .empty--done .icon { width: 2.5rem; height: 2.5rem; color: var(--md-ext-color-success); }
 .empty--done p { margin: 0; max-width: 32rem; }
 .quiet-line { margin: var(--space-4) 0 0; }
