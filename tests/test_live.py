@@ -6,6 +6,7 @@ from other connections, not in-process signals.
 
 import asyncio
 import json
+import re
 import time
 
 import pytest
@@ -15,13 +16,34 @@ from sqlmodel import Session
 from app.db import init_db, make_engine
 from app.live import TOPICS, ChangeHub, event_stream
 from app.main import create_app
-from app.models import Draft, Report, Reporter
+from app.models import Assessment, Draft, Report, Reporter
+from tests.test_assessment import facts
+from tests.test_rdana import AT
 
 SECRET = "Baha sa bahay ni Aling SECRET-NAME-42"
 WAIT_S = 5.0
+# What the page's script sends when a live region refreshes itself (htmx.ajax).
+LIVE_REFRESH = {"HX-Request": "true"}
 
 
-def add_report(settings, text=SECRET) -> int:
+def live_region(page: str, region_id: str) -> str:
+    """The element with this id, start tag to matching end tag: what a live refresh swaps in."""
+    start = re.search(rf'<([a-z][a-z0-9]*)\b[^>]*\bid="{re.escape(region_id)}"', page)
+    assert start, f"no #{region_id} on the page"
+    tag, depth = start.group(1), 0
+    for match in re.compile(rf"<(/?){tag}\b[^>]*>").finditer(page, start.start()):
+        depth += -1 if match.group(1) else 1
+        if depth == 0:
+            return page[start.start() : match.end()]
+    raise AssertionError(f"#{region_id} is never closed")
+
+
+def outside(page: str, region_id: str) -> str:
+    """The page with that region cut out: what a live refresh of it never changes."""
+    return page.replace(live_region(page, region_id), "")
+
+
+def add_report(settings, text=SECRET, **fields) -> int:
     """Commit a report through a new engine (another connection, like the bot's)."""
     engine = make_engine(settings)
     try:
@@ -29,12 +51,32 @@ def add_report(settings, text=SECRET) -> int:
             reporter = Reporter(pseudonym="f" * 64)
             session.add(reporter)
             session.flush()
-            report = Report(reporter_id=reporter.id, channel="telegram", text=text)
+            report = Report(reporter_id=reporter.id, channel="telegram", text=text, **fields)
             session.add(report)
             session.commit()
             return report.id
     finally:
         engine.dispose()
+
+
+def add_fallen_tree(settings, at=AT) -> int:
+    """Commit an assessed report of a fallen tree (always one for the officer to confirm), as
+    the bot would, from another connection; received at `at`, so not news to a later clock."""
+    report_id = add_report(settings, text="May natumbang puno sa kalsada", received_at=at)
+    engine = make_engine(settings)
+    try:
+        with Session(engine) as session:
+            session.add(
+                Assessment(
+                    report_id=report_id,
+                    llm_model="fake-facts",
+                    facts=facts(hazards=["fallen_tree"]),
+                )
+            )
+            session.commit()
+    finally:
+        engine.dispose()
+    return report_id
 
 
 @pytest.fixture

@@ -9,8 +9,11 @@
 {% block title %}{{ "Overview" if technical() else "Home" }}{% endblock %}
 {% block content %}
 {% if not technical() %}
+{# One live region from the heading down: the heading and hint say what the to-do list below
+   shows, so a live update redraws them together from this one template. #}
+<div id="live-todo" data-live="reports incidents drafts">
   <header>
-    <h1>{{ "What needs you" if todo else "All caught up" }}</h1>
+    <h1 id="home-title">{{ "What needs you" if todo else "All caught up" }}</h1>
     {{ hint("Most urgent first. Tap the button on a card to do it." if todo else "Nothing waits for you. New reports from the Telegram bot show up here.") }}
   </header>
   {% if guide %}
@@ -25,38 +28,40 @@
     {{ guide_steps() }}
   </section>
   {% endif %}
-  <div id="live-todo" data-live="reports incidents drafts">
-    {% if todo %}
-      {{ todo_list(todo) }}
-    {% else %}
-      <div class="empty empty--done">{{ icon("task_alt") }}<p><strong>All caught up.</strong> No report waits for your check and no form waits for your approval.</p></div>
-      {% if recent_incidents %}
-      <section aria-labelledby="recent-title">
-        <h2 id="recent-title">Latest incidents</h2>
-        {{ whats_this("incident") }}
-        <ul class="feed">
-        {% for i in recent_incidents %}
-          <li><div class="feed__head"><a href="/incidents/{{ i.id }}"><strong>{{ i.title }}</strong></a><span class="muted">{{ i.status|plain_status }}</span></div>
-            <div class="feed__meta">{{ i.latest_facts.get("report_count", 0) }} report{{ 's' if i.latest_facts.get("report_count", 0) != 1 }} · last one {{ i.last_seen|manila_time }}</div></li>
-        {% endfor %}
-        </ul>
-      </section>
-      {% endif %}
+  {% if todo %}
+    {{ todo_list(todo) }}
+  {% else %}
+    <div class="empty empty--done">{{ icon("task_alt") }}<p><strong>All caught up.</strong> No report waits for your check and no form waits for your approval.</p></div>
+    {% if recent_incidents %}
+    <section aria-labelledby="recent-title">
+      <h2 id="recent-title">Latest incidents</h2>
+      {{ whats_this("incident") }}
+      <ul class="feed">
+      {% for i in recent_incidents %}
+        <li><div class="feed__head"><a href="/incidents/{{ i.id }}"><strong>{{ i.title }}</strong></a><span class="muted">{{ i.status|plain_status }}</span></div>
+          <div class="feed__meta">{{ i.latest_facts.get("report_count", 0) }} report{{ 's' if i.latest_facts.get("report_count", 0) != 1 }} · last one {{ i.last_seen|manila_time }}</div></li>
+      {% endfor %}
+      </ul>
+    </section>
     {% endif %}
-    {% if not_reports %}<p class="muted quiet-line">{{ not_reports }} message{{ "s" if not_reports != 1 }} set aside as not reports (greetings, jokes, unrelated chat). <a href="/reports/set-aside">See them</a></p>{% endif %}
-  </div>
+  {% endif %}
+  {% if not_reports %}<p class="muted quiet-line">{{ not_reports }} message{{ "s" if not_reports != 1 }} set aside as not reports (greetings, jokes, unrelated chat). <a href="/reports/set-aside">See them</a></p>{% endif %}
+</div>
 {% else %}
   <header>
     <h1>Overview</h1>
     <p class="muted">Biñan City · Philippine time (GMT+8) · reported figures for the officer to verify · <a href="/accuracy">How accurate is the agent?</a></p>
   </header>
 
+  {# Always on the page, empty or not, so to-dos that arrive later appear without a reload. #}
+  <div id="live-todo" data-live="reports incidents drafts">
   {% if todo %}
-  <section id="live-todo" data-live="reports incidents drafts" aria-labelledby="todo-title">
+  <section aria-labelledby="todo-title">
     <h2 id="todo-title">What needs you <span class="muted">({{ todo|length }})</span></h2>
     {{ todo_list(todo) }}
   </section>
   {% endif %}
+  </div>
 
   <div id="live-kpis" data-live="reports incidents drafts spend">
   <ul class="kpis" aria-label="Key figures">

@@ -158,9 +158,27 @@
       if (fieldChanged(f)) fields.set(fieldKey(f), f.type === "checkbox" || f.type === "radio" ? f.checked : f.value);
     });
     const active = document.activeElement;
-    const focus = active && region.contains(active) && active !== region
-      ? (active.id ? "#" + active.id : active.name ? fieldKey(active) : "region") : null;
+    const focus = active && region.contains(active) && active !== region ? focusKey(region, active) : null;
     return { anchor, openDetails, keys, fields, focus };
+  }
+
+  // Where focus was, in terms the fresh copy also has: an id, a field, else the element's tag and
+  // position (a page heading the navigation focused), else the region itself.
+  function focusKey(region, el) {
+    if (el.id) return "#" + el.id;
+    if (el.name) return fieldKey(el);
+    const index = Array.from(region.querySelectorAll(el.tagName)).indexOf(el);
+    return index >= 0 ? "@" + el.tagName + ":" + index : "region";
+  }
+
+  function findFocus(region, key) {
+    if (key === "region") return region;
+    if (key.startsWith("#")) return document.getElementById(key.slice(1));
+    if (key.startsWith("@")) {
+      const [tag, index] = key.slice(1).split(":");
+      return region.querySelectorAll(tag)[Number(index)];
+    }
+    return Array.from(region.querySelectorAll("input, textarea, select")).find((f) => fieldKey(f) === key);
   }
 
   function detailsKey(details) {
@@ -185,10 +203,11 @@
       if (details) details.open = true;
     });
     if (before.focus) {
-      const target = before.focus === "region" ? region : before.focus.startsWith("#")
-        ? document.getElementById(before.focus.slice(1))
-        : Array.from(region.querySelectorAll("input, textarea, select")).find((f) => fieldKey(f) === before.focus);
-      (target && region.contains(target) ? target : region).focus({ preventScroll: true });
+      const found = findFocus(region, before.focus);
+      const target = found && region.contains(found) ? found : region;
+      // A heading is focusable only through the tabindex the old copy was given.
+      if (target.tabIndex < 0 && !target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
+      target.focus({ preventScroll: true });
     }
     if (before.anchor) {
       const el = document.getElementById(before.anchor.id);

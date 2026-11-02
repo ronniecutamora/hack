@@ -19,6 +19,7 @@ from app.modes import GLOSSARY, GUIDE_COOKIE, MODE_COOKIE, plain_reason, resolve
 from app.review import queue
 from tests.test_incidents import UNSURE, FakeJudge
 from tests.test_incidents import add_report as add_grouped_report
+from tests.test_live import LIVE_REFRESH, add_fallen_tree, live_region, outside
 from tests.test_nol import AT, Clock, add_photo, fisherfolk_incident
 from tests.test_rdana import SummaryLLM, cite_all
 from tests.test_trace_web import assessed
@@ -117,7 +118,7 @@ def pages(client, ids) -> list[str]:
 
 
 def test_simple_is_the_default_and_a_mode_link_is_remembered_by_the_browser(client):
-    assert "<h1>All caught up</h1>" in client.get("/").text
+    assert '<h1 id="home-title">All caught up</h1>' in client.get("/").text
     switched = client.get("/reports?around=5&mode=technical", follow_redirects=False)
     assert switched.status_code == 303
     assert switched.headers["location"] == "/reports?around=5"
@@ -126,7 +127,7 @@ def test_simple_is_the_default_and_a_mode_link_is_remembered_by_the_browser(clie
     assert "<h1>Overview</h1>" in client.get("/").text  # the cookie now says Technical
     assert "<h1>Overview</h1>" in client.get("/?mode=nonsense").text  # unknown values ignored
     client.get("/?mode=simple")
-    assert "<h1>All caught up</h1>" in client.get("/").text
+    assert '<h1 id="home-title">All caught up</h1>' in client.get("/").text
 
 
 def test_the_configured_default_applies_to_a_browser_without_a_choice(settings, clock, judge):
@@ -210,6 +211,41 @@ def test_home_says_all_caught_up_and_counts_messages_set_aside(client, settings)
     page = client.get("/").text
     assert "1 message set aside as not reports" in page
     assert '<a href="/reports/set-aside">See them</a>' in page
+
+
+def home_heading(page: str) -> str:
+    """Home's heading as it reads, taken from inside the to-do list's live region."""
+    header = live_region(live_region(page, "live-todo"), "home-title")
+    return visible_text("<title></title><body>" + header).strip()
+
+
+def test_homes_heading_is_redrawn_with_the_live_to_do_list(client, settings):
+    """Opened with nothing to do, Home must not keep saying "All caught up" above to-dos that
+    arrive through a live update, nor the reverse: the heading lives in the same live region."""
+    page = client.get("/").text
+    assert home_heading(page) == "All caught up"
+    assert "<h1" not in outside(page, "live-todo")  # no second copy the refresh would miss
+    assert "Nothing waits for you" in live_region(page, "live-todo")
+
+    report = add_fallen_tree(settings)  # the bot, in another process
+    region = live_region(client.get("/", headers=LIVE_REFRESH).text, "live-todo")
+    assert home_heading(region) == "What needs you"
+    assert "Most urgent first" in region and "1 report needs your check" in region
+    assert "All caught up" not in region and "Nothing waits for you" not in region
+
+    client.post(f"/reports/{report}/review/tree", data={"verdict": "absent", "officer": "JDC"})
+    region = live_region(client.get("/", headers=LIVE_REFRESH).text, "live-todo")
+    assert home_heading(region) == "All caught up"
+    assert "Nothing waits for you" in region and "What needs you" not in region
+
+
+def test_technical_overview_keeps_an_empty_to_do_region_for_live_updates(client, settings):
+    client.get("/?mode=technical")
+    region = live_region(client.get("/").text, "live-todo")
+    assert 'data-live="reports incidents drafts"' in region and "What needs you" not in region
+    add_fallen_tree(settings)
+    region = live_region(client.get("/", headers=LIVE_REFRESH).text, "live-todo")
+    assert "What needs you" in region and "1 report needs your check" in region
 
 
 def test_the_first_run_guide_hides_for_this_browser_and_comes_back_from_help(client):
