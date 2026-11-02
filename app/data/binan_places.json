@@ -1,0 +1,5139 @@
+{
+ "source": "OpenStreetMap contributors, via the Overpass API (overpass-api.de)",
+ "license": "ODbL 1.0 (https://opendatacommons.org/licenses/odbl/1-0/); © OpenStreetMap contributors (https://www.openstreetmap.org/copyright)",
+ "osm_data_as_of": "2026-11-02T13:06:08Z",
+ "built_by": "uv run python -m scripts.build_places",
+ "query": "[out:json][timeout:180];\n(\n  way[\"highway\"][\"name\"](14.248878,121.033147,14.360836,121.099892);\n  nwr[\"place\"~\"^(neighbourhood|quarter|suburb|hamlet|isolated_dwelling|village)$\"][\"name\"](14.248878,121.033147,14.360836,121.099892);\n  nwr[\"landuse\"=\"residential\"][\"name\"](14.248878,121.033147,14.360836,121.099892);\n  nwr[\"amenity\"~\"^(marketplace|school|college|university|place_of_worship|hospital|townhall|community_centre)$\"][\"name\"](14.248878,121.033147,14.360836,121.099892);\n);\nout tags geom;",
+ "filter": "inside a Biñan barangay polygon (app.geo); dropped when no word is distinctive (generic place words, numbers, initials, barangay names and the 210773 lowercase words of words are not)",
+ "count": 560,
+ "counts": {
+  "street": 453,
+  "area": 51,
+  "landmark": 56
+ },
+ "places": [
+  {
+   "name": "Cavite–Laguna Expressway",
+   "kind": "street",
+   "barangays": [
+    "Biñan",
+    "Bungahan",
+    "Loma",
+    "Malamig",
+    "Timbao"
+   ],
+   "features": 54,
+   "length_m": 12123
+  },
+  {
+   "name": "South Luzon Expressway",
+   "kind": "street",
+   "barangays": [
+    "Bungahan",
+    "Ganado",
+    "Mamplasan",
+    "San Francisco",
+    "Santo Tomas",
+    "Soro-soro"
+   ],
+   "features": 37,
+   "length_m": 11154
+  },
+  {
+   "name": "Laguna Boulevard",
+   "kind": "street",
+   "barangays": [
+    "Biñan",
+    "Bungahan",
+    "Loma",
+    "Malamig",
+    "Timbao"
+   ],
+   "features": 30,
+   "length_m": 10891
+  },
+  {
+   "name": "Greenfield Parkway",
+   "kind": "street",
+   "barangays": [
+    "Bungahan",
+    "Loma",
+    "Mamplasan",
+    "Zapote"
+   ],
+   "features": 51,
+   "length_m": 7658
+  },
+  {
+   "name": "Cecilia Araneta Parkway",
+   "kind": "street",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 10,
+   "length_m": 5040
+  },
+  {
+   "name": "Carmona - Timbao Road",
+   "kind": "street",
+   "barangays": [
+    "Biñan",
+    "Langkiwa",
+    "Santo Tomas",
+    "Timbao"
+   ],
+   "features": 11,
+   "length_m": 4286
+  },
+  {
+   "name": "LIIP Avenue",
+   "kind": "street",
+   "barangays": [
+    "Bungahan",
+    "Ganado",
+    "Mamplasan"
+   ],
+   "features": 3,
+   "length_m": 2917
+  },
+  {
+   "name": "Ecocentrum Avenue",
+   "kind": "street",
+   "barangays": [
+    "San Francisco",
+    "Soro-soro"
+   ],
+   "features": 14,
+   "length_m": 2450
+  },
+  {
+   "name": "General Malvar Street",
+   "kind": "street",
+   "barangays": [
+    "Poblacion",
+    "San Antonio",
+    "San Vicente",
+    "Santo Domingo",
+    "Tubigan"
+   ],
+   "features": 9,
+   "length_m": 2184
+  },
+  {
+   "name": "Biñan - Santa Rosa Access Road",
+   "kind": "street",
+   "barangays": [
+    "Mamplasan",
+    "Zapote"
+   ],
+   "features": 8,
+   "length_m": 2097
+  },
+  {
+   "name": "Carmona-Biñan Diversion Road",
+   "kind": "street",
+   "barangays": [
+    "Timbao"
+   ],
+   "features": 4,
+   "length_m": 2066
+  },
+  {
+   "name": "Broadfield Boulevard",
+   "kind": "street",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 2,
+   "length_m": 2044
+  },
+  {
+   "name": "Southwoods Avenue",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 25,
+   "length_m": 2025
+  },
+  {
+   "name": "Pedro Paterno Street",
+   "kind": "street",
+   "barangays": [
+    "De La Paz",
+    "Poblacion",
+    "San Jose"
+   ],
+   "features": 7,
+   "length_m": 1920
+  },
+  {
+   "name": "Pedro Escueta Street",
+   "kind": "street",
+   "barangays": [
+    "Casile",
+    "Malaban",
+    "San Antonio"
+   ],
+   "features": 5,
+   "length_m": 1867
+  },
+  {
+   "name": "Amsterdam Street",
+   "kind": "street",
+   "barangays": [
+    "Langkiwa",
+    "San Francisco",
+    "Santo Tomas"
+   ],
+   "features": 7,
+   "length_m": 1658
+  },
+  {
+   "name": "Ilaya Road",
+   "kind": "street",
+   "barangays": [
+    "Malaban"
+   ],
+   "features": 1,
+   "length_m": 1658
+  },
+  {
+   "name": "Doña Justina Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco",
+    "Soro-soro",
+    "Tubigan"
+   ],
+   "features": 7,
+   "length_m": 1606
+  },
+  {
+   "name": "A. Bonifacio Street",
+   "kind": "street",
+   "barangays": [
+    "Canlalay",
+    "Poblacion",
+    "San Antonio",
+    "San Jose"
+   ],
+   "features": 9,
+   "length_m": 1440
+  },
+  {
+   "name": "J. Gonzales Street",
+   "kind": "street",
+   "barangays": [
+    "Poblacion",
+    "San Vicente"
+   ],
+   "features": 3,
+   "length_m": 1434
+  },
+  {
+   "name": "Laguna Bel Air Drive",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 6,
+   "length_m": 1327
+  },
+  {
+   "name": "Washington Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 5,
+   "length_m": 1301
+  },
+  {
+   "name": "Doctor A. Gonzales Street",
+   "kind": "street",
+   "barangays": [
+    "San Jose",
+    "San Vicente"
+   ],
+   "features": 5,
+   "length_m": 1233
+  },
+  {
+   "name": "Juan Luna Street",
+   "kind": "street",
+   "barangays": [
+    "De La Paz"
+   ],
+   "features": 3,
+   "length_m": 1199
+  },
+  {
+   "name": "Sierra Madre Street",
+   "kind": "street",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 4,
+   "length_m": 1168
+  },
+  {
+   "name": "Camino Real Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 6,
+   "length_m": 1160
+  },
+  {
+   "name": "Tagbilaran Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 4,
+   "length_m": 1088
+  },
+  {
+   "name": "Shell SLEX Northbound",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 1065
+  },
+  {
+   "name": "Laguna Boulevard Service Road",
+   "kind": "street",
+   "barangays": [
+    "Loma",
+    "Timbao"
+   ],
+   "features": 4,
+   "length_m": 1033
+  },
+  {
+   "name": "M. Manabat Street",
+   "kind": "street",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": 1014
+  },
+  {
+   "name": "Magallanes Avenue",
+   "kind": "street",
+   "barangays": [
+    "Timbao"
+   ],
+   "features": 2,
+   "length_m": 967
+  },
+  {
+   "name": "Ilaya Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco",
+    "Soro-soro"
+   ],
+   "features": 1,
+   "length_m": 961
+  },
+  {
+   "name": "Macaria Drive",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 940
+  },
+  {
+   "name": "Madrid Avenue",
+   "kind": "street",
+   "barangays": [
+    "Timbao"
+   ],
+   "features": 1,
+   "length_m": 936
+  },
+  {
+   "name": "Paseo de Manila",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 2,
+   "length_m": 908
+  },
+  {
+   "name": "Albania Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 2,
+   "length_m": 907
+  },
+  {
+   "name": "Caltex SLEX Southbound",
+   "kind": "street",
+   "barangays": [
+    "Mamplasan"
+   ],
+   "features": 1,
+   "length_m": 898
+  },
+  {
+   "name": "Padre Burgos Street",
+   "kind": "street",
+   "barangays": [
+    "San Vicente",
+    "Santo Domingo"
+   ],
+   "features": 4,
+   "length_m": 874
+  },
+  {
+   "name": "South Luzon Expressway Service Road",
+   "kind": "street",
+   "barangays": [
+    "Bungahan",
+    "Santo Tomas"
+   ],
+   "features": 5,
+   "length_m": 868
+  },
+  {
+   "name": "CnB",
+   "kind": "street",
+   "barangays": [
+    "Mamplasan"
+   ],
+   "features": 1,
+   "length_m": 821
+  },
+  {
+   "name": "Iligan Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 8,
+   "length_m": 817
+  },
+  {
+   "name": "General Capinpin Street",
+   "kind": "street",
+   "barangays": [
+    "Poblacion",
+    "San Vicente"
+   ],
+   "features": 4,
+   "length_m": 812
+  },
+  {
+   "name": "Napoli Street",
+   "kind": "street",
+   "barangays": [
+    "Platero"
+   ],
+   "features": 2,
+   "length_m": 754
+  },
+  {
+   "name": "Acacia Drive",
+   "kind": "street",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 6,
+   "length_m": 706
+  },
+  {
+   "name": "Saint Francis 7 Subdivision",
+   "kind": "street",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 2,
+   "length_m": 699
+  },
+  {
+   "name": "Santa Ines Street",
+   "kind": "street",
+   "barangays": [
+    "De La Paz"
+   ],
+   "features": 1,
+   "length_m": 685
+  },
+  {
+   "name": "Aberta Street",
+   "kind": "street",
+   "barangays": [
+    "Zapote"
+   ],
+   "features": 3,
+   "length_m": 653
+  },
+  {
+   "name": "Denmark Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco",
+    "Santo Tomas"
+   ],
+   "features": 2,
+   "length_m": 648
+  },
+  {
+   "name": "J. P. De Leon Ocampo Avenue",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 2,
+   "length_m": 622
+  },
+  {
+   "name": "Greenwich Avenue",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 611
+  },
+  {
+   "name": "Jogging Lane",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 5,
+   "length_m": 592
+  },
+  {
+   "name": "Aduana Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco",
+    "Timbao"
+   ],
+   "features": 2,
+   "length_m": 587
+  },
+  {
+   "name": "Norway Street",
+   "kind": "street",
+   "barangays": [
+    "Canlalay",
+    "San Francisco",
+    "Santo Tomas"
+   ],
+   "features": 3,
+   "length_m": 571
+  },
+  {
+   "name": "Australia Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 562
+  },
+  {
+   "name": "Mercado Street",
+   "kind": "street",
+   "barangays": [
+    "Platero"
+   ],
+   "features": 1,
+   "length_m": 562
+  },
+  {
+   "name": "Kaimito Street",
+   "kind": "street",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 3,
+   "length_m": 549
+  },
+  {
+   "name": "Milan Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 2,
+   "length_m": 540
+  },
+  {
+   "name": "Kansas Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 2,
+   "length_m": 538
+  },
+  {
+   "name": "Ritzville Drive",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 512
+  },
+  {
+   "name": "Lansones Street",
+   "kind": "street",
+   "barangays": [
+    "San Antonio",
+    "Santo Tomas"
+   ],
+   "features": 4,
+   "length_m": 496
+  },
+  {
+   "name": "Hillcrest Road",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 2,
+   "length_m": 495
+  },
+  {
+   "name": "Davao Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco",
+    "Santo Tomas"
+   ],
+   "features": 2,
+   "length_m": 488
+  },
+  {
+   "name": "Mondo Drive",
+   "kind": "street",
+   "barangays": [
+    "Zapote"
+   ],
+   "features": 1,
+   "length_m": 488
+  },
+  {
+   "name": "Oroquieta Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 2,
+   "length_m": 484
+  },
+  {
+   "name": "Dipolog Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 471
+  },
+  {
+   "name": "Tyler Street",
+   "kind": "street",
+   "barangays": [
+    "Tubigan"
+   ],
+   "features": 1,
+   "length_m": 465
+  },
+  {
+   "name": "Adelina Avenue",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 2,
+   "length_m": 463
+  },
+  {
+   "name": "Mayfield Drive",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 2,
+   "length_m": 459
+  },
+  {
+   "name": "Comblum Avenue",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 2,
+   "length_m": 453
+  },
+  {
+   "name": "Atlanta Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 447
+  },
+  {
+   "name": "Pa Los Verde Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 3,
+   "length_m": 446
+  },
+  {
+   "name": "Ibsen Street",
+   "kind": "street",
+   "barangays": [
+    "Tubigan"
+   ],
+   "features": 1,
+   "length_m": 444
+  },
+  {
+   "name": "Mamplasan Rotonda",
+   "kind": "street",
+   "barangays": [
+    "Bungahan",
+    "Mamplasan"
+   ],
+   "features": 6,
+   "length_m": 443
+  },
+  {
+   "name": "F. Balagtas Street",
+   "kind": "street",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": 442
+  },
+  {
+   "name": "Tulay Bato Street",
+   "kind": "street",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 2,
+   "length_m": 441
+  },
+  {
+   "name": "Arsobispo Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 435
+  },
+  {
+   "name": "Gardenia Drive",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 435
+  },
+  {
+   "name": "San Agustin Drive",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 4,
+   "length_m": 433
+  },
+  {
+   "name": "Crossville Drive",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 432
+  },
+  {
+   "name": "Kalye Pogi",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 432
+  },
+  {
+   "name": "A. Mabini Street",
+   "kind": "street",
+   "barangays": [
+    "Poblacion"
+   ],
+   "features": 1,
+   "length_m": 423
+  },
+  {
+   "name": "Maestransa Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 423
+  },
+  {
+   "name": "Batangas Loop",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 2,
+   "length_m": 421
+  },
+  {
+   "name": "Fairview Drive",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 412
+  },
+  {
+   "name": "Farmville Drive",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 409
+  },
+  {
+   "name": "Stanford Street",
+   "kind": "street",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 2,
+   "length_m": 408
+  },
+  {
+   "name": "Dadiangas Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 404
+  },
+  {
+   "name": "Nevada Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 404
+  },
+  {
+   "name": "Austria Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco",
+    "Santo Tomas"
+   ],
+   "features": 2,
+   "length_m": 401
+  },
+  {
+   "name": "Tennessee Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 401
+  },
+  {
+   "name": "Madrid Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 399
+  },
+  {
+   "name": "Italy Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco",
+    "Santo Tomas"
+   ],
+   "features": 2,
+   "length_m": 398
+  },
+  {
+   "name": "Nebraska Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 396
+  },
+  {
+   "name": "Monaco Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 395
+  },
+  {
+   "name": "Moscow Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 386
+  },
+  {
+   "name": "Basco Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 3,
+   "length_m": 381
+  },
+  {
+   "name": "General Santos Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 2,
+   "length_m": 378
+  },
+  {
+   "name": "Angela Street",
+   "kind": "street",
+   "barangays": [
+    "Zapote"
+   ],
+   "features": 3,
+   "length_m": 377
+  },
+  {
+   "name": "Matthew Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 374
+  },
+  {
+   "name": "Moises Avenue",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 374
+  },
+  {
+   "name": "Dumaguete Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 373
+  },
+  {
+   "name": "Visayas Drive",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 2,
+   "length_m": 370
+  },
+  {
+   "name": "Cebu Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 370
+  },
+  {
+   "name": "Munich Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 370
+  },
+  {
+   "name": "Bayabas Street",
+   "kind": "street",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": 365
+  },
+  {
+   "name": "Tacloban Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 365
+  },
+  {
+   "name": "Cadiz Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 2,
+   "length_m": 363
+  },
+  {
+   "name": "Paris Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 360
+  },
+  {
+   "name": "Ireneville IV Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 358
+  },
+  {
+   "name": "Lapu Lapu Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 358
+  },
+  {
+   "name": "Burgundy Avenue",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 3,
+   "length_m": 356
+  },
+  {
+   "name": "Kingston Avenue",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 6,
+   "length_m": 352
+  },
+  {
+   "name": "Oregon Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 352
+  },
+  {
+   "name": "Hawaii Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 350
+  },
+  {
+   "name": "Olympic Drive",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 350
+  },
+  {
+   "name": "Germany Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 349
+  },
+  {
+   "name": "Lanewood Street",
+   "kind": "street",
+   "barangays": [
+    "Timbao"
+   ],
+   "features": 1,
+   "length_m": 349
+  },
+  {
+   "name": "Mansanitas Place",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 2,
+   "length_m": 347
+  },
+  {
+   "name": "Santa Cruz Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 346
+  },
+  {
+   "name": "Br. Andrew Road",
+   "kind": "street",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": 344
+  },
+  {
+   "name": "London Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 344
+  },
+  {
+   "name": "Davis Street",
+   "kind": "street",
+   "barangays": [
+    "Tubigan"
+   ],
+   "features": 1,
+   "length_m": 342
+  },
+  {
+   "name": "Lawin Street",
+   "kind": "street",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": 341
+  },
+  {
+   "name": "Canlaon Street",
+   "kind": "street",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": 340
+  },
+  {
+   "name": "Rome Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 340
+  },
+  {
+   "name": "Marawi Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 333
+  },
+  {
+   "name": "Missouri Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 333
+  },
+  {
+   "name": "Aberdeen Drive",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 332
+  },
+  {
+   "name": "Damascus Street",
+   "kind": "street",
+   "barangays": [
+    "Langkiwa"
+   ],
+   "features": 1,
+   "length_m": 331
+  },
+  {
+   "name": "Greenville Drive",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 2,
+   "length_m": 329
+  },
+  {
+   "name": "Baja Street",
+   "kind": "street",
+   "barangays": [
+    "Timbao"
+   ],
+   "features": 1,
+   "length_m": 329
+  },
+  {
+   "name": "Grandville Drive",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 327
+  },
+  {
+   "name": "Juarez Street",
+   "kind": "street",
+   "barangays": [
+    "Timbao"
+   ],
+   "features": 1,
+   "length_m": 327
+  },
+  {
+   "name": "Clearfield Drive",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 324
+  },
+  {
+   "name": "Vermont Drive",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 322
+  },
+  {
+   "name": "Fortknox Drive",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 321
+  },
+  {
+   "name": "Illinois Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 321
+  },
+  {
+   "name": "Colonade Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 320
+  },
+  {
+   "name": "Novalos Street",
+   "kind": "street",
+   "barangays": [
+    "Timbao"
+   ],
+   "features": 1,
+   "length_m": 315
+  },
+  {
+   "name": "Cagayan Street",
+   "kind": "street",
+   "barangays": [
+    "Canlalay",
+    "Santo Tomas"
+   ],
+   "features": 2,
+   "length_m": 314
+  },
+  {
+   "name": "Samar Loop",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 2,
+   "length_m": 313
+  },
+  {
+   "name": "Clarkfield Drive",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 313
+  },
+  {
+   "name": "Sunnyvale Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco",
+    "Soro-soro"
+   ],
+   "features": 2,
+   "length_m": 311
+  },
+  {
+   "name": "Maryland Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 310
+  },
+  {
+   "name": "Puerto Prinsesa Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 2,
+   "length_m": 309
+  },
+  {
+   "name": "Hawthorne Street",
+   "kind": "street",
+   "barangays": [
+    "Timbao"
+   ],
+   "features": 1,
+   "length_m": 309
+  },
+  {
+   "name": "Minnesota Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 309
+  },
+  {
+   "name": "Oates Street",
+   "kind": "street",
+   "barangays": [
+    "Tubigan"
+   ],
+   "features": 1,
+   "length_m": 309
+  },
+  {
+   "name": "Mississippi Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 308
+  },
+  {
+   "name": "Saint Paul Street",
+   "kind": "street",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": 308
+  },
+  {
+   "name": "Cooperation Street",
+   "kind": "street",
+   "barangays": [
+    "Zapote"
+   ],
+   "features": 1,
+   "length_m": 307
+  },
+  {
+   "name": "Reata Street",
+   "kind": "street",
+   "barangays": [
+    "Timbao"
+   ],
+   "features": 1,
+   "length_m": 307
+  },
+  {
+   "name": "Ellis Street",
+   "kind": "street",
+   "barangays": [
+    "Tubigan"
+   ],
+   "features": 1,
+   "length_m": 305
+  },
+  {
+   "name": "Freemont Avenue",
+   "kind": "street",
+   "barangays": [
+    "Soro-soro"
+   ],
+   "features": 3,
+   "length_m": 302
+  },
+  {
+   "name": "Mayon Street",
+   "kind": "street",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 2,
+   "length_m": 301
+  },
+  {
+   "name": "Saint Benilde Road",
+   "kind": "street",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 2,
+   "length_m": 299
+  },
+  {
+   "name": "Dasmariñas",
+   "kind": "street",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": 299
+  },
+  {
+   "name": "Taal Street",
+   "kind": "street",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": 297
+  },
+  {
+   "name": "Bloomfield Avenue",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 296
+  },
+  {
+   "name": "Almeda Street",
+   "kind": "street",
+   "barangays": [
+    "De La Paz"
+   ],
+   "features": 1,
+   "length_m": 295
+  },
+  {
+   "name": "Stockholm Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 294
+  },
+  {
+   "name": "Muralla Street",
+   "kind": "street",
+   "barangays": [
+    "Timbao"
+   ],
+   "features": 1,
+   "length_m": 293
+  },
+  {
+   "name": "Zurich Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 293
+  },
+  {
+   "name": "Mariveles Street",
+   "kind": "street",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": 291
+  },
+  {
+   "name": "Santa Teresita Street",
+   "kind": "street",
+   "barangays": [
+    "De La Paz"
+   ],
+   "features": 1,
+   "length_m": 288
+  },
+  {
+   "name": "England Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 286
+  },
+  {
+   "name": "Mallaga Street",
+   "kind": "street",
+   "barangays": [
+    "Timbao"
+   ],
+   "features": 1,
+   "length_m": 286
+  },
+  {
+   "name": "Luxembourg Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 284
+  },
+  {
+   "name": "Georgia Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 2,
+   "length_m": 280
+  },
+  {
+   "name": "Libnah Street",
+   "kind": "street",
+   "barangays": [
+    "Langkiwa"
+   ],
+   "features": 1,
+   "length_m": 279
+  },
+  {
+   "name": "Legaspi Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco",
+    "Santo Tomas"
+   ],
+   "features": 2,
+   "length_m": 278
+  },
+  {
+   "name": "A. Gana Street",
+   "kind": "street",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": 277
+  },
+  {
+   "name": "Santa Bernardita Street",
+   "kind": "street",
+   "barangays": [
+    "De La Paz"
+   ],
+   "features": 1,
+   "length_m": 277
+  },
+  {
+   "name": "Winridge Street",
+   "kind": "street",
+   "barangays": [
+    "Mamplasan"
+   ],
+   "features": 2,
+   "length_m": 276
+  },
+  {
+   "name": "Bushwick Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 275
+  },
+  {
+   "name": "Aries Street",
+   "kind": "street",
+   "barangays": [
+    "Canlalay",
+    "San Francisco",
+    "Santo Niño"
+   ],
+   "features": 2,
+   "length_m": 273
+  },
+  {
+   "name": "Corinthian Avenue",
+   "kind": "street",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": 273
+  },
+  {
+   "name": "Guyabano Street",
+   "kind": "street",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": 273
+  },
+  {
+   "name": "Simon Street",
+   "kind": "street",
+   "barangays": [
+    "Soro-soro"
+   ],
+   "features": 1,
+   "length_m": 271
+  },
+  {
+   "name": "Celica Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 3,
+   "length_m": 269
+  },
+  {
+   "name": "Kamagong Loop",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 269
+  },
+  {
+   "name": "Avila Street",
+   "kind": "street",
+   "barangays": [
+    "Timbao"
+   ],
+   "features": 1,
+   "length_m": 268
+  },
+  {
+   "name": "Balimbing Street",
+   "kind": "street",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": 267
+  },
+  {
+   "name": "Makopa Street",
+   "kind": "street",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": 267
+  },
+  {
+   "name": "Cordell Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 265
+  },
+  {
+   "name": "Getty Street",
+   "kind": "street",
+   "barangays": [
+    "Tubigan"
+   ],
+   "features": 1,
+   "length_m": 262
+  },
+  {
+   "name": "Stanford Drive",
+   "kind": "street",
+   "barangays": [
+    "San Francisco",
+    "Soro-soro"
+   ],
+   "features": 1,
+   "length_m": 261
+  },
+  {
+   "name": "Rizal Street",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 260
+  },
+  {
+   "name": "Nissan Drive",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 258
+  },
+  {
+   "name": "Ladeene Avenue",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 257
+  },
+  {
+   "name": "France Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 2,
+   "length_m": 256
+  },
+  {
+   "name": "Ylang ylang Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 256
+  },
+  {
+   "name": "Ourense Street",
+   "kind": "street",
+   "barangays": [
+    "Timbao"
+   ],
+   "features": 1,
+   "length_m": 254
+  },
+  {
+   "name": "Zamboanga Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 253
+  },
+  {
+   "name": "Bankers Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 251
+  },
+  {
+   "name": "Langka Road",
+   "kind": "street",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": 249
+  },
+  {
+   "name": "Saint Miguel Road",
+   "kind": "street",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": 249
+  },
+  {
+   "name": "Mindoro Street",
+   "kind": "street",
+   "barangays": [
+    "Canlalay",
+    "Santo Tomas"
+   ],
+   "features": 2,
+   "length_m": 248
+  },
+  {
+   "name": "Missionbay Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 245
+  },
+  {
+   "name": "Poland Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 242
+  },
+  {
+   "name": "Santa Veronica Street",
+   "kind": "street",
+   "barangays": [
+    "De La Paz"
+   ],
+   "features": 1,
+   "length_m": 242
+  },
+  {
+   "name": "Yakal Place",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 242
+  },
+  {
+   "name": "Miami Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 241
+  },
+  {
+   "name": "Indonesia Street",
+   "kind": "street",
+   "barangays": [
+    "Bungahan"
+   ],
+   "features": 1,
+   "length_m": 238
+  },
+  {
+   "name": "Bulgaria Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 236
+  },
+  {
+   "name": "Butuan Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 236
+  },
+  {
+   "name": "Pratt Street",
+   "kind": "street",
+   "barangays": [
+    "Tubigan"
+   ],
+   "features": 1,
+   "length_m": 236
+  },
+  {
+   "name": "Chicago Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 235
+  },
+  {
+   "name": "Gabriel Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 234
+  },
+  {
+   "name": "Ponteveda Street",
+   "kind": "street",
+   "barangays": [
+    "Timbao"
+   ],
+   "features": 1,
+   "length_m": 233
+  },
+  {
+   "name": "Appleton Bend",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 3,
+   "length_m": 230
+  },
+  {
+   "name": "Fairfax Avenue",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 230
+  },
+  {
+   "name": "Toyota Drive",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 229
+  },
+  {
+   "name": "LaSoledaridad Street",
+   "kind": "street",
+   "barangays": [
+    "Poblacion"
+   ],
+   "features": 1,
+   "length_m": 228
+  },
+  {
+   "name": "Druby Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 227
+  },
+  {
+   "name": "Menlo Avenue",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 226
+  },
+  {
+   "name": "Milwaukee Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 226
+  },
+  {
+   "name": "Nauru Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 222
+  },
+  {
+   "name": "Virgo Street",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 221
+  },
+  {
+   "name": "Iriga Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 220
+  },
+  {
+   "name": "Santol Place",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 220
+  },
+  {
+   "name": "Copenhagen Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 218
+  },
+  {
+   "name": "Howthorne Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 216
+  },
+  {
+   "name": "New Zealand Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 216
+  },
+  {
+   "name": "Cochran Avenue",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 215
+  },
+  {
+   "name": "Padova Street",
+   "kind": "street",
+   "barangays": [
+    "Platero"
+   ],
+   "features": 1,
+   "length_m": 215
+  },
+  {
+   "name": "Glenwat Avenue",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 214
+  },
+  {
+   "name": "Malaysia Street",
+   "kind": "street",
+   "barangays": [
+    "Bungahan"
+   ],
+   "features": 2,
+   "length_m": 213
+  },
+  {
+   "name": "Adelfa Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 211
+  },
+  {
+   "name": "Monza Street",
+   "kind": "street",
+   "barangays": [
+    "Platero"
+   ],
+   "features": 1,
+   "length_m": 210
+  },
+  {
+   "name": "Brussels Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 209
+  },
+  {
+   "name": "Dresden Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 209
+  },
+  {
+   "name": "Solana Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 209
+  },
+  {
+   "name": "Teodora Street",
+   "kind": "street",
+   "barangays": [
+    "Platero"
+   ],
+   "features": 1,
+   "length_m": 208
+  },
+  {
+   "name": "Lucena Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 205
+  },
+  {
+   "name": "Almazora Compound",
+   "kind": "street",
+   "barangays": [
+    "De La Paz"
+   ],
+   "features": 3,
+   "length_m": 204
+  },
+  {
+   "name": "Alsale Avenue",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 204
+  },
+  {
+   "name": "Bintan Gate",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 5,
+   "length_m": 201
+  },
+  {
+   "name": "Furman Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 201
+  },
+  {
+   "name": "Masbate Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 201
+  },
+  {
+   "name": "Monterey Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 201
+  },
+  {
+   "name": "Kentucky Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 2,
+   "length_m": 199
+  },
+  {
+   "name": "Audi Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 198
+  },
+  {
+   "name": "Escalon Street",
+   "kind": "street",
+   "barangays": [
+    "Timbao"
+   ],
+   "features": 1,
+   "length_m": 198
+  },
+  {
+   "name": "Kanor Casubuan Street",
+   "kind": "street",
+   "barangays": [
+    "Poblacion",
+    "San Jose"
+   ],
+   "features": 1,
+   "length_m": 197
+  },
+  {
+   "name": "Cervantes Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 196
+  },
+  {
+   "name": "Leyte Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 196
+  },
+  {
+   "name": "Mansfield Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 196
+  },
+  {
+   "name": "Stanley Avenue",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 196
+  },
+  {
+   "name": "Crenshaw Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 195
+  },
+  {
+   "name": "Mitsubishi Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 194
+  },
+  {
+   "name": "Pennsylvania Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 193
+  },
+  {
+   "name": "Guam Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 192
+  },
+  {
+   "name": "Columbia Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 191
+  },
+  {
+   "name": "Oklahoma Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 191
+  },
+  {
+   "name": "Detroit Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 190
+  },
+  {
+   "name": "Cavite Street",
+   "kind": "street",
+   "barangays": [
+    "Canlalay",
+    "Santo Tomas"
+   ],
+   "features": 2,
+   "length_m": 189
+  },
+  {
+   "name": "Archbishop Harty Road",
+   "kind": "street",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 2,
+   "length_m": 188
+  },
+  {
+   "name": "Houston Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 188
+  },
+  {
+   "name": "Las Vegas Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 188
+  },
+  {
+   "name": "Los Angeles Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 186
+  },
+  {
+   "name": "Norris Street",
+   "kind": "street",
+   "barangays": [
+    "Tubigan"
+   ],
+   "features": 1,
+   "length_m": 186
+  },
+  {
+   "name": "Alabama Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 185
+  },
+  {
+   "name": "Misamis Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 185
+  },
+  {
+   "name": "Woodcrest Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 185
+  },
+  {
+   "name": "Acacia Place",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 184
+  },
+  {
+   "name": "Pearlblossom Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 184
+  },
+  {
+   "name": "Mindanao Drive",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 3,
+   "length_m": 183
+  },
+  {
+   "name": "San Agustin Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 183
+  },
+  {
+   "name": "Agusan Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco",
+    "Santo Tomas"
+   ],
+   "features": 2,
+   "length_m": 181
+  },
+  {
+   "name": "Carson Avenue",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 181
+  },
+  {
+   "name": "Huntington Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 181
+  },
+  {
+   "name": "Batangas Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 2,
+   "length_m": 180
+  },
+  {
+   "name": "Florida Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 180
+  },
+  {
+   "name": "Rochester Bend",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 180
+  },
+  {
+   "name": "Saint Mutien Marie Road",
+   "kind": "street",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": 179
+  },
+  {
+   "name": "Utah Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 177
+  },
+  {
+   "name": "Saguittarius Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Niño"
+   ],
+   "features": 1,
+   "length_m": 176
+  },
+  {
+   "name": "Mimosa Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 174
+  },
+  {
+   "name": "Saint Solomon Road",
+   "kind": "street",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": 174
+  },
+  {
+   "name": "Wallace Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 174
+  },
+  {
+   "name": "Dalandan Street",
+   "kind": "street",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": 172
+  },
+  {
+   "name": "Virginia Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 172
+  },
+  {
+   "name": "Santan Place",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 171
+  },
+  {
+   "name": "Abraham Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 170
+  },
+  {
+   "name": "Recoletos Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 170
+  },
+  {
+   "name": "Drysdale Bend",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 169
+  },
+  {
+   "name": "Vermont Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 167
+  },
+  {
+   "name": "Acacia Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 164
+  },
+  {
+   "name": "Blk 7-8 Golden City Subdivision",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 164
+  },
+  {
+   "name": "Sherman Road",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 162
+  },
+  {
+   "name": "Whitnall Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 162
+  },
+  {
+   "name": "Wisconsin Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 162
+  },
+  {
+   "name": "Athens Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 161
+  },
+  {
+   "name": "Schuyler Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 161
+  },
+  {
+   "name": "Calvin Street",
+   "kind": "street",
+   "barangays": [
+    "Zapote"
+   ],
+   "features": 1,
+   "length_m": 160
+  },
+  {
+   "name": "Iloilo Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 159
+  },
+  {
+   "name": "Ozamis Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 159
+  },
+  {
+   "name": "Kamagong Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 158
+  },
+  {
+   "name": "Enzo Street",
+   "kind": "street",
+   "barangays": [
+    "Zapote"
+   ],
+   "features": 2,
+   "length_m": 157
+  },
+  {
+   "name": "Fairoaks Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 157
+  },
+  {
+   "name": "Arkansas Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 156
+  },
+  {
+   "name": "Silay Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 156
+  },
+  {
+   "name": "Tangub Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 156
+  },
+  {
+   "name": "Leavenworth Drive",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 155
+  },
+  {
+   "name": "Lexington Drive",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 154
+  },
+  {
+   "name": "Batanes Street",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 153
+  },
+  {
+   "name": "Liverpool Drive",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 153
+  },
+  {
+   "name": "Queensrow Drive",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 153
+  },
+  {
+   "name": "Pangasinan Street",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 152
+  },
+  {
+   "name": "Arizona Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 151
+  },
+  {
+   "name": "Spain Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 151
+  },
+  {
+   "name": "Adams Street",
+   "kind": "street",
+   "barangays": [
+    "Tubigan"
+   ],
+   "features": 1,
+   "length_m": 150
+  },
+  {
+   "name": "Enrica Street",
+   "kind": "street",
+   "barangays": [
+    "Zapote"
+   ],
+   "features": 1,
+   "length_m": 150
+  },
+  {
+   "name": "Hillcreast Drive",
+   "kind": "street",
+   "barangays": [
+    "Soro-soro"
+   ],
+   "features": 1,
+   "length_m": 150
+  },
+  {
+   "name": "Mount Nebo Street",
+   "kind": "street",
+   "barangays": [
+    "Langkiwa"
+   ],
+   "features": 1,
+   "length_m": 150
+  },
+  {
+   "name": "Zola Street",
+   "kind": "street",
+   "barangays": [
+    "Tubigan"
+   ],
+   "features": 1,
+   "length_m": 150
+  },
+  {
+   "name": "Blk 8-9 Golden City Subdivision",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 149
+  },
+  {
+   "name": "Basilan Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 148
+  },
+  {
+   "name": "California Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 148
+  },
+  {
+   "name": "Hindry Avenue",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 148
+  },
+  {
+   "name": "Saint Dominic Street",
+   "kind": "street",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": 148
+  },
+  {
+   "name": "Bukidnon Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 147
+  },
+  {
+   "name": "Joel Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 147
+  },
+  {
+   "name": "Webb Street",
+   "kind": "street",
+   "barangays": [
+    "Tubigan"
+   ],
+   "features": 1,
+   "length_m": 147
+  },
+  {
+   "name": "Tuklas Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 2,
+   "length_m": 146
+  },
+  {
+   "name": "Lauren Street",
+   "kind": "street",
+   "barangays": [
+    "Zapote"
+   ],
+   "features": 3,
+   "length_m": 145
+  },
+  {
+   "name": "Giordano Street",
+   "kind": "street",
+   "barangays": [
+    "Zapote"
+   ],
+   "features": 2,
+   "length_m": 145
+  },
+  {
+   "name": "Luzon Street",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 144
+  },
+  {
+   "name": "Upton Street",
+   "kind": "street",
+   "barangays": [
+    "Tubigan"
+   ],
+   "features": 2,
+   "length_m": 143
+  },
+  {
+   "name": "Beatriz Drive",
+   "kind": "street",
+   "barangays": [
+    "Platero"
+   ],
+   "features": 1,
+   "length_m": 143
+  },
+  {
+   "name": "Surfing Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 143
+  },
+  {
+   "name": "Midian Street",
+   "kind": "street",
+   "barangays": [
+    "Langkiwa"
+   ],
+   "features": 1,
+   "length_m": 141
+  },
+  {
+   "name": "Metroville Drive",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 2,
+   "length_m": 139
+  },
+  {
+   "name": "Brooklyn Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 139
+  },
+  {
+   "name": "Roseland Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 139
+  },
+  {
+   "name": "Ylagan Street",
+   "kind": "street",
+   "barangays": [
+    "San Jose"
+   ],
+   "features": 1,
+   "length_m": 139
+  },
+  {
+   "name": "Micah Street",
+   "kind": "street",
+   "barangays": [
+    "Langkiwa"
+   ],
+   "features": 1,
+   "length_m": 138
+  },
+  {
+   "name": "Samat Street",
+   "kind": "street",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": 138
+  },
+  {
+   "name": "Dahlia Street",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 137
+  },
+  {
+   "name": "Kisses Street",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 137
+  },
+  {
+   "name": "Mathew Street",
+   "kind": "street",
+   "barangays": [
+    "Langkiwa"
+   ],
+   "features": 1,
+   "length_m": 137
+  },
+  {
+   "name": "Yakal Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 137
+  },
+  {
+   "name": "Belvidere Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 135
+  },
+  {
+   "name": "Dapitan Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 135
+  },
+  {
+   "name": "Gabana Street",
+   "kind": "street",
+   "barangays": [
+    "Zapote"
+   ],
+   "features": 1,
+   "length_m": 135
+  },
+  {
+   "name": "Marinduque Street",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 135
+  },
+  {
+   "name": "Ponderosa Gate",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 3,
+   "length_m": 134
+  },
+  {
+   "name": "Versace Street",
+   "kind": "street",
+   "barangays": [
+    "Zapote"
+   ],
+   "features": 1,
+   "length_m": 134
+  },
+  {
+   "name": "Ferragamo Street",
+   "kind": "street",
+   "barangays": [
+    "Zapote"
+   ],
+   "features": 3,
+   "length_m": 131
+  },
+  {
+   "name": "Greece Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 131
+  },
+  {
+   "name": "Vuitton Street",
+   "kind": "street",
+   "barangays": [
+    "Zapote"
+   ],
+   "features": 1,
+   "length_m": 131
+  },
+  {
+   "name": "Carlston Street",
+   "kind": "street",
+   "barangays": [
+    "Tubigan"
+   ],
+   "features": 1,
+   "length_m": 130
+  },
+  {
+   "name": "Ferrari Street",
+   "kind": "street",
+   "barangays": [
+    "Zapote"
+   ],
+   "features": 1,
+   "length_m": 130
+  },
+  {
+   "name": "Saipan Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 130
+  },
+  {
+   "name": "Jeremiah Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 129
+  },
+  {
+   "name": "Amapola Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 128
+  },
+  {
+   "name": "Ilocos Street",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 128
+  },
+  {
+   "name": "Judge Angeles Street",
+   "kind": "street",
+   "barangays": [
+    "De La Paz"
+   ],
+   "features": 1,
+   "length_m": 128
+  },
+  {
+   "name": "Aguila Street",
+   "kind": "street",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": 125
+  },
+  {
+   "name": "Martinez Street",
+   "kind": "street",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": 125
+  },
+  {
+   "name": "Ferndale Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 124
+  },
+  {
+   "name": "Layang Layang Street",
+   "kind": "street",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": 124
+  },
+  {
+   "name": "Palawan Street",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 124
+  },
+  {
+   "name": "Springfield Avenue",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 124
+  },
+  {
+   "name": "Dominico Street",
+   "kind": "street",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": 123
+  },
+  {
+   "name": "Cloverdale Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 122
+  },
+  {
+   "name": "Fulton Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 122
+  },
+  {
+   "name": "Harcourt Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 122
+  },
+  {
+   "name": "Kalaw Street",
+   "kind": "street",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": 122
+  },
+  {
+   "name": "Pitta Street",
+   "kind": "street",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": 122
+  },
+  {
+   "name": "Uranus Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 122
+  },
+  {
+   "name": "Flatbush Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 120
+  },
+  {
+   "name": "Belgium Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 119
+  },
+  {
+   "name": "Prada Street",
+   "kind": "street",
+   "barangays": [
+    "Zapote"
+   ],
+   "features": 1,
+   "length_m": 118
+  },
+  {
+   "name": "Intramuros Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 117
+  },
+  {
+   "name": "Lanao Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 117
+  },
+  {
+   "name": "Surigao Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 117
+  },
+  {
+   "name": "Camiguin Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 116
+  },
+  {
+   "name": "Peneltone Street",
+   "kind": "street",
+   "barangays": [
+    "Zapote"
+   ],
+   "features": 5,
+   "length_m": 114
+  },
+  {
+   "name": "Generosa Street",
+   "kind": "street",
+   "barangays": [
+    "Casile"
+   ],
+   "features": 1,
+   "length_m": 114
+  },
+  {
+   "name": "Gemini Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Niño"
+   ],
+   "features": 1,
+   "length_m": 113
+  },
+  {
+   "name": "Philadelphia Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 113
+  },
+  {
+   "name": "Madison Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 112
+  },
+  {
+   "name": "Mangga Street",
+   "kind": "street",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": 112
+  },
+  {
+   "name": "Idaho Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 110
+  },
+  {
+   "name": "Ponderosa Place",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 110
+  },
+  {
+   "name": "Santol Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 108
+  },
+  {
+   "name": "Hargrave Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 107
+  },
+  {
+   "name": "Jasmin Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Domingo"
+   ],
+   "features": 1,
+   "length_m": 107
+  },
+  {
+   "name": "Oman Street",
+   "kind": "street",
+   "barangays": [
+    "Bungahan"
+   ],
+   "features": 1,
+   "length_m": 105
+  },
+  {
+   "name": "Marshfield Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 104
+  },
+  {
+   "name": "Don Menong Gana Street",
+   "kind": "street",
+   "barangays": [
+    "Poblacion"
+   ],
+   "features": 1,
+   "length_m": 102
+  },
+  {
+   "name": "Laguna Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 101
+  },
+  {
+   "name": "Br. Xavier Road",
+   "kind": "street",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": 100
+  },
+  {
+   "name": "Ilang-Ilang Street",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 100
+  },
+  {
+   "name": "Samuel Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 98
+  },
+  {
+   "name": "Calbayog Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 97
+  },
+  {
+   "name": "Inglewood Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 97
+  },
+  {
+   "name": "Katala Street",
+   "kind": "street",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": 97
+  },
+  {
+   "name": "Bougainvillea Street",
+   "kind": "street",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": 96
+  },
+  {
+   "name": "Texas Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 96
+  },
+  {
+   "name": "Gumamela Street",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 93
+  },
+  {
+   "name": "Bedford Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 92
+  },
+  {
+   "name": "Daet Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 91
+  },
+  {
+   "name": "Singapore Street",
+   "kind": "street",
+   "barangays": [
+    "Bungahan"
+   ],
+   "features": 1,
+   "length_m": 91
+  },
+  {
+   "name": "Micronesia Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 90
+  },
+  {
+   "name": "Nassau Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 90
+  },
+  {
+   "name": "Quezon Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 88
+  },
+  {
+   "name": "Sarangani Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 88
+  },
+  {
+   "name": "Hamburg Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 2,
+   "length_m": 87
+  },
+  {
+   "name": "Lagos Street",
+   "kind": "street",
+   "barangays": [
+    "Timbao"
+   ],
+   "features": 1,
+   "length_m": 87
+  },
+  {
+   "name": "Mika",
+   "kind": "street",
+   "barangays": [
+    "Santo Domingo"
+   ],
+   "features": 1,
+   "length_m": 87
+  },
+  {
+   "name": "Valentino Street",
+   "kind": "street",
+   "barangays": [
+    "Zapote"
+   ],
+   "features": 1,
+   "length_m": 87
+  },
+  {
+   "name": "Guimaras Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 84
+  },
+  {
+   "name": "Maguindanao Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 84
+  },
+  {
+   "name": "Ramos Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 82
+  },
+  {
+   "name": "Belmont Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 81
+  },
+  {
+   "name": "Malibu Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 81
+  },
+  {
+   "name": "Catbalogan Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 80
+  },
+  {
+   "name": "Cliford Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 79
+  },
+  {
+   "name": "Dayap Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 79
+  },
+  {
+   "name": "Milton Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 78
+  },
+  {
+   "name": "Moab Street",
+   "kind": "street",
+   "barangays": [
+    "Langkiwa"
+   ],
+   "features": 1,
+   "length_m": 78
+  },
+  {
+   "name": "Chatsworth Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 76
+  },
+  {
+   "name": "Morell Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 76
+  },
+  {
+   "name": "Camarines Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 74
+  },
+  {
+   "name": "Camia Street",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 74
+  },
+  {
+   "name": "Fleetwood Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 74
+  },
+  {
+   "name": "Locerne Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 73
+  },
+  {
+   "name": "Broderick Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 71
+  },
+  {
+   "name": "Ohio Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 71
+  },
+  {
+   "name": "School of Rizal Street",
+   "kind": "street",
+   "barangays": [
+    "Poblacion"
+   ],
+   "features": 1,
+   "length_m": 71
+  },
+  {
+   "name": "Sulu Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 71
+  },
+  {
+   "name": "Scuba Drive",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 69
+  },
+  {
+   "name": "Flora Ylagan Street",
+   "kind": "street",
+   "barangays": [
+    "Poblacion"
+   ],
+   "features": 1,
+   "length_m": 68
+  },
+  {
+   "name": "Hong Kong Street",
+   "kind": "street",
+   "barangays": [
+    "Bungahan"
+   ],
+   "features": 1,
+   "length_m": 67
+  },
+  {
+   "name": "Andrea Street",
+   "kind": "street",
+   "barangays": [
+    "Zapote"
+   ],
+   "features": 1,
+   "length_m": 65
+  },
+  {
+   "name": "Seatle Street",
+   "kind": "street",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": 64
+  },
+  {
+   "name": "Windsor Hills Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 64
+  },
+  {
+   "name": "Christian Street",
+   "kind": "street",
+   "barangays": [
+    "Zapote"
+   ],
+   "features": 1,
+   "length_m": 59
+  },
+  {
+   "name": "Rosecran Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 59
+  },
+  {
+   "name": "Arayat Street",
+   "kind": "street",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": 58
+  },
+  {
+   "name": "F. Gana Street",
+   "kind": "street",
+   "barangays": [
+    "Poblacion"
+   ],
+   "features": 1,
+   "length_m": 57
+  },
+  {
+   "name": "Analog Street",
+   "kind": "street",
+   "barangays": [
+    "Soro-soro"
+   ],
+   "features": 1,
+   "length_m": 55
+  },
+  {
+   "name": "Zinia Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 51
+  },
+  {
+   "name": "Amihan Street",
+   "kind": "street",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": 48
+  },
+  {
+   "name": "Frankfurt Street",
+   "kind": "street",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": 42
+  },
+  {
+   "name": "Holy Sepulchre Access Road",
+   "kind": "street",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": 42
+  },
+  {
+   "name": "Macaria Avenue",
+   "kind": "street",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": 40
+  },
+  {
+   "name": "Spm Sun Street",
+   "kind": "street",
+   "barangays": [
+    "Platero"
+   ],
+   "features": 1,
+   "length_m": 40
+  },
+  {
+   "name": "Batulao Street",
+   "kind": "street",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": 28
+  },
+  {
+   "name": "P. Paterno Street",
+   "kind": "street",
+   "barangays": [
+    "De La Paz"
+   ],
+   "features": 1,
+   "length_m": 13
+  },
+  {
+   "name": "Villagio Di Xavier Dolce Vita",
+   "kind": "area",
+   "barangays": [
+    "Zapote"
+   ],
+   "features": 2,
+   "length_m": null
+  },
+  {
+   "name": "Altarez Village",
+   "kind": "area",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Alvarez Compound",
+   "kind": "area",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Aveia",
+   "kind": "area",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Blk 3 Lot 11 Stage 3 Batangas Loop",
+   "kind": "area",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Brentville International",
+   "kind": "area",
+   "barangays": [
+    "Mamplasan"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Camille International Village",
+   "kind": "area",
+   "barangays": [
+    "De La Paz"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Celina Homes Biñan",
+   "kind": "area",
+   "barangays": [
+    "Loma",
+    "Timbao"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Celina Mansion",
+   "kind": "area",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Doña Marcela Subdivision",
+   "kind": "area",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Faraon Subdivision",
+   "kind": "area",
+   "barangays": [
+    "Casile",
+    "Malaban",
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Ferlines Subdivision",
+   "kind": "area",
+   "barangays": [
+    "San Vicente"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Filinvest South",
+   "kind": "area",
+   "barangays": [
+    "Canlalay",
+    "San Francisco",
+    "Soro-soro",
+    "Tubigan"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Garcia Filart",
+   "kind": "area",
+   "barangays": [
+    "Platero"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Generosa Village",
+   "kind": "area",
+   "barangays": [
+    "Casile",
+    "Malaban"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Jonelta Housing",
+   "kind": "area",
+   "barangays": [
+    "Santo Niño"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Juana 1",
+   "kind": "area",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Juana 3",
+   "kind": "area",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Juana 6",
+   "kind": "area",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Laguna BelAir 3",
+   "kind": "area",
+   "barangays": [
+    "Ganado",
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Maranan Subdivision",
+   "kind": "area",
+   "barangays": [
+    "De La Paz"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Muñoz Compound",
+   "kind": "area",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Narbonita Residences",
+   "kind": "area",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Nepa Highway Homes",
+   "kind": "area",
+   "barangays": [
+    "San Vicente"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Olivarez Homes South - Phase 1",
+   "kind": "area",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Olivarez Homes South - Phase 5",
+   "kind": "area",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Pasadeña Heights",
+   "kind": "area",
+   "barangays": [
+    "Platero",
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Phuket Mansions",
+   "kind": "area",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Prominence II at Brentville",
+   "kind": "area",
+   "barangays": [
+    "Mamplasan"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Rosaflor Subdivision",
+   "kind": "area",
+   "barangays": [
+    "Platero"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Saint Francis Homes 7 Subdivision",
+   "kind": "area",
+   "barangays": [
+    "Malaban",
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Saint Francis X Subdivision",
+   "kind": "area",
+   "barangays": [
+    "Platero",
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "San Agustin Village",
+   "kind": "area",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "San Jose Village I - Phase 4C",
+   "kind": "area",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Segunda Village",
+   "kind": "area",
+   "barangays": [
+    "Platero",
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Sevina Park",
+   "kind": "area",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Silmer Village",
+   "kind": "area",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "South Plains II",
+   "kind": "area",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Southville 5",
+   "kind": "area",
+   "barangays": [
+    "Malamig",
+    "Timbao"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Southwoods City",
+   "kind": "area",
+   "barangays": [
+    "San Francisco",
+    "Soro-soro"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Stonecrest",
+   "kind": "area",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "The Arborage at Brentville",
+   "kind": "area",
+   "barangays": [
+    "Mamplasan"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "The Racha Mansions",
+   "kind": "area",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Tokyo Mansions",
+   "kind": "area",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Town & Country Southville",
+   "kind": "area",
+   "barangays": [
+    "Bungahan",
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "United Estates Townhomes",
+   "kind": "area",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Venido",
+   "kind": "area",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Verdana Homes",
+   "kind": "area",
+   "barangays": [
+    "Langkiwa",
+    "Loma",
+    "Timbao"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Village Front at Brentville",
+   "kind": "area",
+   "barangays": [
+    "Mamplasan"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Villaggio di Xavier",
+   "kind": "area",
+   "barangays": [
+    "Platero"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Zenaida Sudivision (Tulay Bato)",
+   "kind": "area",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Iglesia ni Cristo",
+   "kind": "landmark",
+   "barangays": [
+    "Santo Tomas",
+    "Tubigan"
+   ],
+   "features": 2,
+   "length_m": null
+  },
+  {
+   "name": "Advent Caregiver School, Inc.",
+   "kind": "landmark",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Ang Dating Daan (MCGI)",
+   "kind": "landmark",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Biñan Adventist Elementary School",
+   "kind": "landmark",
+   "barangays": [
+    "San Vicente"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Biñan Faith Bible Christian Church",
+   "kind": "landmark",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Biñan Secondary School of Applied Academics (Main Campus)",
+   "kind": "landmark",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Bulwagang Pambarangay ng Casile",
+   "kind": "landmark",
+   "barangays": [
+    "Casile"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Bulwagang Pambarangay ng Dela Paz",
+   "kind": "landmark",
+   "barangays": [
+    "De La Paz"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Caritas Don Bosco School",
+   "kind": "landmark",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Casa Del Niño Montessori School - Biñan Campus",
+   "kind": "landmark",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Church of Christ At Binan (33AD)",
+   "kind": "landmark",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Colegio San Agustin - Biñan",
+   "kind": "landmark",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "De La Salle University Laguna Campus",
+   "kind": "landmark",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "GS Option House and Learning Center",
+   "kind": "landmark",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "His Life City Church Laguna",
+   "kind": "landmark",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Holy Child Jesus Academy of Biñan",
+   "kind": "landmark",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Iglesia Ni Cristo Bel-Air Extension",
+   "kind": "landmark",
+   "barangays": [
+    "Loma"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Jacobo Z. Gonzales Memorial National High School",
+   "kind": "landmark",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Jacobo Z. Gonzales Memorial School of Arts and Trades",
+   "kind": "landmark",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Kingdom Hall of Jehovah's Witnesses",
+   "kind": "landmark",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "La Consolacion College-Biñan",
+   "kind": "landmark",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Lake Shore Educational Intitution",
+   "kind": "landmark",
+   "barangays": [
+    "Canlalay",
+    "Santo Domingo"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Lokal ng Casile",
+   "kind": "landmark",
+   "barangays": [
+    "Casile"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Lokal ng Dela Paz",
+   "kind": "landmark",
+   "barangays": [
+    "De La Paz"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Metroville Complex Clubhaus",
+   "kind": "landmark",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Montessorri Children Workshop",
+   "kind": "landmark",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Nuestra Señora dela Paz Buenviaje",
+   "kind": "landmark",
+   "barangays": [
+    "De La Paz"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Ospital ng Binan (extension)",
+   "kind": "landmark",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Ospital ng Biñan",
+   "kind": "landmark",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Our Lady of Fatima Mini-Parish",
+   "kind": "landmark",
+   "barangays": [
+    "Tubigan"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Our Lady of Lourdes Elementary School",
+   "kind": "landmark",
+   "barangays": [
+    "Malamig"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Paaralang Elementarya ng Santo Tomas",
+   "kind": "landmark",
+   "barangays": [
+    "Santo Tomas"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Pagkakaisa Elementary School",
+   "kind": "landmark",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Panorama Montessori School",
+   "kind": "landmark",
+   "barangays": [
+    "Canlalay"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Pedro H. Escueta Memorial Elementary School",
+   "kind": "landmark",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Polytechnic University of the Philippines Biñan",
+   "kind": "landmark",
+   "barangays": [
+    "Zapote"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Saint Francis Chapel",
+   "kind": "landmark",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Saint John Bosco Institute of Arts & Science Inc.",
+   "kind": "landmark",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Saint Michael College of Laguna",
+   "kind": "landmark",
+   "barangays": [
+    "Platero"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Saint Stephen Chapel",
+   "kind": "landmark",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "San Antonio de Padua Parish Church",
+   "kind": "landmark",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "San Isidro Labrador Parish",
+   "kind": "landmark",
+   "barangays": [
+    "Poblacion"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "San Vicente Ferrer Parish Church",
+   "kind": "landmark",
+   "barangays": [
+    "San Vicente"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Santo Niño de Cebu Parish",
+   "kind": "landmark",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Santuario de La Salle",
+   "kind": "landmark",
+   "barangays": [
+    "Biñan"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Seventh-day Adventist Church",
+   "kind": "landmark",
+   "barangays": [
+    "San Vicente"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Southville 5 Elementary School - Timbao Annex",
+   "kind": "landmark",
+   "barangays": [
+    "Timbao"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Southville 5-A National High School – Annex",
+   "kind": "landmark",
+   "barangays": [
+    "Langkiwa"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "The Church of Jesus Christ of Latter-day Saints",
+   "kind": "landmark",
+   "barangays": [
+    "Santo Domingo"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Tomas A. Turalba Memorial Elementary School",
+   "kind": "landmark",
+   "barangays": [
+    "Bungahan"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Trimex Colleges",
+   "kind": "landmark",
+   "barangays": [
+    "Poblacion"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Unihealth Southwoods Hospital and Medical Center",
+   "kind": "landmark",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Unity Christian Fellowship",
+   "kind": "landmark",
+   "barangays": [
+    "Platero"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "University of Perpetual Help System Laguna",
+   "kind": "landmark",
+   "barangays": [
+    "Santo Niño"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Word of Faith Baptist Christian Church",
+   "kind": "landmark",
+   "barangays": [
+    "San Francisco"
+   ],
+   "features": 1,
+   "length_m": null
+  },
+  {
+   "name": "Worship International Ministries Biñan",
+   "kind": "landmark",
+   "barangays": [
+    "San Antonio"
+   ],
+   "features": 1,
+   "length_m": null
+  }
+ ]
+}

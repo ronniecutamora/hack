@@ -129,8 +129,8 @@ def test_a_transcribe_entry_has_one_row_per_setting_and_marks_the_bots(path):
     assert entry.metrics["settings"]["barangays"]["wer"] == 0.163
     text = eval_results.render_markdown(eval_results.load(path))
     voice = "| muse-voice-transcribe-1.0 | Taglish voice notes (real) | 8 |"
-    assert f"{voice} Language hint | 19.8% | 17.8% | – |" in text  # unlabeled: no place score
-    assert f"{voice} Hint + barangay names **(the bot)** | 16.3% | 14.3% | 9 of 10 |" in text
+    assert f"{voice} Language hint | 31 | 19.8% | 17.8% | – | – |" in text  # unlabeled: no places
+    assert f"{voice} Hint + barangay names **(the bot)** | 31 | 16.3% | 14.3% | 9 of 10 |" in text
 
 
 def _broken(change):

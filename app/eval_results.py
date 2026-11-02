@@ -43,13 +43,14 @@ the free rule), model_calls (screening calls made), unsure and miss_ids. ``score
 precision, recall, f1 and the tp/fp/fn/tn counts. ``transcribe`` metrics (Voice Transcribe on
 voice notes, scripts.eval_transcribe): reference_words, production (the settings key the bot
 uses) and settings {name: {label, language_bias (list or null), keywords (what was sent:
-"none", "barangays" or "barangays+places"), keyword_count, wer, wer_clean (after
-app.transcript_cleanup), place_names_heard, place_names (both null when unlabeled)}}; every
-setting was run on the same n notes. ``crosscheck`` metrics (Spark and SAM checking each other,
-app.crosscheck, scored by scripts.eval_crosscheck from a photo_judge run's outputs): photos,
-disagreed (photos where any rule fired), asked (photos where a rule that asks the officer
-fired) and checks {code: {asks, fired, spark_right, sam_right}}, where spark_right + sam_right
-== fired.
+"none", "barangays", "barangays+places", "barangays+osm" or "barangays+osm:N"), keyword_count,
+wer, wer_clean (after app.transcript_cleanup), place_names_heard, place_names (both null when
+unlabeled), insertions (keyword-list names the transcript has that the script does not;
+absent in runs recorded before 2026-11-02)}}; every setting was run on the same n notes.
+``crosscheck`` metrics (Spark and SAM checking each other, app.crosscheck, scored by
+scripts.eval_crosscheck from a photo_judge run's outputs): photos, disagreed (photos where
+any rule fired), asked (photos where a rule that asks the officer fired) and checks {code:
+{asks, fired, spark_right, sam_right}}, where spark_right + sam_right == fired.
 """
 
 import json
@@ -83,7 +84,7 @@ SCREEN_KEYS = (
 )  # fmt: skip
 TRANSCRIBE_SETTING_KEYS = (
     "label", "language_bias", "keywords", "keyword_count", "wer", "wer_clean",
-    "place_names_heard", "place_names",
+    "place_names_heard", "place_names", "insertions",
 )  # fmt: skip
 CROSSCHECK_KEYS = ("asks", "fired", "spark_right", "sam_right")
 
@@ -249,7 +250,11 @@ def _transcribe_errors(metrics: dict[str, Any]) -> list[str]:
         errors.append("metrics.production must name one of the settings")
     for name, setting in settings.items():
         where = f"metrics.settings.{name}"
-        if not isinstance(setting, dict) or set(setting) != set(TRANSCRIBE_SETTING_KEYS):
+        keys = set(setting) if isinstance(setting, dict) else set()
+        if keys not in (
+            set(TRANSCRIBE_SETTING_KEYS),
+            set(TRANSCRIBE_SETTING_KEYS) - {"insertions"},
+        ):
             errors.append(f"{where} needs exactly {', '.join(TRANSCRIBE_SETTING_KEYS)}")
             continue
         if not all(_rate(setting[k]) for k in ("wer", "wer_clean")):
@@ -259,8 +264,8 @@ def _transcribe_errors(metrics: dict[str, Any]) -> list[str]:
             _count(heard) and _positive_int(total) and heard <= total
         ):
             errors.append(f"{where}: place_names_heard must be a count up to place_names")
-        if not _count(setting["keyword_count"]):
-            errors.append(f"{where}: keyword_count must be a count")
+        if not _count(setting["keyword_count"]) or not _count(setting.get("insertions", 0)):
+            errors.append(f"{where}: keyword_count and insertions must be counts")
     return errors
 
 
@@ -475,9 +480,9 @@ def render_markdown(results: Results) -> str:
             "**Voice Transcribe** (Taglish voice notes through the bot's own audio path; WER "
             'counts every word that differs, so "seventy" for "70" is an error):',
             "",
-            "| Model | Dataset | n | Setting | WER | WER after cleanup | Place names heard "
-            "| Date |",
-            "|---|---|---|---|---|---|---|---|",
+            "| Model | Dataset | n | Setting | Keywords | WER | WER after cleanup "
+            "| Place names heard | False insertions | Date |",
+            "|---|---|---|---|---|---|---|---|---|---|",
         ]
         for e in transcribes:
             for name, s in e.metrics["settings"].items():
@@ -487,7 +492,8 @@ def render_markdown(results: Results) -> str:
                 )
                 lines.append(
                     f"| {e.model} | {_dataset_cell(e.dataset)} | {e.n} | {label} "
-                    f"| {s['wer']:.1%} | {s['wer_clean']:.1%} | {places} | {e.date} |"
+                    f"| {s['keyword_count']} | {s['wer']:.1%} | {s['wer_clean']:.1%} | {places} "
+                    f"| {s.get('insertions', '–')} | {e.date} |"
                 )
         lines.append("")
     return "\n".join([*lines, README_END])

@@ -414,8 +414,10 @@ class IntakeService:
                 self.transcriber,
                 audio_path,
                 language_bias=LANGUAGE_BIAS,
-                # Biñan's barangay names: keywords help only for places on the list (voice-notes-8
-                # in data/eval/results.json: 3/10 -> 10/10 with them listed, 3/10 without)
+                # Biñan's barangay names, then its OpenStreetMap streets, subdivisions and
+                # landmarks up to the API's 500 keywords: keywords help only for places on the
+                # list (voice-notes-8 in data/eval/results.json: the notes' own place names
+                # 3/10 -> 10/10 once listed), and the 500-name list cost no WER or insertions
                 keywords=transcription_keywords(),
                 convert=self.convert,
             )

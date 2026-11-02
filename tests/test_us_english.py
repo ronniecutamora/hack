@@ -65,6 +65,9 @@ ALLOWED_TOKENS = {
     "CancelledError": "asyncio's exception name",
     ".cancelled()": "asyncio's Task and Future method",
     "DamageJudgement": "the JSON schema name inside cached Spark photo requests",
+    '"neighbourhood"': "an OpenStreetMap tag value (place=neighbourhood)",
+    "(neighbourhood|": "the same tag value inside the stored Overpass query",
+    "community_centre": "an OpenStreetMap tag value (amenity=community_centre)",
 }
 # Files whose British text is stored data we must not change.
 ALLOWED_FILES = {

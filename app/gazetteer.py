@@ -7,13 +7,19 @@ Names and PSGC-based codes come from the OCHA COD-AB Philippines dataset (PSA an
 admin level 4, version v03, valid on 2025-02-13), downloaded 2026-10-27 from
 https://data.humdata.org/dataset/cod-ab-phl (license CC BY-IGO). The 24 names match PhilAtlas'
 list for Biñan (https://www.philatlas.com/luzon/r04a/laguna/binan.html).
+
+Street, subdivision and landmark names for keyword biasing come from OpenStreetMap
+(app/data/binan_places.json, rebuilt by scripts.build_places; © OpenStreetMap contributors,
+ODbL 1.0). They are never used to match or place a report: only to bias the transcript.
 """
 
 import difflib
+import json
 import re
 import unicodedata
 from dataclasses import dataclass
 from functools import cache
+from pathlib import Path
 
 CITY_PCODE = "PH0403403"
 
@@ -103,14 +109,50 @@ def normalize(text: str) -> str:
     return " ".join(_ABBREVIATIONS.get(w, w) for w in words)
 
 
-def transcription_keywords() -> list[str]:
-    """Names to bias Voice Transcribe toward, with their usual spelling (accents kept)."""
+PLACES_FILE = Path(__file__).parent / "data" / "binan_places.json"
+# Voice Transcribe's keyword limits. The docs give none; the API answers HTTP 400 "Too many ASR
+# keywords: received 501, maximum is 500" and "ASR keyword 67 exceeds the maximum length of 30
+# characters" (tested 2026-11-02).
+KEYWORD_LIMIT = 500
+KEYWORD_MAX_CHARS = 30
+# The OpenStreetMap names in keyword order when not all of them fit: the subdivisions, sitios and
+# puroks people give as an address, then landmarks, then streets by their length inside Biñan.
+PLACE_KIND_ORDER = ("area", "landmark", "street")
+# How many of those names the bot sends after the barangay names (0: none; None: as many as fit,
+# 471 of the 522 names of at most 30 characters today). Chosen on voice-notes-8
+# (data/eval/results.json, 2026-11-02): the full list did not make WER (19.1% vs 20.3% with the
+# barangays only) or false insertions (0 vs 0) worse.
+# The notes name no Biñan street, so this measured the cost of the long list, not its benefit.
+BOT_PLACE_KEYWORDS: int | None = None
+
+
+@cache
+def place_keywords() -> tuple[str, ...]:
+    """Biñan's OpenStreetMap names that fit a keyword, in PLACE_KIND_ORDER (no barangay name)."""
+    places = json.loads(PLACES_FILE.read_text(encoding="utf-8"))["places"]
+    order = {kind: i for i, kind in enumerate(PLACE_KIND_ORDER)}
+    ranked = sorted(  # stable: each kind keeps the file's own ranking
+        (p for p in places if len(p["name"]) <= KEYWORD_MAX_CHARS), key=lambda p: order[p["kind"]]
+    )
+    taken = {normalize(n) for b in BARANGAYS for n in b.names}
+    names = []
+    for place in ranked:
+        if (folded := normalize(place["name"])) not in taken:
+            taken.add(folded)
+            names.append(place["name"])
+    return tuple(names)
+
+
+def transcription_keywords(places: int | None = BOT_PLACE_KEYWORDS) -> list[str]:
+    """Names to bias Voice Transcribe toward, with their usual spelling (accents kept): every
+    barangay name, then up to `places` OpenStreetMap names (None: as many as the API takes)."""
     keywords: list[str] = []
     for barangay in BARANGAYS:
         for name in barangay.names:
             if not name.startswith(("Sto.", "Sta.")) and name not in keywords:
                 keywords.append(name)
-    return keywords
+    room = KEYWORD_LIMIT - len(keywords)
+    return keywords + list(place_keywords()[: room if places is None else min(places, room)])
 
 
 @dataclass(frozen=True)

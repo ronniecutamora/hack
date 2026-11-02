@@ -156,12 +156,12 @@ Measured on labeled sets with real (cached) model calls, not mocks. Every number
 
 **Voice Transcribe** (Taglish voice notes through the bot's own audio path; WER counts every word that differs, so "seventy" for "70" is an error):
 
-| Model | Dataset | n | Setting | WER | WER after cleanup | Place names heard | Date |
-|---|---|---|---|---|---|---|---|
-| muse-voice-transcribe-1.0 | Taglish voice notes (real) | 8 | No language hint | 19.3% | 16.5% | 3 of 10 | 2026-11-02 |
-| muse-voice-transcribe-1.0 | Taglish voice notes (real) | 8 | Language hint (Tagalog, English) | 19.8% | 16.5% | 3 of 10 | 2026-11-02 |
-| muse-voice-transcribe-1.0 | Taglish voice notes (real) | 8 | Hint + Biñan's barangay names **(the bot)** | 21.6% | 18.3% | 3 of 10 | 2026-11-02 |
-| muse-voice-transcribe-1.0 | Taglish voice notes (real) | 8 | Hint + barangay names + the notes' own place names | 16.3% | 15.0% | 10 of 10 | 2026-11-02 |
+| Model | Dataset | n | Setting | Keywords | WER | WER after cleanup | Place names heard | False insertions | Date |
+|---|---|---|---|---|---|---|---|---|---|
+| muse-voice-transcribe-1.0 | Taglish voice notes (real) | 8 | No language hint | 0 | 19.3% | 16.5% | 3 of 10 | – | 2026-11-02 |
+| muse-voice-transcribe-1.0 | Taglish voice notes (real) | 8 | Language hint (Tagalog, English) | 0 | 19.8% | 16.5% | 3 of 10 | – | 2026-11-02 |
+| muse-voice-transcribe-1.0 | Taglish voice notes (real) | 8 | Hint + Biñan's barangay names **(the bot)** | 29 | 21.6% | 18.3% | 3 of 10 | – | 2026-11-02 |
+| muse-voice-transcribe-1.0 | Taglish voice notes (real) | 8 | Hint + barangay names + the notes' own place names | 39 | 16.3% | 15.0% | 10 of 10 | – | 2026-11-02 |
 
 <!-- eval-results:end -->
 
@@ -637,6 +637,8 @@ uv run python -m scripts.eval_transcribe /path/to/test-audio --only 3-10 --recor
 # Paid eval scripts log every call to DATA_DIR/eval-spend.db, print the cost of the uncached calls
 # (a free cache-only dry run) and refuse to pass --spend-cap (default $5.00)
 uv run python -m scripts.eval_facts /path/to/recordings [--llm muse-spark-open]     # facts.json + audio
+# Rebuild Biñan's street and place names from OpenStreetMap (free; --raw reuses a saved response)
+uv run python -m scripts.build_places [--save-raw overpass.json | --raw overpass.json]
 # Delete expired raw media once (the bot and a running web app are not required)
 uv run python -m app.retention
 ```
@@ -815,6 +817,7 @@ Data:
 | Name | License | Used for |
 |---|---|---|
 | [OpenStreetMap](https://www.openstreetmap.org/copyright) map tiles (`tile.openstreetmap.org`, loaded by the browser, not stored here) | [ODbL](https://opendatacommons.org/licenses/odbl/) data; tiles CC BY-SA, attributed "© OpenStreetMap contributors" on the map | Basemap of the officer map, under the [tile usage policy](https://operations.osmfoundation.org/policies/tiles/) (light, interactive use) |
+| [OpenStreetMap](https://www.openstreetmap.org/copyright) data: Biñan's named streets, subdivisions, sitios and landmarks, queried through the [Overpass API](https://overpass-api.de/) (data as of 2026-11-02) | [ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/), © OpenStreetMap contributors | `app/data/binan_places.json` (560 names, with the query that made it; rebuilt by `scripts/build_places.py`): the Voice Transcribe keyword list. It is a derived database under the ODbL, so it stays under the ODbL (share-alike) and keeps this attribution; the MIT License of this repository does not cover it |
 | [OCHA COD-AB Philippines](https://data.humdata.org/dataset/cod-ab-phl) admin level 4 (sources: PSA, NAMRIA), v03, valid on 2025-02-13 | [CC BY-IGO](https://creativecommons.org/licenses/by/3.0/igo/) | Barangay names, codes and boundaries for Biñan in `app/data/binan_barangays.geojson` (24 polygons, clipped and simplified to about 3 m). OCHA notes the boundaries are indicative, not official |
 | 25 Wikimedia Commons photos of Philippine typhoon damage (eval set `kill-test-25`; **not copied into this repository**; only aggregate metrics are) | CC BY 2.0, CC BY-SA 3.0/4.0 or public domain, per photo | Photo-judge and SAM accuracy in "How well it works". Authors and sources: DFID - UK Department for International Development (CC BY 2.0): [img01](https://commons.wikimedia.org/wiki/File:A_car_up-ended_amid_the_wreckage_of_buildings_destroyed_by_Typhoon_Haiyan_in_Tacloban,_Philippines_(11290331544).jpg), [img02](https://commons.wikimedia.org/wiki/File:A_few_palm_trees_remain_standing_amid_the_destruction_caused_by_Typhoon_Haiyan_in_the_city_of_Tacloban,_Philippines_(11290331484).jpg), [img03](https://commons.wikimedia.org/wiki/File:A_man_stands_surrounded_by_the_devastation_wrought_by_Typhoon_Haiyan_in_the_city_of_Tacloban_(11290380063).jpg), [img06](https://commons.wikimedia.org/wiki/File:Rebuilding_after_Typhoon_Haiyan,_in_Guinan,_Philippines_(13943379519).jpg); Trocaire from Ireland (CC BY 2.0): [img04](https://commons.wikimedia.org/wiki/File:Tacloban_Typhoon_Haiyan_2013-11-14.jpg); Master Sgt. Antoine Robinson (Public domain): [img05](https://commons.wikimedia.org/wiki/File:Operation_Damayan_131123-M-IE150-015.jpg); Exec8 (CC BY-SA 4.0): [img07](https://commons.wikimedia.org/wiki/File:Flooding_in_Culiat_Creek_in_Project_8,_Quezon_City_Philippines_from_Typhoon_Ketsana_(Ondoy).webm), [img08](https://commons.wikimedia.org/wiki/File:Flooding_in_Hereford_Street,_Project_8,_Quezon_City,_Philippines_from_Typhoon_Ketsana_(Ondoy)_1.webm); Exec8 (Public domain): [img09](https://commons.wikimedia.org/wiki/File:Ketsana_002.jpg); Philippinepresidency (CC BY-SA 3.0): [img10](https://commons.wikimedia.org/wiki/File:Ondoy4.jpg); The Philippine Online Chronicles from The Philippines (CC BY 2.0): [img11](https://commons.wikimedia.org/wiki/File:Ondoy_(3967857165).jpg); IRRI Images (CC BY 2.0): [img12](https://commons.wikimedia.org/wiki/File:Typhoon_Ketsana_flood_near_Laguna_de_Bay.jpg); PaulGorduiz106 (CC BY-SA 4.0): [img13](https://commons.wikimedia.org/wiki/File:Damaged_tree_(12-24-2021).jpg), [img16](https://commons.wikimedia.org/wiki/File:Damaged_trees_(12-17-2021).jpg); ALFRED FRIAS / PRESIDENTIAL PHOTO (Public domain): [img14](https://commons.wikimedia.org/wiki/File:Photo_of_Typhoon_Odette-battered_areas_in_Tisa,_Cebu_City_01.jpg), [img15](https://commons.wikimedia.org/wiki/File:Photo_of_Typhoon_Odette-battered_areas_in_Tisa,_Cebu_City_02.jpg); Martin Michlmayr (CC BY-SA 4.0): [img17](https://commons.wikimedia.org/wiki/File:Aftermath_of_Typhoon_Rai_in_Cebu_City_2021_12_022.jpg), [img18](https://commons.wikimedia.org/wiki/File:Aftermath_of_Typhoon_Rai_on_Mactan_island_2021_12_001.jpg), [img19](https://commons.wikimedia.org/wiki/File:Aftermath_of_Typhoon_Rai_on_Mactan_island_2021_12_005.jpg), [img20](https://commons.wikimedia.org/wiki/File:Aftermath_of_Typhoon_Rai_on_Mactan_island_2021_12_006.jpg), [img21](https://commons.wikimedia.org/wiki/File:Aftermath_of_Typhoon_Rai_on_Mactan_island_2021_12_009.jpg), [img22](https://commons.wikimedia.org/wiki/File:Aftermath_of_Typhoon_Rai_on_Mactan_island_2021_12_025.jpg), [img23](https://commons.wikimedia.org/wiki/File:Aftermath_of_Typhoon_Rai_on_Mactan_island_2021_12_016.jpg), [img24](https://commons.wikimedia.org/wiki/File:Aftermath_of_Typhoon_Rai_on_Mactan_island_2021_12_018.jpg), [img25](https://commons.wikimedia.org/wiki/File:Aftermath_of_Typhoon_Rai_on_Mactan_island_2021_12_020.jpg) |
 
@@ -843,7 +846,8 @@ app/
   trace.py             Agent trace context: the pipeline steps, the Meta model families, the call-to-report link
   agent_trace.py       Each report's agent trace (model, rule and officer steps) and a draft's model calls
   accuracy.py          The /accuracy page from data/eval/results.json: tables, captions, provenance
-  gazetteer.py         Biñan's 24 barangays: names, aliases, matching in text, transcription keywords
+  gazetteer.py         Biñan's 24 barangays: names, aliases, matching in text, transcription keywords (with
+                       the OpenStreetMap names of data/binan_places.json, up to Voice Transcribe's 500)
   geo.py, data/        Point-in-barangay lookup on COD-AB boundaries; photo EXIF GPS
   transcript_cleanup.py  Removes repeated-word artifacts from transcripts
   facts.py, photo.py   Fact extraction; photo judgment, SAM measurement and evidence overlay
@@ -877,6 +881,7 @@ app/
   evaluation.py        WER, place names heard, Cohen's kappa and F1 helpers
 scripts/
   build_icons.py       Builds the Material Symbols icon sprite from a list of icon names
+  build_places.py      Rebuilds app/data/binan_places.json from OpenStreetMap (Overpass API, idempotent)
   eval_transcribe.py   Voice Transcribe WER and place names per setting, on recordings outside the repo
   eval_vision.py       Photo judge and SAM vs hand labels, per agent LLM
   eval_crosscheck.py   How often Spark and SAM disagree and whom the hand label sides with (free, from eval_vision's outputs)
@@ -900,7 +905,7 @@ Ronnie Cutamora.
 The MIT License covers only what was written for this project. Everything listed under
 [Third-party code and assets](#third-party-code-and-assets) keeps its own terms: the Python libraries and the
 vendored Leaflet and htmx files, the Roboto font and the Material Symbols icons (their licenses are in the table, and the vendored copies keep their LICENSE files),
-the OCHA COD-AB boundaries (CC BY-IGO, credit to OCHA, PSA and NAMRIA), the OpenStreetMap tiles (ODbL, "©
-OpenStreetMap contributors"), the Wikimedia Commons eval photos (CC BY, CC BY-SA or public domain per photo; not in
+the OCHA COD-AB boundaries (CC BY-IGO, credit to OCHA, PSA and NAMRIA), the OpenStreetMap tiles and the
+OpenStreetMap place names in `app/data/binan_places.json` (ODbL, share-alike, "© OpenStreetMap contributors"), the Wikimedia Commons eval photos (CC BY, CC BY-SA or public domain per photo; not in
 this repository, credited by author above) and the bot avatar (see its row). Meta's models are used through their
 APIs under Meta's terms and are not part of this repository.

@@ -16,10 +16,13 @@ WAV, then muse-voice-transcribe-1.0) once per setting in SETTINGS, so every sett
 on the same notes. `--language` / `--keywords` run one custom setting instead (not recordable).
 
 Metrics per setting: corpus WER (all word errors over all reference words, not a mean of
-per-note rates), raw and after app.transcript_cleanup, and the labeled place names that occur
-in the transcript with their spelling. Key-fact accuracy is not measured here: the references
-are plain text, and speakers say numbers as words ("seventy", "dalawa't kalahati"), so a fact
-can only be read back by the extraction step; scripts.eval_facts measures that end to end.
+per-note rates), raw and after app.transcript_cleanup, the labeled place names that occur
+in the transcript with their spelling, and false insertions: names from any setting's keyword
+list (barangays, Biñan's OpenStreetMap names, the notes' own places) that the transcript has
+more often than the script (app.evaluation.names_inserted), the cost of a long list. Key-fact
+accuracy is not measured here: the references are plain text, and speakers say numbers as
+words ("seventy", "dalawa't kalahati"), so a fact can only be read back by the extraction step;
+scripts.eval_facts measures that end to end.
 
 After confirmation, a free cache-only dry run prices the uncached calls by their audio length;
 the estimate is checked against the spend cap (scripts/spend.py), and a run stops paying at the
@@ -42,6 +45,7 @@ from app.config import get_settings
 from app.evaluation import (
     corpus_word_error_rate,
     names_heard,
+    names_inserted,
     normalize_text,
     outside_repo,
     word_error_rate,
@@ -67,15 +71,21 @@ class Setting:
     name: str
     label: str
     language_bias: list[str] | None
-    keywords: str  # "none", "barangays", "barangays+places", or a custom comma list
+    # "none", "barangays", "barangays+places" (the notes' own), "barangays+osm" (Biñan's
+    # OpenStreetMap names up to the API's limit) or "barangays+osm:N" (the first N of them),
+    # or a custom comma list
+    keywords: str
 
     def keyword_list(self, places: list[str]) -> list[str] | None:
         if self.keywords == "none":
             return None
         if self.keywords in ("barangays", "barangays+places"):
-            names = transcription_keywords()
+            names = transcription_keywords(places=0)
             extra = places if self.keywords == "barangays+places" else []
             return names + [p for p in extra if p not in names]
+        if self.keywords.startswith("barangays+osm"):
+            _, _, count = self.keywords.partition(":")
+            return transcription_keywords(places=int(count) if count else None)
         return [k.strip() for k in self.keywords.split(",") if k.strip()] or None
 
 
@@ -92,8 +102,28 @@ SETTINGS = (
         LANGUAGE_BIAS,
         "barangays+places",
     ),
+    # Biñan's streets, subdivisions and landmarks from OpenStreetMap (app/data/binan_places.json):
+    # all 553 do not fit (the API takes 500 keywords of at most 30 characters), so the first 100,
+    # then as many as fit, in app.gazetteer's order.
+    Setting(
+        "barangays_and_osm_100",
+        "Hint + barangay names + 100 Biñan street and place names",
+        LANGUAGE_BIAS,
+        "barangays+osm:100",
+    ),
+    Setting(
+        "barangays_and_osm",
+        "Hint + barangay names + Biñan street and place names, up to the 500-keyword limit",
+        LANGUAGE_BIAS,
+        "barangays+osm",
+    ),
 )
-PRODUCTION = "barangays"
+# The setting that sends what the bot sends (app.intake.IntakeService._transcribe).
+PRODUCTION = next(
+    s.name
+    for s in SETTINGS
+    if s.language_bias == LANGUAGE_BIAS and s.keyword_list([]) == transcription_keywords()
+)
 
 
 def find_pairs(folder: Path) -> list[tuple[Path, Path]]:
@@ -189,6 +219,7 @@ class Scored:
     pairs: list[tuple[str, str]]  # (reference, hypothesis)
     heard: int = 0
     places: int = 0
+    inserted: int = 0
 
 
 async def evaluate(
@@ -207,6 +238,8 @@ async def evaluate(
     """
     all_places = [p for note, _, _ in notes for p in labels.get(note, [])]
     scored = [Scored(s, len(s.keyword_list(all_places) or []), []) for s in settings]
+    # Insertions are counted over every name any setting sends, so the settings compare.
+    pool = list(dict.fromkeys(k for s in settings for k in s.keyword_list(all_places) or []))
     failed = skipped = 0
     echo(f"{'note':12} " + " ".join(f"{s.name[:20]:>20}" for s in settings) + "  words")
     for note, reference, audio in notes:
@@ -243,6 +276,7 @@ async def evaluate(
             result.pairs.append((reference, hypothesis))
             result.heard += names_heard(places, hypothesis)
             result.places += len(places)
+            result.inserted += names_inserted(pool, reference, hypothesis)
         rates = " ".join(f"{word_error_rate(reference, h):20.1%}" for h in hypotheses)
         heard = (
             f"  places {'/'.join(str(names_heard(places, h)) for h in hypotheses)} of {len(places)}"
@@ -269,6 +303,7 @@ def metrics_of(scored: list[Scored], production: str) -> dict[str, Any]:
             ),
             "place_names_heard": result.heard if result.places else None,
             "place_names": result.places or None,
+            "insertions": result.inserted,
         }
     return {
         "reference_words": sum(len(normalize_text(r).split()) for r in references),
@@ -279,13 +314,13 @@ def metrics_of(scored: list[Scored], production: str) -> dict[str, Any]:
 
 def print_summary(metrics: dict[str, Any], n: int) -> None:
     print(f"\n{n} notes, {metrics['reference_words']} reference words")
-    print(f"{'setting':22} {'WER':>6} {'clean':>6}  places  keywords")
+    print(f"{'setting':22} {'WER':>6} {'clean':>6}  places  inserted  keywords")
     for name, s in metrics["settings"].items():
         places = f"{s['place_names_heard']}/{s['place_names']}" if s["place_names"] else "-"
         mark = "  (the bot)" if name == metrics["production"] else ""
         print(
             f"{name:22} {s['wer']:6.1%} {s['wer_clean']:6.1%}  {places:>6}  "
-            f"{s['keyword_count']}{mark}"
+            f"{s['insertions']:8}  {s['keyword_count']}{mark}"
         )
     print("clean = after app.transcript_cleanup (repeated-word artifacts removed)")
 

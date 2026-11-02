@@ -592,7 +592,9 @@ VOICE_INTRO = (
     "Muse Voice Transcribe turns each voice note into text before the agent reads it. Words "
     "wrong (word error rate) is the share of the script's words it got wrong, missed or added: "
     "lower is better, 0% is perfect. Place names heard counts the barangay and sitio names it "
-    "spelled right, which the agent needs to place a report on the map."
+    "spelled right, which the agent needs to place a report on the map. False insertions counts "
+    "place names from the keyword lists that the transcript has but the speaker never said: the "
+    "cost of sending a long list."
 )
 VOICE_PROVENANCE = (
     "Real recordings, but read from scripts by one speaker, with no wind, rain or crowd noise."
@@ -643,7 +645,10 @@ def _wer_chart(entry: Entry, settings: dict[str, Any], label: Callable[[str], st
         tables=[
             NumberTable(
                 "Voice Transcribe per request setting",
-                ["Setting", "Words wrong", "After cleanup", "Place names heard", "Keyword hints"],
+                [
+                    *("Setting", "Words wrong", "After cleanup", "Place names heard"),
+                    *("False insertions", "Keyword hints"),
+                ],
                 [
                     [
                         label(key),
@@ -652,6 +657,7 @@ def _wer_chart(entry: Entry, settings: dict[str, Any], label: Callable[[str], st
                         f"{s['place_names_heard']} of {s['place_names']}"
                         if s["place_names"]
                         else "not labeled",
+                        str(s.get("insertions", "–")),
                         str(s["keyword_count"]),
                     ]
                     for key, s in settings.items()

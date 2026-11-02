@@ -42,6 +42,19 @@ def names_heard(names: Iterable[str], text: str) -> int:
     return sum(bool(n) and f" {n} " in haystack for n in map(normalize_place, names))
 
 
+def names_inserted(names: Iterable[str], reference: str, hypothesis: str) -> int:
+    """How many times the hypothesis has one of `names` beyond the times the reference has it:
+    names a keyword list pulled into the transcript that the speaker did not say. Longer names
+    are matched first, so "Juan Luna Street" is one name, not also "Luna Street"."""
+    ref, hyp = normalize_place(reference), normalize_place(hypothesis)
+    inserted = 0
+    for name in sorted({n for n in map(normalize_place, names) if n}, key=len, reverse=True):
+        word = re.compile(rf"(?<!\S){re.escape(name)}(?!\S)")  # whole words only
+        inserted += max(0, len(word.findall(hyp)) - len(word.findall(ref)))
+        ref, hyp = word.sub("|", ref), word.sub("|", hyp)
+    return inserted
+
+
 def cohen_kappa(labels: Sequence[str], predictions: Sequence[str]) -> float:
     """Agreement between two labelings beyond chance (1 = perfect, 0 = chance level)."""
     if len(labels) != len(predictions) or not labels:

@@ -53,7 +53,8 @@ def test_the_production_setting_is_what_the_bot_sends():
     assert bot.language_bias == LANGUAGE_BIAS
     assert bot.keyword_list(["Talimusak"]) == transcription_keywords()
     with_places = by_name("barangays_and_places").keyword_list(["Talimusak", "Malaban"])
-    assert with_places == [*transcription_keywords(), "Talimusak"]  # Malaban is already listed
+    # The notes' places go after the barangay names only (Malaban is already listed).
+    assert with_places == [*transcription_keywords(places=0), "Talimusak"]
     assert by_name("language_hint").keyword_list(["Talimusak"]) is None
 
 
@@ -132,7 +133,7 @@ def test_a_recorded_run_stores_metrics_only(recordings, capsys):
     assert entry.backend == "Meta Model API" and entry.spend_usd > 0
     settings = entry.metrics["settings"]
     assert list(settings) == [s.name for s in eval_transcribe.SETTINGS]
-    assert entry.metrics["production"] == "barangays"
+    assert entry.metrics["production"] == eval_transcribe.PRODUCTION
     assert settings["barangays"]["place_names_heard"] == 0
     assert settings["barangays_and_places"]["place_names_heard"] == 1
     assert settings["barangays_and_places"]["place_names"] == 2
@@ -185,6 +186,6 @@ async def test_the_dry_run_prices_every_uncached_call_by_its_audio(recordings, s
         )
     finally:
         await transcriber.aclose()
-    # 2 notes x 4 settings, about 1 s of audio each: nothing is called, every miss is priced.
-    assert detail == "8 uncached call(s), 8 s of audio"
-    assert usd == pytest.approx(8 * 32_004 / 32_000 / 3600 * PRICE_PER_AUDIO_HOUR)
+    # 2 notes x 6 settings, about 1 s of audio each: nothing is called, every miss is priced.
+    assert detail == "12 uncached call(s), 12 s of audio"
+    assert usd == pytest.approx(12 * 32_004 / 32_000 / 3600 * PRICE_PER_AUDIO_HOUR)
