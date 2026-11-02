@@ -245,7 +245,7 @@ class TodoItem:
     href: str
     action: str  # the button: what happens when it is tapped
     icon: str
-    tone: str = ""  # "alert" | "warn" | "" (the card's colour only repeats what the words say)
+    tone: str = ""  # "alert" | "warn" | "" (the card's color only repeats what the words say)
     due: Countdown | None = None
     order: float = 0.0  # within a rank: lower first
 

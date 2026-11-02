@@ -121,7 +121,7 @@ async def test_the_pair_judgment_shows_its_call_beside_the_decision(settings, cl
     assert expected in trace
 
 
-async def test_officer_actions_follow_the_agent_steps_labelled_as_human(settings, client):
+async def test_officer_actions_follow_the_agent_steps_labeled_as_human(settings, client):
     engine = client.app.state.engine
     report_id = await assessed(settings, engine)
     with Session(engine) as session:

@@ -137,7 +137,7 @@ def images_command(settings: Settings, *, assume_yes: bool = False) -> int:
     if not assume_yes:
         answer = input(f"Generate {len(missing)} image(s) for ~${cost:.2f}? [y/N] ")
         if answer.strip().lower() not in ("y", "yes"):
-            print("Cancelled; no images generated.")
+            print("Canceled; no images generated.")
             return 0
     written = asyncio.run(
         ensure_images(

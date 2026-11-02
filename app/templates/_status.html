@@ -1,4 +1,4 @@
-{# Status badges: the word is always shown; the colour and the icon only repeat it. #}
+{# Status badges: the word is always shown; the color and the icon only repeat it. #}
 {% from "_icons.html" import icon %}
 {% macro incident_status(status) -%}
   <span class="chip {{ 'warn' if status == 'needs_officer' else 'info' }}">{{ icon('warning' if status == 'needs_officer' else 'info') }}{{ status|replace("_", " ") if technical() else status|plain_status }}</span>

@@ -62,7 +62,7 @@ def test_note_ids_take_ranges_and_lists():
     assert eval_transcribe.parse_only("3, 7,clip-a") == {"3", "7", "clip-a"}
 
 
-def test_place_names_count_only_when_spelled_as_labelled():
+def test_place_names_count_only_when_spelled_as_labeled():
     text = "Baha na po dito sa barangay Talimúsak, sityo Kawayanan"
     assert names_heard(["Talimusak", "Kawayanan", "Bagumbayan"], text) == 2
     assert names_heard(["Talimusak"], "barangay Talimosak") == 0

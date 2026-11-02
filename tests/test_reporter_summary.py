@@ -13,11 +13,11 @@ from app.assessment import AssessmentService
 from app.db import init_db, make_engine
 from app.incidents import IncidentService
 from app.models import AgentDecision, Assessment, Report
-from app.reporter_summary import FOOTER, HEADER, PLACE_UNKNOWN, Acknowledgements, summary_text
+from app.reporter_summary import FOOTER, HEADER, PLACE_UNKNOWN, Acknowledgments, summary_text
 from tests.test_abuse_guards import block, context, rows
 from tests.test_assessment import FakeLLM, FakeSam, facts, jpeg
 from tests.test_bot import Downloadable, make_update
-from tests.test_geo import CENTRES
+from tests.test_geo import CENTERS
 from tests.test_incidents import FakeJudge
 
 QUIET_S = 0.2
@@ -37,7 +37,7 @@ def summary_context(settings, engine, reply=None, judge=None):
     ctx.application.bot_data["assessor"] = AssessmentService(
         settings, engine, llm, FakeSam(), IncidentService(settings, engine, judge or FakeJudge())
     )
-    ctx.application.bot_data["acks"] = Acknowledgements(quiet_s=QUIET_S)
+    ctx.application.bot_data["acks"] = Acknowledgments(quiet_s=QUIET_S)
     return ctx, tasks, llm
 
 
@@ -99,7 +99,7 @@ async def test_one_summary_for_a_photo_its_pin_and_its_caption(settings, engine)
         settings, engine, facts(flood_depth="waist", houses_flooded=4, needs=["shelter"])
     )
     photo = message(photo=[Downloadable(jpeg())], caption=None)
-    lat, lon = CENTRES["Casile"]
+    lat, lon = CENTERS["Casile"]
     pin = message(location=SimpleNamespace(latitude=lat, longitude=lon))
     caption = message(text="Pinasok ng baha ang apat na bahay")
     await bot.on_photo(photo, ctx)
@@ -211,9 +211,9 @@ async def test_another_reporters_report_is_never_linked(settings, engine):
     assert mine.corrects_report_id is None
 
 
-def test_acknowledgements_keep_only_the_latest_generation_and_forget_after_the_window():
+def test_acknowledgments_keep_only_the_latest_generation_and_forget_after_the_window():
     now = [0.0]
-    acks = Acknowledgements(quiet_s=0, reply_window_s=60, limit=2, clock=lambda: now[0])
+    acks = Acknowledgments(quiet_s=0, reply_window_s=60, limit=2, clock=lambda: now[0])
     first, second = object(), object()
     g1 = acks.touch(7, first)
     g2 = acks.touch(7, second)
@@ -232,12 +232,12 @@ def test_acknowledgements_keep_only_the_latest_generation_and_forget_after_the_w
     now[0] = 61
     assert acks.replied_to(reply(3)) is None  # outside the reply window
     # A fresh process (a restart) knows no summary: replies become ordinary reports.
-    assert Acknowledgements().replied_to(reply(2)) is None
+    assert Acknowledgments().replied_to(reply(2)) is None
 
 
-def test_the_bot_turns_acknowledgements_on(settings):
+def test_the_bot_turns_acknowledgments_on(settings):
     from pydantic import SecretStr
 
     configured = settings.model_copy(update={"telegram_bot_token": SecretStr("123456:ABC-test")})
     application = bot.build_application(configured)
-    assert isinstance(application.bot_data["acks"], Acknowledgements)
+    assert isinstance(application.bot_data["acks"], Acknowledgments)

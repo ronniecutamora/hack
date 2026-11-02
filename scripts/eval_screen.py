@@ -1,4 +1,4 @@
-"""Score the not-a-report screen (app.screening) on labelled messages, with real cached calls.
+"""Score the not-a-report screen (app.screening) on labeled messages, with real cached calls.
 
     uv run python -m scripts.eval_screen [messages.json] [--llm muse-spark-1.3] [--yes]
         [--record data/eval/results.json [--dataset ID]] [--spend-cap USD] [--cached-only]

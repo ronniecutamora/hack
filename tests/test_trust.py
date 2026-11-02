@@ -16,7 +16,7 @@ from app.intake import IntakeService
 from app.models import Assessment, Incident, Media, PhotoAssessment, Report, Reporter
 from app.retention import purge_expired
 from tests.test_assessment import FakeLLM, FakeSam
-from tests.test_geo import CENTRES, jpeg_with_gps
+from tests.test_geo import CENTERS, jpeg_with_gps
 from tests.test_incidents import FakeJudge
 
 
@@ -140,10 +140,10 @@ def test_hash_respects_exif_orientation_and_invalid_input():
 @pytest.mark.parametrize(
     ("point", "text", "code"),
     [
-        (CENTRES["Malaban"], "dito sa Casile", "pin_text_mismatch"),
+        (CENTERS["Malaban"], "dito sa Casile", "pin_text_mismatch"),
         ((14.5995, 120.9842), "dito sa Casile", "pin_outside_binan"),
-        (CENTRES["Malaban"], "dito sa Malaban", None),
-        (CENTRES["Malaban"], "Malaban at Casile", None),
+        (CENTERS["Malaban"], "dito sa Malaban", None),
+        (CENTERS["Malaban"], "Malaban at Casile", None),
         (None, "dito sa Casile", None),
     ],
 )
@@ -154,7 +154,7 @@ async def test_location_signals_preserve_geolocation_choice(settings, engine, po
         await intake.ingest_location("a", *point)
     signals = await signals_for(settings, engine, report)
     assert [s["code"] for s in signals] == ([code] if code else [])
-    if point == CENTRES["Malaban"]:
+    if point == CENTERS["Malaban"]:
         assert row(engine, Assessment, report.id).geo_source == "pin"
 
 
@@ -197,7 +197,7 @@ async def test_lazy_hash_and_capture_evidence_survive_purge_and_reassessment(set
     settings.photo_hash_max_distance = 0
     with Session(engine) as session:
         r = session.get(Report, second.id)
-        r.lat, r.lon, r.text = *CENTRES["Malaban"], "dito sa Casile"
+        r.lat, r.lon, r.text = *CENTERS["Malaban"], "dito sa Casile"
         session.add(r)
         session.commit()
     signals = await signals_for(settings, engine, second)
@@ -214,7 +214,7 @@ async def test_incident_counts_distinct_reporters_and_never_sends_trust_to_judge
     reports = []
     for user in ("a", "a", "b"):
         r = await intake.ingest_text(user, "baha sa Malaban")
-        await intake.ingest_location(user, *CENTRES["Malaban"])
+        await intake.ingest_location(user, *CENTERS["Malaban"])
         await service.assess(r.id)
         reports.append(r)
     with Session(engine) as session:

@@ -109,7 +109,7 @@ def jpeg() -> bytes:
     return buffer.getvalue()
 
 
-def labelled(label):
+def labeled(label):
     return [m for m in json.loads(MESSAGES.read_text("utf-8"))["messages"] if m["label"] == label]
 
 
@@ -173,8 +173,8 @@ def test_a_photo_voice_note_or_pin_is_never_dropped_by_the_rule(attachments):
     assert rule_screen("hahaha", attachments) is None
 
 
-def test_no_labelled_real_report_and_no_demo_report_is_dropped_by_the_rule():
-    real = labelled("report")
+def test_no_labeled_real_report_and_no_demo_report_is_dropped_by_the_rule():
+    real = labeled("report")
     assert len(real) == 30
     assert [m["id"] for m in real if rule_screen(m["text"], Attachments())] == []
     scenario = load_scenario(SCENARIO_PATH)
@@ -474,7 +474,7 @@ async def test_a_model_screened_message_gets_the_nudge_not_a_summary(settings, e
     intake = IntakeService(settings, engine)
     report = await intake.ingest_text(42, "Bili na kayo ng longganisa")
     service = assessor(settings, engine, ScreenLLM())
-    acks = bot.Acknowledgements(quiet_s=0)
+    acks = bot.Acknowledgments(quiet_s=0)
     message = SimpleNamespace(reply_text=AsyncMock(return_value=SimpleNamespace()))
     generation = acks.touch(report.id, message)
     application = SimpleNamespace(
@@ -507,15 +507,15 @@ def test_the_nudge_is_kind_bilingual_and_asks_for_what_makes_a_report():
 async def test_the_trace_says_why_a_message_was_screened(settings, engine):
     intake = IntakeService(settings, engine)
     ruled = await intake.ingest_text(7, "asdfghjkl")
-    modelled = await intake.ingest_text(8, "Bili na kayo")
-    await assessor(settings, engine, ScreenLLM()).assess(modelled.id)
+    modeled = await intake.ingest_text(8, "Bili na kayo")
+    await assessor(settings, engine, ScreenLLM()).assess(modeled.id)
     with Session(engine) as session:
-        reports = [session.get(Report, ruled.id), session.get(Report, modelled.id)]
+        reports = [session.get(Report, ruled.id), session.get(Report, modeled.id)]
         traces = report_traces(session, reports)
     (rule_step,) = traces[ruled.id].steps
     assert (rule_step.label, rule_step.actor) == ("Screen the message", "rule")
     assert rule_step.output == "not a report (keyboard mashing)"
-    screen = next(s for s in traces[modelled.id].steps if s.label == "Screen the message")
+    screen = next(s for s in traces[modeled.id].steps if s.label == "Screen the message")
     assert screen.actor == "model" and screen.output == "not a report (only small talk)"
     assert screen.model == "fake-llm"
 

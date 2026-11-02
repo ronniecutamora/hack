@@ -184,7 +184,7 @@ class OfficerAction(SQLModel, table=True):
 
     Separate from AgentDecision, which explains the agent's own grouping per report and
     incident: an officer also reviews trust signals and blocks reporters, which have no incident,
-    and every row names the officer. The incident timeline shows both, labelled.
+    and every row names the officer. The incident timeline shows both, labeled.
     """
 
     id: int | None = Field(default=None, primary_key=True)

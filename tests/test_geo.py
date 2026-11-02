@@ -6,8 +6,8 @@ from PIL import Image
 from app.gazetteer import BARANGAYS, BY_NAME
 from app.geo import barangay_at, exif_gps
 
-# Centre points published with COD-AB (adm4 center_lat / center_lon), rounded to 5 decimals.
-CENTRES = {
+# Center points published with COD-AB (adm4 center_lat / center_lon), rounded to 5 decimals.
+CENTERS = {
     "Biñan": (14.26429, 121.04994),
     "Bungahan": (14.30233, 121.07430),
     "Santo Tomas": (14.31440, 121.07267),
@@ -35,9 +35,9 @@ CENTRES = {
 }
 
 
-def test_every_barangay_has_a_boundary_containing_its_centre():
-    assert set(CENTRES) == {b.name for b in BARANGAYS}
-    for name, (lat, lon) in CENTRES.items():
+def test_every_barangay_has_a_boundary_containing_its_center():
+    assert set(CENTERS) == {b.name for b in BARANGAYS}
+    for name, (lat, lon) in CENTERS.items():
         assert barangay_at(lat, lon) == BY_NAME[name], name
 
 

@@ -8,7 +8,7 @@ livestock, blocked roads and needs. Fields not stated in the report are null, ne
 Fields are only ever added, never renamed: stored facts from older schemas stay valid, and
 readers treat a missing field as unstated. `livelihood_damage` says that a livelihood asset was
 damaged when no count is given ("sira po yung mga fish cage namin"), so two reports about the
-same fish pens can be recognised as one situation without either stating a number.
+same fish pens can be recognized as one situation without either stating a number.
 """
 
 import re

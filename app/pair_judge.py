@@ -44,7 +44,7 @@ _PERSON = re.compile(
     rf"\s+{_NAME_WORD}(?:\s+(?:(?:at|and)\s+)?{_NAME_WORD}){{0,5}}",
     re.IGNORECASE,
 )
-# A capitalised name (with optional surname particles) before an English possessive.
+# A capitalized name (with optional surname particles) before an English possessive.
 _POSSESSIVE_PERSON = re.compile(
     r"\b[^\W\d_a-z][\w.-]*(?:\s+(?:dela|de|del|la|van|von|[^\W\d_a-z][\w.-]*))*['’]s\b"
 )
@@ -93,7 +93,7 @@ def redacted_place(value: Any) -> str | None:
 
 
 def safe_facts(facts: dict[str, Any] | None) -> dict[str, Any]:
-    """Allow schema-typed scalars/enums only; drop every unrecognised or invalid field."""
+    """Allow schema-typed scalars/enums only; drop every unrecognized or invalid field."""
     result = {}
     for key, value in (facts or {}).items():
         if key in ("place_detail", "summary_en", "barangay_mentioned"):

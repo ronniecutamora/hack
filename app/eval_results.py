@@ -9,9 +9,9 @@ else edits the numbers by hand. Its shape (``schema`` 1)::
       "datasets": {                      # what was measured, keyed by dataset id
         "<id>": {
           "title": str, "provenance": "real" | "synthetic",
-          "source": str,                 # where the items come from, with licence
-          "label_source": str,           # who labelled them, how, when
-          "n": int,                      # labelled items in the dataset
+          "source": str,                 # where the items come from, with license
+          "label_source": str,           # who labeled them, how, when
+          "n": int,                      # labeled items in the dataset
           "location": str                # where the items live (never inside this repo)
         }
       },
@@ -44,7 +44,7 @@ precision, recall, f1 and the tp/fp/fn/tn counts. ``transcribe`` metrics (Voice 
 voice notes, scripts.eval_transcribe): reference_words, production (the settings key the bot
 uses) and settings {name: {label, language_bias (list or null), keywords (what was sent:
 "none", "barangays" or "barangays+places"), keyword_count, wer, wer_clean (after
-app.transcript_cleanup), place_names_heard, place_names (both null when unlabelled)}}; every
+app.transcript_cleanup), place_names_heard, place_names (both null when unlabeled)}}; every
 setting was run on the same n notes.
 """
 

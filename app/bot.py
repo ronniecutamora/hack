@@ -35,7 +35,7 @@ from app.intake import Admission, IntakeService
 from app.logs import configure_logging
 from app.meta.factory import make_transcriber
 from app.models import STATUS_HELD, STATUS_NOT_A_REPORT, Assessment, Incident, Report, Reporter
-from app.reporter_summary import Acknowledgements, summary_text
+from app.reporter_summary import Acknowledgments, summary_text
 from app.retention import purge_loop
 from app.screening import NudgeLimiter
 
@@ -186,7 +186,7 @@ class Inflight:
 
     async def settle(self, grace_s: float) -> int:
         """Wait up to `grace_s` for every task, then cancel the rest. Returns how many were
-        cancelled (a cancelled assessment stays new or assessing and resumes at the next start)."""
+        canceled (a canceled assessment stays new or assessing and resumes at the next start)."""
         if not self._tasks:
             return 0
         _, pending = await asyncio.wait(set(self._tasks), timeout=grace_s)
@@ -232,12 +232,12 @@ def _assess_later(
     context: ContextTypes.DEFAULT_TYPE, report: Report, message: object | None = None
 ) -> None:
     """Assess in the background so the reporter gets "received" without waiting on models, then
-    tell them what was understood (when acknowledgements are on and `message` is given)."""
+    tell them what was understood (when acknowledgments are on and `message` is given)."""
     application = context.application
     assessor = application.bot_data.get("assessor")
     if assessor is None or report.status in (STATUS_HELD, STATUS_NOT_A_REPORT):
         return
-    acks: Acknowledgements | None = application.bot_data.get("acks")
+    acks: Acknowledgments | None = application.bot_data.get("acks")
     generation = acks.touch(report.id, message) if acks and message is not None else None
     task = application.create_task(
         _assess_and_acknowledge(application, assessor, report.id, generation),
@@ -251,7 +251,7 @@ async def _assess_and_acknowledge(
     application: Application, assessor: object, report_id: int, generation: int | None
 ) -> None:
     report = await assessor.assess(report_id)
-    acks: Acknowledgements | None = application.bot_data.get("acks")
+    acks: Acknowledgments | None = application.bot_data.get("acks")
     if generation is None or acks is None or report is None:
         return
     # Wait for the quiet period: a later caption, pin or album photo supersedes this task.
@@ -352,7 +352,7 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await _stored(context, report, message, CAPTION_ADDED)  # re-assesses the photo
         return
     # A reply to one of our summaries corrects that report ("Mali? I-reply…").
-    acks: Acknowledgements | None = context.application.bot_data.get("acks")
+    acks: Acknowledgments | None = context.application.bot_data.get("acks")
     corrects = acks.replied_to(message) if acks else None
     report = await intake.ingest_text(
         update.effective_user.id, message.text, corrects_report_id=corrects
@@ -503,7 +503,7 @@ def build_application(
     application.bot_data["settings"] = settings
     application.bot_data["intake"] = IntakeService(settings, engine, transcriber)
     application.bot_data["assessor"] = assessor
-    application.bot_data["acks"] = Acknowledgements()  # in memory only: chats are never stored
+    application.bot_data["acks"] = Acknowledgments()  # in memory only: chats are never stored
     application.bot_data["inflight"] = Inflight()
     application.bot_data["nudges"] = NudgeLimiter()  # in memory only, like acks
     add_handlers(application)

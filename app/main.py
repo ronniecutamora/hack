@@ -350,7 +350,7 @@ def report_page(
     session: Session, around: int | None, *, set_aside: bool = False
 ) -> list[tuple[Report, str]]:
     """Up to REPORT_LIMIT reports with pseudonyms, newest first: the most recent ones, or a
-    window centred on report `around`, so an evidence link reaches any report however old.
+    window centered on report `around`, so an evidence link reaches any report however old.
     Messages the screen set aside as not reports (app.screening) have their own list."""
     newest_first = (col(Report.received_at).desc(), col(Report.id).desc())
     screened = col(Report.status) == STATUS_NOT_A_REPORT

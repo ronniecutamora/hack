@@ -16,7 +16,7 @@ An entry for the **Meta Global AI Developer Hackathon** (Cerebral Valley, Oct 27
   2. each affected fisherfolk's **PCIC Notice of Loss** (fish cages and pens), with photo evidence, while the agent tracks the filing deadline. Crop insurance (rice, corn) is later work.
 
   The coordination and reporting agent is the core of the product; the photo analysis supports it. Both outputs come from the same pipeline, so the claim flow must not become a separate product. Don't let the product drift into a "simple image analyzer". SAM-based measurements are evidence for the officer and the PCIC adjuster, not the loss figure.
-- **Model jobs (from the 2026-10-27 kill test):** Spark judges damage and condition; SAM 3.1 localises and measures with plain object nouns ("roof", "floodwater"), never conditions ("damaged roof"). Neither detects fallen trees reliably, so the reporter or the officer confirms them.
+- **Model jobs (from the 2026-10-27 kill test):** Spark judges damage and condition; SAM 3.1 localizes and measures with plain object nouns ("roof", "floodwater"), never conditions ("damaged roof"). Neither detects fallen trees reliably, so the reporter or the officer confirms them.
 - **Demo area:** Biñan City, Laguna (lakeshore, with Laguna de Bay floods that last weeks). The local offices are the City DRRM Office (CDRRMO) and the Office of the City Agriculturist.
 - **Stack (decided 2026-10-27):** Python 3.12, FastAPI, SQLite, a server-rendered officer dashboard (Jinja + HTMX + Leaflet), and a Telegram bot for intake.
 

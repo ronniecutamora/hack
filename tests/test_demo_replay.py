@@ -118,7 +118,7 @@ def test_speed_scales_the_gaps_inside_the_clamp():
 # --- a replay with fake models --------------------------------------------------------------
 
 
-def test_replay_ingests_in_order_at_real_time_and_honours_the_speed(tmp_path):
+def test_replay_ingests_in_order_at_real_time_and_honors_the_speed(tmp_path):
     settings = replay_dir(tmp_path)
     fakes, pauses = Fakes(), []
     before = utcnow()

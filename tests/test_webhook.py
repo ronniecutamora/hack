@@ -18,7 +18,7 @@ from app.db import init_db, make_engine
 from app.intake import IntakeService
 from app.main import create_app
 from app.models import STATUS_ASSESSED, Media, Report, utcnow
-from app.reporter_summary import HEADER, Acknowledgements
+from app.reporter_summary import HEADER, Acknowledgments
 from app.telegram_webhook import SECRET_HEADER, WEBHOOK_PREFIX, webhook_path
 from tests.fake_telegram import FakeTelegram, text_update
 
@@ -62,7 +62,7 @@ class MarkAssessed:
 def webhook_app(settings, fake: FakeTelegram):
     application = bot.build_application(settings, request=fake)
     application.bot_data["assessor"] = MarkAssessed(application.bot_data["intake"].engine)
-    application.bot_data["acks"] = Acknowledgements(quiet_s=0)
+    application.bot_data["acks"] = Acknowledgments(quiet_s=0)
     return create_app(settings, telegram_application=application)
 
 
@@ -187,14 +187,14 @@ class HangingAssessor:
 
     def __init__(self):
         self.started = []
-        self.cancelled = []
+        self.canceled = []
 
     async def assess(self, report_id, **_kwargs):
         self.started.append(report_id)
         try:
             await asyncio.Event().wait()
         except asyncio.CancelledError:
-            self.cancelled.append(report_id)
+            self.canceled.append(report_id)
             raise
 
 
@@ -228,7 +228,7 @@ def test_shutdown_fits_modal_grace_with_room_for_the_snapshots():
 
 
 async def test_flush_ends_the_quiet_period_at_once():
-    acks = Acknowledgements(quiet_s=60)
+    acks = Acknowledgments(quiet_s=60)
     waiting = asyncio.create_task(acks.quiet())
     await asyncio.sleep(0)
     acks.flush()
@@ -281,7 +281,7 @@ def test_a_report_acknowledged_just_before_shutdown_survives_the_restart(
     worker.join(timeout=15)
     assert not worker.is_alive(), "shutdown waited for the assessment without a limit"
     assert time.monotonic() - started < 10
-    assert assessor.cancelled == assessor.started != []
+    assert assessor.canceled == assessor.started != []
     assert fake.sent_texts() == [bot.RECEIVED]
 
     second = first.model_copy(  # the next container, without a bot: only its database matters

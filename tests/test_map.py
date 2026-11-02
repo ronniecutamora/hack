@@ -34,7 +34,7 @@ def features(client):
     return response.json()["features"]
 
 
-def test_every_barangay_centre_lies_inside_its_polygon():
+def test_every_barangay_center_lies_inside_its_polygon():
     for barangay in BARANGAYS:
         point = centroid(barangay.name)
         assert point is not None and barangay_at(*point) == barangay, barangay.name
@@ -84,7 +84,7 @@ def test_markers_are_exact_approximate_or_left_off_the_map(client, engine):
     assert ">approximate</span>" in html and "GPS of 2 reports (mean)" in html
     assert "Not on the map (no GPS and no barangay)" in html and f"/incidents/{nowhere}" in html
     for text in ("Needs officer review (square)", "Approximate:", "outside Biñan"):
-        assert text in html  # the legend says it in words, not colour alone
+        assert text in html  # the legend says it in words, not color alone
 
 
 def test_only_flagged_reports_outside_binan_are_shown(client, engine):

@@ -9,7 +9,7 @@ flags trust evidence and cannot see fallen trees. The officer resolves each of t
 - review a trust signal (genuine or a problem) and confirm or rule out a fallen tree;
 - block or unblock the reporter, with the same function as `python -m app.trust`;
 - restore a message the agent screened out as not a report (app.screening): it goes through
-  the normal pipeline again, and screening never overrules the officer afterwards.
+  the normal pipeline again, and screening never overrules the officer afterward.
 
 Every override is one append-only `OfficerAction` row (triggers reject updates and deletes),
 written in the same transaction as the state it changes, so the audit and the state never
@@ -289,7 +289,7 @@ def queue(session: Session) -> list[ReviewCard]:
 
 
 def timeline(session: Session, incident_id: int) -> list[dict[str, Any]]:
-    """Agent decisions and officer actions about one incident, oldest first, labelled by actor."""
+    """Agent decisions and officer actions about one incident, oldest first, labeled by actor."""
     decisions = session.exec(
         select(AgentDecision).where(
             (AgentDecision.incident_id == incident_id)

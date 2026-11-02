@@ -117,7 +117,7 @@ class _Pending:
     message: Any  # the latest message about the report: the summary goes to its chat
 
 
-class Acknowledgements:
+class Acknowledgments:
     """Reports that owe their reporter a summary, and which sent summary belongs to which report.
 
     In memory only, by design: the chat lives inside the Telegram message objects and is never

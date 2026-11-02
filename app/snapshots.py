@@ -377,7 +377,7 @@ class SnapshotStore:
             self._wanted.set()
 
     async def run(self) -> None:
-        """Snapshot every interval, and soon after each request(), until cancelled (the web
+        """Snapshot every interval, and soon after each request(), until canceled (the web
         app's lifespan runs this)."""
         self._wanted = wanted = asyncio.Event()
         loop = asyncio.get_running_loop()

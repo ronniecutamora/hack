@@ -228,7 +228,7 @@ def load_command(
                 "cache) and reload? [y/N] "
             )
             if answer.strip().lower() not in ("y", "yes"):
-                print("Cancelled; demo data left alone.")
+                print("Canceled; demo data left alone.")
                 return 0
         clear_demo_data(settings, data_dir)
         print(f"Deleted demo data in {data_dir}; kept generated images and the model cache.")

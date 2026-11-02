@@ -81,7 +81,7 @@
     heading.append(link);
     const chips = el("ul", "chips");
     chips.append(el("li", "chip " + (p.status === "needs_officer" ? "warn" : "info"), p.status_label));
-    if (p.approximate) chips.append(el("li", "chip warn", "approximate: barangay centre"));
+    if (p.approximate) chips.append(el("li", "chip warn", "approximate: barangay center"));
     if (p.reporter_count === 1) chips.append(el("li", "chip warn", "single source"));
     if (p.flagged_report_count > 0) chips.append(el("li", "chip warn", plural(p.flagged_report_count, "flagged report")));
     const facts = el("p", null, plural(p.report_count, "report")

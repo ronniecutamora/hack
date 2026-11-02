@@ -105,7 +105,7 @@ def purge_orphans(settings: Settings, engine: Engine, cutoff: datetime) -> int:
 
 
 async def purge_loop(settings: Settings, engine: Engine) -> None:
-    """Background task: purge once an hour until cancelled."""
+    """Background task: purge once an hour until canceled."""
     while True:
         try:
             count = purge_expired(settings, engine)

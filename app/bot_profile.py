@@ -70,7 +70,7 @@ PROFILE = BotProfile(
 
 
 def profile_jpeg(path: Path) -> bytes:
-    """A square JPEG (centre crop, transparency on white) from any image Pillow reads."""
+    """A square JPEG (center crop, transparency on white) from any image Pillow reads."""
     with Image.open(path) as image:
         image = ImageOps.exif_transpose(image)
         if image.mode in ("RGBA", "LA", "P"):

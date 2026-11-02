@@ -3,8 +3,8 @@
 Each drawing function returns one ``<svg>`` as Markup with role="img", a ``<title>`` naming it
 and a ``<desc>`` summing it up, and a viewBox 320 units wide, so it scales to its box (the CSS
 sets width 100%). Every mark carries its own ``<title>``, the browser's hover tooltip, on a hit
-area larger than the mark. Colours are CSS classes, never hex values: ``chart__fill--<role>``
-paints an SVG mark and an HTML legend swatch alike, and maps to a Material 3 colour role in
+area larger than the mark. Colors are CSS classes, never hex values: ``chart__fill--<role>``
+paints an SVG mark and an HTML legend swatch alike, and maps to a Material 3 color role in
 the "Accuracy charts" block of app/static/css/app.css, so light and dark themes both work.
 
 A chart repeats numbers, it never holds the only copy: each one ships with an HTML table of the
@@ -235,7 +235,7 @@ def matrix_chart(
             count = counts.get((row, col), 0)
             cx = left + j * cell
             # Four steps of one hue: the two light steps take dark ink, the two strong ones the
-            # surface colour, so every count clears 4.5:1 in both themes.
+            # surface color, so every count clears 4.5:1 in both themes.
             step = min(4, math.ceil(count / biggest * 4)) if count else 0
             kind = "agree" if row == col else "disagree"
             fill = f"chart__fill--{kind}-{step}" if step else "chart__fill--empty"

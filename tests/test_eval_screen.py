@@ -1,4 +1,4 @@
-"""The not-a-report screen's eval: the bundled labelled set, the script and the results entry.
+"""The not-a-report screen's eval: the bundled labeled set, the script and the results entry.
 Every model call is a fake."""
 
 import json
@@ -11,7 +11,7 @@ from scripts import eval_screen
 from tests.test_screening import ScreenLLM, verdict
 
 
-def test_the_bundled_set_is_60_labelled_synthetic_messages():
+def test_the_bundled_set_is_60_labeled_synthetic_messages():
     messages = eval_screen.load_messages(eval_screen.DEFAULT_MESSAGES)
     labels = [m["label"] for m in messages]
     assert (len(messages), labels.count("report"), labels.count("not_report")) == (60, 30, 30)

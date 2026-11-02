@@ -47,7 +47,7 @@ def test_vision_eval_scores_judge_and_sam(photo_folder, monkeypatch, settings, c
     assert code == 0
     assert "scored 2 of 2 photos with fake-llm" in out
     assert "agreement 1/2" in out  # partial right, severe wrong
-    assert "floodwater         F1 0.67" in out  # predicted flood on both, one is labelled
+    assert "floodwater         F1 0.67" in out  # predicted flood on both, one is labeled
     assert "SAM roof" in out
     assert len(json.loads(out_file.read_text())) == 2
 

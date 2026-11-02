@@ -1,4 +1,4 @@
-"""Measure Voice Transcribe on your own labelled recordings: corpus WER and place names heard.
+"""Measure Voice Transcribe on your own labeled recordings: corpus WER and place names heard.
 
 Usage:
     uv run python -m scripts.eval_transcribe /path/to/folder [--only 3-10] [--yes]
@@ -16,7 +16,7 @@ WAV, then muse-voice-transcribe-1.0) once per setting in SETTINGS, so every sett
 on the same notes. `--language` / `--keywords` run one custom setting instead (not recordable).
 
 Metrics per setting: corpus WER (all word errors over all reference words, not a mean of
-per-note rates), raw and after app.transcript_cleanup, and the labelled place names that occur
+per-note rates), raw and after app.transcript_cleanup, and the labeled place names that occur
 in the transcript with their spelling. Key-fact accuracy is not measured here: the references
 are plain text, and speakers say numbers as words ("seventy", "dalawa't kalahati"), so a fact
 can only be read back by the extraction step; scripts.eval_facts measures that end to end.
@@ -122,7 +122,7 @@ def parse_only(text: str) -> set[str]:
 
 
 def place_labels(folder: Path) -> dict[str, list[str]]:
-    """Labelled place names per note id, from the folder's facts.json (empty when absent)."""
+    """Labeled place names per note id, from the folder's facts.json (empty when absent)."""
     path = folder / "facts.json"
     if not path.is_file():
         return {}

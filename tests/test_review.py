@@ -494,7 +494,7 @@ def test_review_queue_shows_the_judges_comparisons_and_is_linked(client, engine,
     assert 'id="review"' in incident and "Officer review" in incident
 
 
-def test_incident_history_shows_agent_and_officer_entries_labelled(client, engine, settings, judge):
+def test_incident_history_shows_agent_and_officer_entries_labeled(client, engine, settings, judge):
     voice, photo = casile_with_uncertain_photo(engine, settings, judge)
     act(
         client,

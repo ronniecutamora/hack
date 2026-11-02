@@ -13,11 +13,11 @@ from app.intake import IntakeService
 from app.meta.base import CallRecord, ModelApiError
 from app.meta.sam import parse_stream
 from app.models import Assessment, Media, ModelCall, PhotoAssessment, Report
-from tests.test_geo import CENTRES, jpeg_with_gps
+from tests.test_geo import CENTERS, jpeg_with_gps
 from tests.test_photo import JUDGMENT
 from tests.test_sam import STREAM
 
-POBLACION = CENTRES["Poblacion"]
+POBLACION = CENTERS["Poblacion"]
 MANILA = (14.5995, 120.9842)
 
 
@@ -94,7 +94,7 @@ def test_pin_wins_over_names_in_text():
 
 
 def test_photo_gps_is_used_when_there_is_no_pin():
-    geo = geolocate(pin=None, exif=CENTRES["Zapote"], text=None, transcript=None, llm_barangay=None)
+    geo = geolocate(pin=None, exif=CENTERS["Zapote"], text=None, transcript=None, llm_barangay=None)
     assert (geo.barangay, geo.source) == (BY_NAME["Zapote"], "exif")
 
 
@@ -227,7 +227,7 @@ async def test_a_later_pin_re_maps_the_report(settings, engine):
 
 
 async def test_exif_gps_from_a_photo_sent_as_a_file(settings, engine):
-    lat_dms = (14.0, 18.0, 55.33)  # Zapote's centre, 14.31537 N
+    lat_dms = (14.0, 18.0, 55.33)  # Zapote's center, 14.31537 N
     lon_dms = (121.0, 5.0, 2.47)  # 121.08402 E
     report = await IntakeService(settings, engine).ingest_photo(
         7, jpeg_with_gps(lat_dms, "N", lon_dms, "E")

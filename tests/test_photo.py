@@ -23,9 +23,9 @@ JUDGMENT = {
 }
 
 
-def jpeg(size=(1000, 500), colour=(128, 128, 128)) -> bytes:
+def jpeg(size=(1000, 500), color=(128, 128, 128)) -> bytes:
     buffer = io.BytesIO()
-    Image.new("RGB", size, colour).save(buffer, "JPEG")
+    Image.new("RGB", size, color).save(buffer, "JPEG")
     return buffer.getvalue()
 
 
@@ -58,7 +58,7 @@ def test_floodwater_needs_confidence_or_area(detections, present, fraction):
     assert m.as_dict()["thresholds"]["floodwater"] == 0.7
 
 
-def test_overlay_paints_masks_in_concept_colours():
+def test_overlay_paints_masks_in_concept_colors():
     sam = parse_stream(STREAM, "floodwater")
     overlay = render_overlay(jpeg(), {"floodwater": (sam, 0.5)})
     image = Image.open(io.BytesIO(overlay)).convert("RGB")
@@ -66,7 +66,7 @@ def test_overlay_paints_masks_in_concept_colours():
     inside = image.getpixel((150, 210))  # inside the 0.9 detection's mask
     outside = image.getpixel((800, 400))
     assert inside[2] > inside[0] + 40  # tinted blue
-    assert abs(outside[0] - outside[2]) < 10  # untouched grey
+    assert abs(outside[0] - outside[2]) < 10  # untouched gray
 
 
 def test_overlay_is_shrunk_and_unreadable_photos_give_none():

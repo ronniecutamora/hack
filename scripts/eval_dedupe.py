@@ -1,10 +1,10 @@
-"""Score the incident pair judge on synthetic or private labelled facts (no images/audio).
+"""Score the incident pair judge on synthetic or private labeled facts (no images/audio).
 
     uv run python -m scripts.eval_dedupe [pairs.json] --judge muse-spark-1.3 [--yes]
         [--record data/eval/results.json [--dataset ID]] [--spend-cap USD]
 
 Only the bundled synthetic fixture may live inside this public repository. Keep additional
-labelled data outside it. Every context is rebuilt with the production redaction/allowlist.
+labeled data outside it. Every context is rebuilt with the production redaction/allowlist.
 After confirmation, a free cache-only dry run counts the uncached pairs; their estimated cost is
 checked against the spend cap (scripts/spend.py) before any paid call. --record writes the
 metrics into the results file (app/eval_results.py); the bundled fixture's dataset id is the

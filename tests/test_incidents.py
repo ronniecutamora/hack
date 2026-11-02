@@ -32,7 +32,7 @@ from app.models import (
 )
 from app.pair_judge import PAIR_SCHEMA, redacted_place, report_context
 from tests.test_assessment import FakeLLM, FakeSam, facts
-from tests.test_geo import CENTRES
+from tests.test_geo import CENTERS
 
 AT = datetime(2026, 10, 28, 4)
 SAME = {
@@ -177,7 +177,7 @@ async def test_late_pin_reuses_singleton_and_writes_relink(settings, engine):
     report = await intake.ingest_text(7, "Flood in Brgy. Casile")
     assessor = AssessmentService(settings, engine, FakeLLM(), FakeSam())
     first = await assessor.assess(report.id)
-    await intake.ingest_location(7, *CENTRES["Malaban"])
+    await intake.ingest_location(7, *CENTERS["Malaban"])
     second = await assessor.assess(report.id)
     assert first.incident_id == second.incident_id
     assert second.barangay == "Malaban"
@@ -425,12 +425,12 @@ def test_schema_upgrade_preserves_existing_reports_and_is_repeatable(tmp_path):
 
 async def test_gps_only_member_keeps_known_incident_barangay(settings, engine):
     service = IncidentService(settings, engine, FakeJudge())
-    first = await service.group(add_report(engine, point=CENTRES["Malaban"]))
+    first = await service.group(add_report(engine, point=CENTERS["Malaban"]))
     second = await service.group(
         add_report(
             engine,
             barangay=None,
-            point=CENTRES["Malaban"],
+            point=CENTERS["Malaban"],
             at=AT + timedelta(hours=1),
         )
     )
@@ -561,7 +561,7 @@ async def test_correction_goes_to_the_incident_stating_the_corrected_figure(sett
             at=AT + timedelta(hours=2),
             is_correction=True,
             houses_partially_damaged=2,
-            reporter="neighbour",  # not the voice note's reporter: the judge decides
+            reporter="neighbor",  # not the voice note's reporter: the judge decides
         )
     )
     assert correction.incident_id == voice.incident_id
@@ -594,7 +594,7 @@ async def test_wrongly_merged_correction_moves_when_regrouped(settings, engine):
         at=AT + timedelta(hours=2),
         is_correction=True,
         houses_partially_damaged=2,
-        reporter="neighbour",
+        reporter="neighbor",
     )
     with Session(engine) as session:  # the live state: merged into the photo's incident
         report = session.get(Report, correction_id)

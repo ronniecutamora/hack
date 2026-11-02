@@ -243,7 +243,7 @@ def _run_rows(entries: list[Entry]) -> list[Row]:
     return [
         Row(
             "Items scored",
-            "Labelled items the model answered; failed calls are not scored.",
+            "Labeled items the model answered; failed calls are not scored.",
             [Cell(str(e.n), f"{e.errors} failed" if e.errors else None) for e in entries],
         ),
         Row(
@@ -595,7 +595,7 @@ def _wer_chart(entry: Entry, settings: dict[str, Any], label: Callable[[str], st
                         _percent(s["wer_clean"]),
                         f"{s['place_names_heard']} of {s['place_names']}"
                         if s["place_names"]
-                        else "not labelled",
+                        else "not labeled",
                         str(s["keyword_count"]),
                     ]
                     for key, s in settings.items()
@@ -612,7 +612,7 @@ def _place_chart(entry: Entry, settings: dict[str, Any], label: Callable[[str], 
         heard, total = s["place_names_heard"], s["place_names"]
         if not total:
             rows.append(
-                BarRow(label(key), [Bar(None, "not labelled")], f"{s['label']}: not labelled")
+                BarRow(label(key), [Bar(None, "not labeled")], f"{s['label']}: not labeled")
             )
             continue
         rate = heard / total
@@ -639,7 +639,7 @@ def _place_chart(entry: Entry, settings: dict[str, Any], label: Callable[[str], 
     )
 
 
-def _setting_labeller(settings: dict[str, Any], production: str) -> Callable[[str], str]:
+def _setting_labeler(settings: dict[str, Any], production: str) -> Callable[[str], str]:
     return lambda key: (
         settings[key]["label"] + (" (the bot uses this)" if key == production else "")
     )
@@ -649,7 +649,7 @@ def build_voice(results: Results) -> list[VoiceSection]:
     sections = []
     for entry in sorted(results.for_task("transcribe"), key=lambda e: (e.dataset.id, e.model)):
         settings = entry.metrics["settings"]
-        label = _setting_labeller(settings, entry.metrics["production"])
+        label = _setting_labeler(settings, entry.metrics["production"])
         found = [_wer_chart(entry, settings, label)]
         if any(s["place_names"] for s in settings.values()):
             found.append(_place_chart(entry, settings, label))

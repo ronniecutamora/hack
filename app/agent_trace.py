@@ -2,7 +2,7 @@
 
 A report's trace lists what the agent did for it, in pipeline order: every Meta model call
 (model, latency, cache hit, cost) next to the decision it produced, the deterministic steps
-labelled as rules, and then every officer action on the report, labelled as a human decision.
+labeled as rules, and then every officer action on the report, labeled as a human decision.
 Outputs are the derived facts the dashboard already shows; never a prompt, a raw reply or a
 reporter's words. Totals count every logged call, including repeats from a re-assessment.
 """
@@ -320,7 +320,7 @@ def build_trace(
         pending.groups.items(), key=lambda item: _order(item[0][0])
     ):
         known = _as_step(step)
-        label = STEPS[known].label if known else (step or "unlabelled call").replace("_", " ")
+        label = STEPS[known].label if known else (step or "unlabeled call").replace("_", " ")
         steps.append(TraceStep(label, "model", "no saved output", CallStats.of(group)))
     for action in actions:
         steps.append(

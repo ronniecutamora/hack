@@ -50,7 +50,7 @@ LOCATION_JOIN_WINDOW = timedelta(minutes=15)
 # and 14 s gaps). A text this soon after a caption-less photo becomes the photo's caption.
 CAPTION_JOIN_WINDOW = timedelta(minutes=2)
 # Telegram delivers an album as one message per photo, sharing a media_group_id, within seconds.
-# The photos join one report (one situation, one assessment, one acknowledgement), so a text
+# The photos join one report (one situation, one assessment, one acknowledgment), so a text
 # sent after a caption-less album captions all of it through the caption join above.
 ALBUM_JOIN_WINDOW = timedelta(minutes=2)
 # A caption, pin or album photo joining a finished report makes it "new" again, so it is

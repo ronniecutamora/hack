@@ -127,7 +127,7 @@ class StoryClock:
 class StoryClockJudge:
     """The pair judge, shown story time instead of replay time (see the module docstring).
 
-    The request is rebuilt exactly as ``app.pair_judge.judge_pair`` serialises it, so the cache
+    The request is rebuilt exactly as ``app.pair_judge.judge_pair`` serializes it, so the cache
     key equals that of a plain ``load`` of the same scenario.
     """
 
@@ -431,7 +431,7 @@ def replay_command(
                 f"Delete the replay data in '{data_dir}' (keeps images and cache)? [y/N] "
             )
             if answer.strip().lower() not in ("y", "yes"):
-                say("Cancelled; replay data left alone.")
+                say("Canceled; replay data left alone.")
                 return 0
         clear_demo_data(settings, data_dir)
         say(f"Deleted replay data in {data_dir}; kept images and the model cache.")

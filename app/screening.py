@@ -116,7 +116,7 @@ RULE_REASONS = {
     "keyboard_mash": "keyboard mashing",
     "laughter": "only laughter",
     "test": "only a test message",
-    "greeting": "only a greeting, thanks or an acknowledgement",
+    "greeting": "only a greeting, thanks or an acknowledgment",
 }
 # Whole-message filler: a message made only of these (and laughter or mash) says nothing a report
 # needs. No word here can describe damage, a place or a need ("tulong", "baha", "help" are not).

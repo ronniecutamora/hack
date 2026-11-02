@@ -105,7 +105,7 @@ def _ring_centroid(ring: Ring) -> tuple[float, float, float]:
 
 @cache
 def centroid(name: str) -> tuple[float, float] | None:
-    """(lat, lon) of a point inside the named barangay near its centre, or None if unknown.
+    """(lat, lon) of a point inside the named barangay near its center, or None if unknown.
 
     For map markers of incidents without a GPS point. The area centroid of a concave polygon can
     fall outside it; then the nearest point of a 40 x 40 grid inside the polygon is used.

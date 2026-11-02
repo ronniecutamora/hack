@@ -1,6 +1,6 @@
 """Photo assessment: the agent LLM judges damage, SAM 3.1 measures it, masks become evidence.
 
-Model jobs follow the 2026-10-27 kill test on 25 labelled typhoon and flood photos:
+Model jobs follow the 2026-10-27 kill test on 25 labeled typhoon and flood photos:
 - The LLM judges damage state (roof damage kappa 0.78 vs hand labels; floodwater and debris
   F1 0.92). The schema and definitions below are the ones that were scored.
 - SAM measures with plain object nouns only. "damaged roof" scored F1 0.36, so conditions are
@@ -72,7 +72,7 @@ FLOOD_MIN_AREA = 0.10
 SAM_CONCEPTS = ("roof", "floodwater")
 OVERLAY_MAX_SIDE = 1280
 MASK_ALPHA = 110  # 0-255: masks tint the photo but keep it readable
-_COLOURS = {"roof": (255, 140, 0), "floodwater": (30, 144, 255)}
+_COLORS = {"roof": (255, 140, 0), "floodwater": (30, 144, 255)}
 
 
 @dataclass(frozen=True)
@@ -152,7 +152,7 @@ def render_overlay(image: bytes, layers: dict[str, tuple[SamResult, float]]) -> 
     paint = Image.new("RGBA", base.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(paint)
     for concept, (result, threshold) in layers.items():
-        colour = _COLOURS.get(concept, (255, 0, 255))
+        color = _COLORS.get(concept, (255, 0, 255))
         sx, sy = _scale(result, base.size)
         for detection in result.above(threshold):
             mask = detection.mask
@@ -162,12 +162,12 @@ def render_overlay(image: bytes, layers: dict[str, tuple[SamResult, float]]) -> 
                 size = (max(1, box[2] - box[0]), max(1, box[3] - box[1]))
                 alpha = bytes(MASK_ALPHA if v else 0 for v in mask.raster)
                 grid = Image.frombytes("L", (mask.width, mask.height), alpha)
-                fill = Image.new("RGBA", size, (*colour, 255))  # the grid sets the alpha
+                fill = Image.new("RGBA", size, (*color, 255))  # the grid sets the alpha
                 # paste() clips at the photo's edges; the grid is the paste mask
                 paint.paste(fill, (box[0], box[1]), grid.resize(size, Image.Resampling.NEAREST))
             left, top, right, bottom = detection.box
             draw.rectangle(
-                (left * sx, top * sy, right * sx, bottom * sy), outline=(*colour, 255), width=3
+                (left * sx, top * sy, right * sx, bottom * sy), outline=(*color, 255), width=3
             )
     out = Image.alpha_composite(base.convert("RGBA"), paint).convert("RGB")
     out.thumbnail((OVERLAY_MAX_SIDE, OVERLAY_MAX_SIDE))

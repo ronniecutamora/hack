@@ -1,4 +1,4 @@
-"""Score the photo judge (and optionally SAM measurements) against hand-labelled photos.
+"""Score the photo judge (and optionally SAM measurements) against hand-labeled photos.
 
 Usage:
     uv run python -m scripts.eval_vision /path/to/folder [--llm muse-spark-open] [--sam]
@@ -82,7 +82,7 @@ async def run(args: argparse.Namespace) -> int:
         print(f"error: {problem}", file=sys.stderr)
         return 2
     if not rows:
-        print("error: no labelled images found", file=sys.stderr)
+        print("error: no labeled images found", file=sys.stderr)
         return 2
     settings = get_settings()
     if args.llm:

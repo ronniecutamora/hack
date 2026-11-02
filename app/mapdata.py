@@ -1,7 +1,7 @@
 """Officer map features: one marker per active incident, plus flagged pins outside Biñan.
 
 An incident's marker sits at the mean of its reports' GPS points (location pin, else photo GPS)
-that fall inside Biñan; an incident without one sits at its barangay's centre and is marked
+that fall inside Biñan; an incident without one sits at its barangay's center and is marked
 approximate. A report pinned outside Biñan is shown only when trust signals flagged it, as its own
 marker, and the map never pans to it. Properties carry what the incident pages already show
 (title, barangay, status, counts, depth); never report text or reporter pseudonyms.
@@ -42,8 +42,8 @@ def map_features(session: Session) -> tuple[dict[str, Any], list[Incident]]:
         mine = points.get(incident.id, [])
         if mine:
             lat, lon, approximate = fmean(p[0] for p in mine), fmean(p[1] for p in mine), False
-        elif incident.barangay and (centre := centroid(incident.barangay)):
-            (lat, lon), approximate = centre, True
+        elif incident.barangay and (center := centroid(incident.barangay)):
+            (lat, lon), approximate = center, True
         else:
             unplaced.append(incident)
             continue

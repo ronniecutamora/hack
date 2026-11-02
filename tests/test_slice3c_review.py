@@ -24,7 +24,7 @@ from app.retention import purge_expired
 from tests.test_abuse_guards import add_cost, block, context, rows
 from tests.test_assessment import FakeLLM, FakeSam, jpeg
 from tests.test_bot import FakeTranscriber, make_update, one_chunk
-from tests.test_geo import CENTRES
+from tests.test_geo import CENTERS
 
 
 @pytest.fixture(autouse=True)
@@ -199,12 +199,12 @@ async def test_blocked_pin_never_attaches_to_preexisting_report(settings, engine
         session.commit()
     block(engine, report.reporter_id)
     snapshot = rows(engine, Report)[0].model_dump()
-    attached = await intake.ingest_location("a", *CENTRES["Malaban"])
+    attached = await intake.ingest_location("a", *CENTERS["Malaban"])
     assert attached.id != report.id
     assert (attached.status, attached.hold_reason) == ("held", "reporter blocked")
     assert rows(engine, Report)[0].model_dump() == snapshot
     assert not intake.can_attach_location("a")
-    standalone = await intake.ingest_location("a", *CENTRES["Malaban"])
+    standalone = await intake.ingest_location("a", *CENTERS["Malaban"])
     assert standalone.id != report.id
     assert (standalone.status, standalone.hold_reason) == ("held", "reporter blocked")
 
@@ -228,7 +228,7 @@ async def test_pin_on_assessed_report_is_pending_across_spend_hold(settings, eng
     assert (await service.assess(report.id)).barangay == "Casile"
     add_cost(engine, 11)
     service.llm.calls.clear()
-    attached = await intake.ingest_location("a", *CENTRES["Malaban"])
+    attached = await intake.ingest_location("a", *CENTERS["Malaban"])
     assert attached.id == report.id and attached.status == "new"
     assert service.report_ids(pending_only=True) == [report.id]
     held = await service.assess(report.id)
@@ -355,7 +355,7 @@ async def test_spend_cap_skips_assessed_reports(settings, engine, monkeypatch, c
 async def test_mismatch_uses_the_same_clean_transcript_as_geolocation(
     settings, engine, monkeypatch, raw, clean, mismatch
 ):
-    report = await IntakeService(settings, engine).ingest_location("a", *CENTRES["Malaban"])
+    report = await IntakeService(settings, engine).ingest_location("a", *CENTERS["Malaban"])
     with Session(engine) as session:
         current = session.get(Report, report.id)
         current.transcript = raw

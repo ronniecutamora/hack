@@ -225,7 +225,7 @@ def test_reset_asks_first(tmp_path, capsys, monkeypatch):
 
     assert (settings.data_dir / "sentinel.txt").is_file()
     assert "keeps generated images and the model cache" in prompts[0]
-    assert "Cancelled" in capsys.readouterr().out
+    assert "Canceled" in capsys.readouterr().out
 
 
 def test_images_command_reports_cost_and_waits(tmp_path, capsys, monkeypatch):

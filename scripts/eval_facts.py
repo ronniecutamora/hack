@@ -7,7 +7,7 @@ Usage:
 The folder (OUTSIDE this repository) holds the audio (N.m4a, N.ogg, ...) and facts.json:
 {"N": {"field": expected value, ...}} with fields from app.facts.FACTS_SCHEMA. Only the
 listed fields are scored: counts and numbers must match (numbers within 0.05), enums and
-booleans exactly, lists as sets, and names after normalisation (accents, case, "Sto.").
+booleans exactly, lists as sets, and names after normalization (accents, case, "Sto.").
 """
 
 import argparse

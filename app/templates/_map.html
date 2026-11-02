@@ -1,4 +1,4 @@
-{# The Leaflet map (app/static/js/map.js) and its legend. Text in the legend, not colour alone;
+{# The Leaflet map (app/static/js/map.js) and its legend. Text in the legend, not color alone;
    without JavaScript the map stays hidden and the page's list carries the same incidents.
    app.js loads the files in data-assets (in order) the first time a page shows a map. #}
 {% macro map(compact=false) %}
@@ -13,7 +13,7 @@
   <ul class="legend" aria-label="Map legend">
     <li><span class="pin pin--open" aria-hidden="true">3</span> Open incident (the number is its reports)</li>
     <li><span class="pin pin--needs_officer" aria-hidden="true">2</span> {{ "Needs officer review" if technical() else "Needs your check" }} (square)</li>
-    <li><span class="pin pin--open pin--approx" aria-hidden="true">1</span> Approximate: no GPS in its reports, placed at the barangay centre (dashed, hollow)</li>
+    <li><span class="pin pin--open pin--approx" aria-hidden="true">1</span> Approximate: no GPS in its reports, placed at the barangay center (dashed, hollow)</li>
     <li><span class="pin pin--outside" aria-hidden="true">!</span> Flagged report pinned outside Biñan (red diamond)</li>
     <li><span class="pin pin--group" aria-hidden="true">+3</span> Incidents close together: tap to spread them out</li>
     <li><span class="swatch swatch--active" aria-hidden="true"></span> Barangay with active incidents</li>
