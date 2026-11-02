@@ -15,8 +15,14 @@ Fill modes:
 
 Every field also says how the officer fills it in (app.fillable): its control, the paper form's
 own options, a plain hint, whether only the office can answer it (`ask`, listed first in Simple
-mode) and whether it is personal (typed for the printout only, never stored). Options the
-transcription of a question leaves out are read from the same scan.
+mode) and whether it is personal (typed for the printout only, never stored).
+
+Labels, options, section titles and notes are the scan's own words, checked field by field
+against the rendered Annex I pages in slice 7k (spelling, capitals and the form's typos such as
+"Are their road segments" kept). A label ends where the form's blank or boxes begin; the
+printout adds the colon the form prints there. `paper_label` is set only where the screen needs
+more than the paper prints (the two tables, typed into one box on screen). How each field and
+box is laid out on paper is the PAPER table at the end (read by app.paper).
 """
 
 from dataclasses import dataclass, replace
@@ -40,7 +46,8 @@ from app.fillable import (
 
 FORM_ID = "rdana-2021-annex-i"
 FORM_TITLE = "RDANA FORM"
-FORM_SUBTITLE = "To be accomplished within the first 72 HOURS after a disaster"
+FORM_ANNEX = "Annex I"  # printed above the form, top right
+FORM_SUBTITLE = "To be accomplished within the first 72 HOURS after a disaster."
 FORM_SOURCE = "NDRRMC Memorandum No. 107, s. 2021, Annex I (2021 RDANA SOP)"
 REGION, PROVINCE, CITY = "Region IV-A (CALABARZON)", "Laguna", "City of Biñan"
 MODES = ("fixed", "officer", "evidence", "agent", "team")
@@ -65,6 +72,10 @@ class FormField:
     help: str | None = None  # the "?" text: from HELP below
     help_source: str | None = None
     numbered: bool = True  # False under "Submitted by", which the form does not number
+    paper_label: str | None = None  # the printed label, where the screen's must say more
+    # Options this form once worded differently: (old wording, its new options), so a value
+    # saved before the wording was corrected still ticks the right boxes (app.fillable.parts).
+    renamed: tuple[tuple[str, tuple[str, ...]], ...] = ()
 
     @property
     def number(self) -> str:
@@ -87,6 +98,7 @@ class FormSection:
     title: str
     fields: tuple[FormField, ...]
     note: str | None = None
+    title_note: str | None = None  # printed after the title in plain type: "(e.g., ...)"
 
 
 def _h(key: str, label: str) -> FormField:
@@ -96,6 +108,17 @@ def _h(key: str, label: str) -> FormField:
 YES_NO = ("Yes", "No")
 YES_NO_UNKNOWN = ("Yes", "No", "Do not know")
 PERCENT_BANDS = ("<25%", "26-50%", "51-75%", ">75%")
+WATER_SRR = "Water Search and Rescue"  # what app.rdana ticks for a rescue in a flood
+SRR_OPTIONS = (
+    "Search and Rescue (SAR)",
+    "Urban Search and Rescue (USAR)",
+    "Mountain Search and Rescue",
+    "Collapsed Structure Search and Rescue",
+    WATER_SRR,
+    "Maritime Search and Rescue",
+    "Aviation Search and Rescue",
+    "Others",
+)
 
 
 def _yes_no(key: str, label: str, mode: str = "team", **kw) -> FormField:
@@ -114,6 +137,16 @@ def _pick(key: str, label: str, options: tuple[str, ...], mode: str = "team", **
     """A check-all-that-apply question."""
     return FormField(key, label, mode, options=options, control=MULTI, **kw)
 
+
+# "Submitted by", printed as a table of label and value cells, two pairs a row.
+SUBMITTED: dict[str, tuple[str, bool, Control]] = {
+    "name": ("NAME", True, TEXT),
+    "designation": ("DESIGNATION", False, TEXT),
+    "organization": ("ORGANIZATION", False, TEXT),
+    "team": ("RDANA Team", False, TEXT),
+    "contact": ("CONTACT #", True, PHONE),
+    "email": ("EMAIL", True, EMAIL),
+}
 
 SECTIONS: tuple[FormSection, ...] = (
     FormSection(
@@ -238,7 +271,7 @@ SECTIONS: tuple[FormSection, ...] = (
             _yes_no("3.1", "Is the community accessible?"),
             _pick(
                 "3.2",
-                "How can the community be reached?",
+                "How can the community be reached? [check all that applies]",
                 (
                     "Car or Bus",
                     "4WD or 6-10-Wheeler Trucks",
@@ -258,12 +291,13 @@ SECTIONS: tuple[FormSection, ...] = (
             ),
             _pick(
                 "3.3.1",
-                "If yes, details",
+                "If yes, please indicate details below",
                 ("Partially passable", "Totally Unpassable", "Others"),
             ),
             _pick(
                 "3.4",
-                "What is the most immediate need on access?",
+                "Based on current situation, please identify your most immediate need on access: "
+                "[check all that applies]",
                 (
                     "Transport",
                     "Debris clearing",
@@ -287,7 +321,7 @@ SECTIONS: tuple[FormSection, ...] = (
         (
             FormField(
                 "4.1",
-                "Is there electricity in the community?",
+                "Is their electricity in the community?",
                 options=(
                     "Yes",
                     "None (Totally, no power)",
@@ -299,13 +333,13 @@ SECTIONS: tuple[FormSection, ...] = (
             ),
             _pick(
                 "4.2",
-                "Power damage",
+                "Based on observations, please check if the following are true:",
                 (
                     "Fallen electric posts",
-                    "Power lines are cut",
-                    "Damaged Power Plant",
                     "Fallen or damaged electric tower",
+                    "Power lines are cut",
                     "Damaged transformers",
+                    "Damaged Power Plant",
                     "Others",
                 ),
                 "evidence",
@@ -318,11 +352,11 @@ SECTIONS: tuple[FormSection, ...] = (
             ),
             FormField(
                 "4.4",
-                "Urgent power needs",
+                "What are the urgent power (electricity) needs of the community?",
                 options=(
-                    "Generators / Alternative Power Kit (Solar) Quantity",
-                    "Gasoline for Generators Quantity",
-                    "Diesel for Generators Quantity",
+                    "Generators / Alternative Power Kit (Solar)",
+                    "Gasoline for Generators",
+                    "Diesel for Generators",
                 ),
                 hint="What is needed and how many, e.g. Generators: 2; Diesel: 40 L.",
             ),
@@ -332,15 +366,21 @@ SECTIONS: tuple[FormSection, ...] = (
         "5",
         "COMMUNICATIONS",
         (
-            _pick("5.1", "Telecom services operational", ("Smart/Sun", "Globe/TM", "Others")),
+            _pick(
+                "5.1",
+                "Please check if the following telecommunication services are operational (has "
+                "signal) in the area:",
+                ("Smart/Sun", "Globe/TM", "Others"),
+            ),
             _pick(
                 "5.2",
-                "Services operational",
+                "Please check if the following services are operational in the area:",
                 ("Radio - AM", "Radio - FM", "TV Free-Air", "TV Cable", "TV Satellite"),
             ),
             _pick(
                 "5.3",
-                "Alternative communications operational",
+                "Please check if the following alternative communications are operational in the "
+                "area:",
                 (
                     "Satellite Phone",
                     "VHF Radio",
@@ -352,7 +392,8 @@ SECTIONS: tuple[FormSection, ...] = (
             ),
             _pick(
                 "5.4",
-                "Most immediate need on communication",
+                "Based on current situation, please identify your most immediate need on "
+                "communication [check all that applies]",
                 (
                     "Communication to Family or Relatives",
                     "Communication to Responders / Government",
@@ -373,17 +414,20 @@ SECTIONS: tuple[FormSection, ...] = (
         "EVACUATION CENTER DETAILS",
         (
             _yes_no("6.1", "Is there an evacuation center in the community?"),
-            _yes_no("6.2", "Is there a designated camp manager?"),
+            _yes_no("6.2", "If yes, is there a designated camp manager?"),
             FormField(
                 "6.3",
                 "Evacuation Center summary (Name, Address, GPS coordinates, "
                 "Inside EC: # family, # person)",
                 control=LONG,
                 hint="One line per evacuation center.",
+                paper_label="Evacuation Center summary",
             ),
             _pick(
                 "6.4",
-                "Existing protection mechanisms",
+                "What are the existing protection mechanisms in the community, communal "
+                "shelters, or evacuation sites for cases related to maltreatment or violence "
+                "against these groups of people? [check all that applies]",
                 (
                     "Security Patrols Organized by the Affected Population",
                     "Police Presence / Patrols",
@@ -394,12 +438,14 @@ SECTIONS: tuple[FormSection, ...] = (
                     "Church Groups",
                     "Child-Friendly Spaces",
                     "Others",
-                    "No Protection Mechanism at all",
+                    "No Protection Mechanism at all.",
                 ),
+                renamed=(("No Protection Mechanism at all", ("No Protection Mechanism at all.",)),),
             ),
             _pick(
                 "6.5",
-                "Operational facilities in evacuation areas",
+                "Please check the following if operational in the evacuation areas (Check all "
+                "that applies):",
                 (
                     "Lighting",
                     "Ventilation",
@@ -412,8 +458,14 @@ SECTIONS: tuple[FormSection, ...] = (
                     "Medical / Health Desk",
                     "Police / VAWC Desk",
                     "Marked breast-feeding Areas",
-                    "Libreng Tawag / Phone recharging station",
+                    "“Libreng Tawag” / Phone recharging station",
                     "Others",
+                ),
+                renamed=(
+                    (
+                        "Libreng Tawag / Phone recharging station",
+                        ("“Libreng Tawag” / Phone recharging station",),
+                    ),
                 ),
             ),
         ),
@@ -430,7 +482,12 @@ SECTIONS: tuple[FormSection, ...] = (
                 "# of families served)",
                 control=LONG,
                 hint="One line per organization. Use an office's contact details, not a person's.",
+                paper_label="If yes, please list below",
             ),
+        ),
+        title_note=(
+            "(e.g., Family Food Packs, Clothes, Sleeping Implements, Kitchen Utensils, Water "
+            "Kits, Cash, others)"
         ),
     ),
     FormSection(
@@ -438,23 +495,26 @@ SECTIONS: tuple[FormSection, ...] = (
         "SEARCH-RESCUE-RETRIEVAL",
         (
             _yes_no_unknown(
-                "8.1", "Is SEARCH-RESCUE-RETRIEVAL needed?", "evidence", rule="srr_needed"
+                "8.1",
+                "Based on observation, is SEARCH-RESCUE-RETRIEVAL needed in your community?",
+                "evidence",
+                rule="srr_needed",
             ),
             _pick(
                 "8.2",
-                "What SRR is needed?",
-                (
-                    "Search and Rescue",
-                    "Mountain",
-                    "Water",
-                    "Aviation",
-                    "Urban",
-                    "Collapsed Structure",
-                    "Maritime",
-                    "Others",
-                ),
+                "Please check what SRR is needed:",
+                SRR_OPTIONS,
                 "evidence",
                 rule="srr_type",
+                renamed=(
+                    ("Search and Rescue", ("Search and Rescue (SAR)",)),
+                    ("Mountain", ("Mountain Search and Rescue",)),
+                    ("Water", (WATER_SRR,)),
+                    ("Aviation", ("Aviation Search and Rescue",)),
+                    ("Urban", ("Urban Search and Rescue (USAR)",)),
+                    ("Collapsed Structure", ("Collapsed Structure Search and Rescue",)),
+                    ("Maritime", ("Maritime Search and Rescue",)),
+                ),
             ),
         ),
     ),
@@ -462,26 +522,41 @@ SECTIONS: tuple[FormSection, ...] = (
         "9",
         "LAW and ORDER",
         (
-            _yes_no_unknown("9.1", "Is LAW AND ORDER a problem?"),
+            _yes_no_unknown("9.1", "Is LAW AND ORDER a problem in your community?"),
             _pick(
                 "9.2",
-                "Threats",
+                "Are any of the following a threat in your community? [check all that applies]",
                 (
                     "Looting",
                     "Robbery",
-                    "Banditry",
+                    "Banditry, Hold-up",
                     "Kidnapping",
-                    "Human trafficking",
-                    "Violence against children/women",
-                    "Sexual abuse",
-                    "Violence between groups/families",
+                    "Human Trafficking",
+                    "Violence against Children",
+                    "Violence against Women",
+                    "Sexual Abuse",
+                    "Violence between groups",
+                    "Violence between families",
                     "Juvenile delinquency",
                     "Others",
+                ),
+                renamed=(
+                    ("Banditry", ("Banditry, Hold-up",)),
+                    ("Human trafficking", ("Human Trafficking",)),
+                    (
+                        "Violence against children/women",
+                        ("Violence against Children", "Violence against Women"),
+                    ),
+                    ("Sexual abuse", ("Sexual Abuse",)),
+                    (
+                        "Violence between groups/families",
+                        ("Violence between groups", "Violence between families"),
+                    ),
                 ),
             ),
             _pick(
                 "9.3",
-                "Security actors present",
+                "Please check if any of the following are present in your community",
                 (
                     "Barangay Tanod (BPSO)",
                     "Coast Guard",
@@ -510,7 +585,7 @@ SECTIONS: tuple[FormSection, ...] = (
             ),
             _count(
                 "10.2",
-                "Number and/or percentage of damaged houses (e.g. walls, roof and column "
+                "Number and/or percentage of damaged houses (e.g., walls, roof and column "
                 "collapsed, hanging wall) (repairable)",
                 "evidence",
                 rule="count:houses_partially_damaged",
@@ -518,10 +593,11 @@ SECTIONS: tuple[FormSection, ...] = (
             ),
             _pick(
                 "10.3",
-                "Most immediate need on shelter",
+                "Based on current situation, please identify your most immediate need on "
+                "shelter: [check all that applies]",
                 (
                     "Hammer/Nails/Saw",
-                    "Galvanized iron sheets",
+                    "Galvanized Iron sheets",
                     "Tarpaulins",
                     "Plastic sheeting",
                     "Tents",
@@ -535,6 +611,7 @@ SECTIONS: tuple[FormSection, ...] = (
                 ),
                 "evidence",
                 rule="need:shelter",
+                renamed=(("Galvanized iron sheets", ("Galvanized Iron sheets",)),),
             ),
         ),
     ),
@@ -542,10 +619,10 @@ SECTIONS: tuple[FormSection, ...] = (
         "11",
         "FOOD SECURITY",
         (
-            _yes_no("11.1", "Access to food?"),
+            _yes_no("11.1", "Do people have access to food in their current location?"),
             _pick(
                 "11.2",
-                "Main sources of food",
+                "What are the main sources of food in the area?",
                 (
                     "Household food stocks",
                     "Household garden/farm",
@@ -555,11 +632,11 @@ SECTIONS: tuple[FormSection, ...] = (
                     "Other",
                 ),
             ),
-            _yes_no("11.3", "Local market operating?"),
-            _yes_no("11.4", "Food warehouse in the area?"),
+            _yes_no("11.3", "Is the local market operating?"),
+            _yes_no("11.4", "Is there a food warehouse in the area?"),
             _pick(
                 "11.5",
-                "Most immediate food need",
+                "Based on current situation, please check most immediate food need",
                 ("Cooked food", "Food pack", "Rice", "Fresh produce", "Cash", "Others"),
                 "evidence",
                 rule="need:food",
@@ -570,11 +647,11 @@ SECTIONS: tuple[FormSection, ...] = (
         "12",
         "WATER SUPPLY",
         (
-            _yes_no("12.1", "Access to drinking water?"),
-            _yes_no("12.2", "Access to domestic water?"),
+            _yes_no("12.1", "Is their access to water for drinking?"),
+            _yes_no("12.2", "Is their access to water for domestic use?"),
             _pick(
                 "12.3",
-                "Primary drinking water source",
+                "What is the primary water source for drinking?",
                 (
                     "Open well",
                     "Bore hole/hand pump",
@@ -584,10 +661,14 @@ SECTIONS: tuple[FormSection, ...] = (
                     "Other",
                 ),
             ),
-            _yes_no("12.4", "Own water containers with a lid?"),
+            _yes_no(
+                "12.4",
+                "Do affected households have their own water containers with a lid to store water?",
+            ),
             _pick(
                 "12.5",
-                "Most immediate water needs",
+                "Based on current situation, please identify your most immediate needs for "
+                "water systems?",
                 (
                     "Jerry cans",
                     "Bottled water",
@@ -605,12 +686,18 @@ SECTIONS: tuple[FormSection, ...] = (
         "13",
         "SANITATION",
         (
-            _yes_no("13.1", "Access to functioning sanitary facilities?"),
-            _yes_no("13.2", "Separate facilities for women and men?"),
-            _yes_no("13.3", "Adequate personal hygiene supplies?", printed="14.3"),
+            _yes_no("13.1", "Is their access to functioning sanitary facilities?"),
+            _yes_no("13.2", "Are there separate facilities for women and men?"),
+            _yes_no(
+                "13.3",
+                "Do affected families have adequate personal hygiene supplies? (e.g., soap, "
+                "sanitary napkins, etc.)",
+                printed="14.3",
+            ),
             _pick(
                 "13.4",
-                "Most immediate need on sanitation",
+                "Based on current situation, please identify your most immediate need on "
+                "sanitation: [check all that applies]",
                 (
                     "Toilet facilities",
                     "Bathing Facilities",
@@ -631,10 +718,10 @@ SECTIONS: tuple[FormSection, ...] = (
         "14",
         "HEALTH",
         (
-            _yes_no_unknown("14.1", "Access to Health Services?"),
+            _yes_no_unknown("14.1", "Do people have access to Health Services in the community?"),
             _pick(
                 "14.2",
-                "Functional facilities/services",
+                "Which health facilities/services are functional?",
                 (
                     "Barangay health station",
                     "Hospital",
@@ -646,7 +733,7 @@ SECTIONS: tuple[FormSection, ...] = (
             ),
             _pick(
                 "14.3",
-                "Main health concerns",
+                "What are the main health concerns?",
                 (
                     "Diarrhea/dehydration",
                     "Skin infections",
@@ -659,13 +746,14 @@ SECTIONS: tuple[FormSection, ...] = (
             ),
             FormField(
                 "14.4",
-                "Level of medicines/medical supplies",
+                "What is the level of availability of medicines and medical supplies in health "
+                "facilities?",
                 options=("Adequate", "Inadequate"),
                 control=CHOICE,
             ),
             _pick(
                 "14.5",
-                "Most immediate need on health",
+                "Based on current situation, please identify your most immediate need on health",
                 (
                     "Mobile clinics",
                     "Health personnel",
@@ -687,21 +775,47 @@ SECTIONS: tuple[FormSection, ...] = (
         "15",
         "NUTRITION",
         (
-            _yes_no("15.1", "Information on exclusively breastfed infants?"),
-            _yes_no("15.2", "Infant milk products distributed?"),
+            _yes_no("15.1", "Is their information on infants that are exclusively breastfed?"),
+            _yes_no(
+                "15.2",
+                "Have infant milk products (e.g., milk formulas) and/or baby bottles/teats been "
+                "distributed since the start of the emergency?",
+            ),
             _pick(
                 "15.3",
-                "Uninterrupted nutrition activities",
+                "Are any of the following activities being continued without any disruption "
+                "during the emergency?",
                 (
-                    "Vitamin A",
-                    "Iron-Folic Acid",
-                    "Micronutrient Powders",
-                    "Moderate/severe acute malnutrition management",
+                    "Vitamin A capsule supplementation for children 6-59 months",
+                    "Iron-Folic Acid tablet distribution for pregnant and lactating women",
+                    "Multiple Micronutrient Powders/Iron Syrup/Iron Drops for children 6-23 "
+                    "months of age",
+                    "Management of children with moderate and severe acute malnutrition",
+                ),
+                hint="Tick each activity that continues; the paper prints Yes beside it.",
+                renamed=(
+                    ("Vitamin A", ("Vitamin A capsule supplementation for children 6-59 months",)),
+                    (
+                        "Iron-Folic Acid",
+                        ("Iron-Folic Acid tablet distribution for pregnant and lactating women",),
+                    ),
+                    (
+                        "Micronutrient Powders",
+                        (
+                            "Multiple Micronutrient Powders/Iron Syrup/Iron Drops for children "
+                            "6-23 months of age",
+                        ),
+                    ),
+                    (
+                        "Moderate/severe acute malnutrition management",
+                        ("Management of children with moderate and severe acute malnutrition",),
+                    ),
                 ),
             ),
             _pick(
                 "15.4",
-                "Most immediate need on nutrition",
+                "Based on current situation, please identify your most immediate need on "
+                "nutrition (shade all that applies):",
                 (
                     "Food",
                     "Food supplements",
@@ -718,11 +832,13 @@ SECTIONS: tuple[FormSection, ...] = (
         "PROTECTION",
         (
             _yes_no_unknown(
-                "16.1", "Cases of violence as a result of the disaster or displacement?"
+                "16.1",
+                "Are their cases (reported or not) of violence in the community as a result of "
+                "the disaster or displacement?",
             ),
             _pick(
                 "16.2",
-                "Vulnerable people present",
+                "Presence of vulnerable people in the community/EC who need assistance:",
                 (
                     "Unaccompanied/Separated MINORS/ORPHANS",
                     "Unaccompanied/Separated SENIORS",
@@ -737,19 +853,22 @@ SECTIONS: tuple[FormSection, ...] = (
                 ),
             ),
             _yes_no(
-                "16.3", "Existing reporting mechanism for protection incidents?", printed="17.3"
+                "16.3",
+                "Is there an existing reporting mechanism for protection related incidents?",
+                printed="17.3",
             ),
             _pick(
                 "16.4",
-                "Most immediate need on protection essential services",
+                "Based on current situation, please identify your most immediate need for "
+                "protection essential services:",
                 (
                     "Referral",
                     "Police Presence",
                     "Local Gov't. Official's Presence",
                     "Social Services",
                     "Counseling / Debriefing",
-                    "Replacement of identification documents",
                     "Others",
+                    "Replacement of identification documents",
                 ),
                 printed="17.4",
             ),
@@ -759,13 +878,23 @@ SECTIONS: tuple[FormSection, ...] = (
         "17",
         "EDUCATION",
         (
-            FormField("17.1", "Classrooms used as evacuation centers", control=CLASSROOMS),
-            _count("17.2", "Children staying in evacuation centers"),
-            FormField("17.3", "Destroyed (irreparable) classrooms", control=CLASSROOMS),
-            FormField("17.4", "Damaged (repairable) classrooms", control=CLASSROOMS),
+            FormField(
+                "17.1",
+                "Number of classrooms are being used as evacuation centers",
+                control=CLASSROOMS,
+            ),
+            _count("17.2", "Number of children are staying in the evacuation centers"),
+            FormField("17.3", "Number of destroyed (irreparable) classrooms", control=CLASSROOMS),
+            FormField(
+                "17.4",
+                "Number of damaged (repairable) classrooms (Walls, roof and column collapsed, "
+                "hanging wall etc.)",
+                control=CLASSROOMS,
+            ),
             _pick(
                 "17.5",
-                "Most urgent educational needs",
+                "What are the most urgent educational needs in the area. Please shade all that "
+                "apply:",
                 (
                     "Safe spaces to hold classes",
                     "Replacement of Children's School Supplies",
@@ -797,7 +926,8 @@ SECTIONS: tuple[FormSection, ...] = (
             ),
             _pick(
                 "18.2",
-                "Most immediate need on livelihood/early recovery",
+                "Based on current situation, please identify your most immediate need on "
+                "livelihood/early recovery?",
                 ("Transport", "Cash for Work", "Debris clearance", "Cash", "Others"),
                 "evidence",
                 rule="livelihood_need",
@@ -808,10 +938,15 @@ SECTIONS: tuple[FormSection, ...] = (
         "19",
         "COMMUNITY ENGAGEMENT",
         (
-            _yes_no_unknown("19.1", "Does the community receive needed information?"),
+            _yes_no_unknown(
+                "19.1",
+                "Based on observation, does the community receive from government or concerned "
+                "agencies the information they need to cope with the evolving humanitarian "
+                "situation?",
+            ),
             _pick(
                 "19.2",
-                "What affected people want to know most",
+                "What do affected people want to know most?",
                 (
                     "General situation",
                     "Situation at home",
@@ -825,7 +960,7 @@ SECTIONS: tuple[FormSection, ...] = (
             ),
             _pick(
                 "19.3",
-                "Main sources of information",
+                "What are the main sources of information?",
                 (
                     "Friends/neighbors/family",
                     "Community leader",
@@ -845,30 +980,48 @@ SECTIONS: tuple[FormSection, ...] = (
     ),
     FormSection(
         "20",
-        "OVER-ALL ASSESSMENT (concluding observation of the enumerator)",
+        "OVER-ALL ASSESSMENT",
         (
             FormField(
                 "20.1",
-                "General situation",
+                "When you consider the general situation in the area, would you say:",
                 "officer",
                 printed="21.1",
                 options=(
-                    "People facing serious problems",
-                    "People will get sick and might even die",
-                    "Many people have already died",
+                    "People are facing serious problems in the area",
+                    "As a result of the emergency, people will get sick and might even die",
+                    "As a result of the emergency, many people have already died",
                 ),
                 control=CHOICE,
                 ask=True,
                 hint="Your overall judgment of the area, not the key informant's.",
+                renamed=(
+                    (
+                        "People facing serious problems",
+                        ("People are facing serious problems in the area",),
+                    ),
+                    (
+                        "People will get sick and might even die",
+                        ("As a result of the emergency, people will get sick and might even die",),
+                    ),
+                    (
+                        "Many people have already died",
+                        ("As a result of the emergency, many people have already died",),
+                    ),
+                ),
             ),
             FormField(
                 "20.2",
-                "General justification for the answer",
+                "Please provide general justification for the answer:",
                 "officer",
                 control=LONG,
                 ask=True,
                 hint="Two or three sentences on why, from what you saw and the reports.",
             ),
+        ),
+        title_note=(
+            "(not to be asked from the key informant, but as a concluding observation of the "
+            "enumerator)"
         ),
     ),
     FormSection(
@@ -884,14 +1037,7 @@ SECTIONS: tuple[FormSection, ...] = (
                 control=control,
                 numbered=False,
             )
-            for key, label, personal, control in (
-                ("name", "NAME", True, TEXT),
-                ("designation", "DESIGNATION", False, TEXT),
-                ("organization", "ORGANIZATION", False, TEXT),
-                ("team", "RDANA Team", False, TEXT),
-                ("contact", "CONTACT #", True, PHONE),
-                ("email", "EMAIL", True, EMAIL),
-            )
+            for key, (label, personal, control) in SUBMITTED.items()
         ),
     ),
 )
@@ -1086,8 +1232,8 @@ HELP: dict[str, tuple[str, str | None]] = {
         None,
     ),
     "8.2": (
-        "Tick the kinds of search and rescue needed. Example: Water, for people trapped by the "
-        "flood.",
+        "Tick the kinds of search and rescue needed. Example: Water Search and Rescue, for "
+        "people trapped by the flood.",
         None,
     ),
     "9.1": ("Is law and order a problem? Yes, No or Do not know.", None),
@@ -1107,7 +1253,7 @@ HELP: dict[str, tuple[str, str | None]] = {
         None,
     ),
     "10.3": (
-        "Tick the most urgent shelter needs. Example: Tarpaulins, Galvanized iron sheets.",
+        "Tick the most urgent shelter needs. Example: Tarpaulins, Galvanized Iron sheets.",
         None,
     ),
     "11.1": ("Can people get food where they are now? Yes or No.", None),
@@ -1144,7 +1290,8 @@ HELP: dict[str, tuple[str, str | None]] = {
         None,
     ),
     "15.3": (
-        "Tick the nutrition programs still running without a break. Example: Vitamin A.",
+        "Tick the nutrition programs still running without a break. Example: Vitamin A "
+        "capsule supplementation.",
         None,
     ),
     "15.4": ("Tick the most urgent nutrition needs. Example: Food supplements.", None),
@@ -1228,6 +1375,183 @@ def all_fields() -> list[FormField]:
     return [f for section in SECTIONS for f in section.fields]
 
 
+# ---------- The printout: Annex I's own layout (read by app.paper) ----------
+# Measured against the scan in slice 7k. Each section prints as its title bar, then its boxes
+# top to bottom. A box is one cell or two side by side ("left | right"); a cell is rows split
+# by ";"; a row is the keys printed side by side. NOTE is the section's printed note, where the
+# form prints it. Annex I starts a new page at the first fields of ANNEX_PAGES.
+NOTE = "note"
+PAPER_BOXES: dict[str, tuple[str, ...]] = {
+    "1": (
+        "1.1; 1.1.1; 1.1.2; 1.1.3 | 1.2; 1.2.1; 1.2.2; 1.2.3; 1.2.4; 1.2.5; 1.2.6; 1.2.7",
+        "1.3; 1.3.1 1.3.2 1.3.3; 1.3.4 1.3.5 1.3.6",
+        "1.4",
+    ),
+    "2": (
+        "2.1 2.3 2.5; 2.2 2.4 2.6; 2.2a; 2.2b 2.2c; note; 2.7 2.8 2.9; 2.10 2.11 2.12; "
+        "2.13 2.14 2.15",
+    ),
+    "3": ("3.1", "3.2", "3.3", "3.3.1", "3.4"),
+    "4": ("4.1 | 4.2", "4.3 | 4.4"),
+    "5": ("5.1", "5.2 | 5.3", "5.4"),
+    "6": ("6.1 | 6.2", "6.3", "6.4", "6.5"),
+    "7": ("7.1; 7.2",),
+    "8": ("8.1 | 8.2",),
+    "9": ("9.1 | 9.2", "9.3"),
+    "10": ("10.1; 10.2", "10.3"),
+    "11": ("11.1", "11.2", "11.3 | 11.4", "11.5"),
+    "12": ("12.1; 12.2", "12.3 | 12.4", "12.5"),
+    "13": ("13.1", "13.2 | 13.3", "13.4"),
+    "14": ("14.1 | 14.2", "14.3 | 14.4", "14.5"),
+    "15": ("15.1 | 15.2", "15.3", "15.4"),
+    "16": ("16.1", "16.2", "16.3 | 16.4"),
+    "17": ("17.1; 17.2; 17.3; 17.4", "17.5"),
+    "18": ("18.1 | 18.2",),
+    "19": ("19.1 | 19.2", "19.3"),
+    "20": ("20.1; 20.2",),
+    "": (
+        "submitted.name submitted.designation; submitted.organization submitted.team; "
+        "submitted.contact submitted.email",
+    ),
+}
+BLANK = "___"  # in a printed option: a ruled blank to write on
+
+
+@dataclass(frozen=True)
+class Paper:
+    """How one field prints, where its control alone does not say (app.paper)."""
+
+    # The option boxes: None after the label; a number of columns under it; or the length of
+    # each printed row (columns as wide as the longest row).
+    cols: int | tuple[int, ...] | None = None
+    # line: "Label: ____"; area: the label, then ruled lines; table: the label, then the form's
+    # table; matrix: each option with the `answers` boxes; cells: a boxed row, one cell per
+    # option with its amount; amounts: a box per option with its "Quantity ___"; pair: a shaded
+    # label cell and a value cell (Submitted by). Default: from the control.
+    style: str | None = None
+    printed: tuple[tuple[str, str], ...] = ()  # an option as printed, when it says more
+    sep: str = ":"  # between a line's label and its blank (none after "?" or ":")
+    mark: str = ""  # printed after the blank, as "#" after 10.1
+    lines: int = 2  # ruled lines of an empty area
+    head: tuple[tuple[str, tuple[str, ...]], ...] = ()  # a table's columns, with sub-columns
+    rows: int = 3  # a table's printed rows
+    answers: tuple[str, ...] = ()
+    split: int = 0  # options printed as two groups side by side, the second from this one
+
+
+SKIP = "No [Skip to next section]"
+OTHERS = (("Others", f"Others {BLANK}"), ("Other", f"Other {BLANK}"))  # unless a field says
+PAPER_FIELDS: dict[str, Paper] = {
+    "1.4": Paper(lines=3),
+    "2.2a": Paper(style="cells"),
+    "3.2": Paper(cols=8),
+    "3.3.1": Paper(cols=(3,), printed=(("Others", f"Others Specify: {BLANK}"),)),
+    "3.4": Paper(cols=4),
+    "4.1": Paper(
+        cols=(2, 1, 1, 1),
+        printed=(
+            ("Partial (cite % without power)", f"Partial (cite % without power) {BLANK}"),
+            ("Limited from (time) to", f"Limited from (time) {BLANK} to {BLANK}"),
+            (
+                "No power even before the disaster",
+                "No power even before the disaster (proceed to next section)",
+            ),
+        ),
+    ),
+    "4.2": Paper(cols=2),
+    "4.4": Paper(
+        cols=1,
+        style="amounts",
+        printed=(
+            (
+                "Generators / Alternative Power Kit (Solar)",
+                f"Generators / Alternative Power Kit (Solar) Quantity{BLANK}",
+            ),
+            ("Gasoline for Generators", f"Gasoline for Generators Quantity{BLANK}"),
+            ("Diesel for Generators", f"Diesel for Generators Quantity{BLANK}"),
+        ),
+    ),
+    "5.1": Paper(cols=3, printed=(("Others", "Others"),)),
+    "5.2": Paper(cols=3),
+    "5.3": Paper(cols=3),
+    "5.4": Paper(cols=3),
+    "6.1": Paper(cols=(2,), printed=(("No", SKIP),)),
+    "6.2": Paper(cols=(2,)),
+    "6.3": Paper(
+        style="table",
+        head=(
+            ("Name of Evacuation Center", ()),
+            ("Address", ()),
+            ("GPS COORDINATES", ()),
+            ("Inside EC", ("# FAMILY", "# PERSON")),
+        ),
+    ),
+    "6.4": Paper(cols=4),
+    "6.5": Paper(cols=4),
+    "7.1": Paper(printed=(("No", "No [skip to next section]"),)),
+    "7.2": Paper(
+        style="table",
+        head=(
+            ("NAME or ORGANIZATION (required)", ()),
+            ("CONTACT PERSON", ()),
+            ("CONTACT DETAILS", ()),
+            ("ASSISTANCE GIVEN", ("PARTICULAR", "QUANTITY")),
+            ("SERVICE DATE", ("START", "END")),
+            ("# of Families Served", ()),
+        ),
+    ),
+    "8.1": Paper(printed=(("No", SKIP),)),
+    "8.2": Paper(cols=2),
+    "9.1": Paper(cols=(3,), printed=(("No", SKIP),)),
+    "9.2": Paper(cols=(3, 2, 2, 2, 2, 1)),
+    "9.3": Paper(
+        cols=2,
+        split=5,
+        printed=(
+            ("Other law enforcement units", f"Other law enforcement units {BLANK}"),
+            ("Other Armed Groups", f"Other Armed Groups {BLANK}"),
+        ),
+    ),
+    "10.1": Paper(sep="", mark="#"),
+    "10.2": Paper(sep="", mark="#"),
+    "10.3": Paper(cols=6),
+    "11.2": Paper(cols=3, printed=(("Other", f"Other: {BLANK}"),)),
+    "11.5": Paper(cols=6),
+    "12.3": Paper(cols=3),
+    "12.5": Paper(cols=4),
+    "13.2": Paper(cols=(2,)),
+    "13.4": Paper(cols=(5, 3, 2)),
+    "14.1": Paper(cols=(3,)),
+    "14.2": Paper(cols=3),
+    "14.3": Paper(cols=(3, 2, 1, 1)),
+    "14.4": Paper(cols=1),
+    "14.5": Paper(cols=4),
+    "15.1": Paper(cols=(2,)),
+    "15.2": Paper(cols=(2,)),
+    "15.3": Paper(style="matrix", answers=YES_NO),
+    "15.4": Paper(cols=4),
+    "16.1": Paper(cols=(3,)),
+    "16.2": Paper(cols=(5, 5)),
+    "16.3": Paper(cols=(2,)),
+    "16.4": Paper(cols=2),
+    "17.5": Paper(cols=2, printed=(("Cash", f"Cash {BLANK}"),)),
+    "18.1": Paper(style="line"),
+    "18.2": Paper(cols=(3, 2)),
+    "19.1": Paper(cols=(3,)),
+    "19.2": Paper(cols=(2, 2, 3, 1)),
+    "19.3": Paper(cols=(6, 5, 1)),
+    "20.1": Paper(cols=1),
+    "20.2": Paper(lines=2),
+    **{f"submitted.{k}": Paper(style="pair") for k in SUBMITTED},
+}
+STYLES = ("line", "area", "table", "matrix", "cells", "amounts", "pair")
+
+
+def paper_rows(box: str) -> list[list[list[str]]]:
+    """A PAPER_BOXES box as its cells, each a list of rows of keys."""
+    return [[row.split() for row in cell.split(";")] for cell in box.split("|")]
+
+
 def _check() -> None:
     keys = [f.key for f in all_fields()]
     duplicates = {k for k in keys if keys.count(k) > 1}
@@ -1245,6 +1569,23 @@ def _check() -> None:
     stale = set(HELP) - set(keys)
     if stale:
         raise ValueError(f"help for fields the form does not have: {sorted(stale)}")
+    # The printout places every field once, in its own section, and knows each layout hint.
+    by_section = {s.number: {f.key for f in s.fields} for s in SECTIONS}
+    if set(PAPER_BOXES) != set(by_section):
+        raise ValueError("PAPER_BOXES must list every section")
+    for number, boxes in PAPER_BOXES.items():
+        placed = [k for box in boxes for cell in paper_rows(box) for row in cell for k in row]
+        notes = placed.count(NOTE)
+        placed = [k for k in placed if k != NOTE]
+        if sorted(placed) != sorted(by_section[number]) or notes > 1:
+            raise ValueError(f"PAPER_BOXES section {number!r} must place each field once")
+    fields = {f.key: f for f in all_fields()}
+    for key, paper in PAPER_FIELDS.items():
+        if key not in fields or (paper.style and paper.style not in STYLES):
+            raise ValueError(f"PAPER_FIELDS {key!r}: no such field or style")
+        unknown = {o for o, _ in paper.printed} - set(fields[key].options)
+        if unknown:
+            raise ValueError(f"PAPER_FIELDS {key!r}: printed text for unknown options {unknown}")
 
 
 _check()

@@ -315,7 +315,7 @@ async def test_every_evidence_rule_fills_its_official_field(engine, settings):
     assert value["3.3"] == "Yes" and f["3.3"]["evidence"][0]["report_ids"] == [a]
     assert value["3.4"] == "Transport, Debris clearing"
     assert value["4.2"] == "Power outage or damage reported"
-    assert value["8.1"] == "Yes" and value["8.2"] == "Water"
+    assert value["8.1"] == "Yes" and value["8.2"] == "Water Search and Rescue"
     assert value["10.1"] == "1" and value["10.2"] == "4"
     assert value["10.3"].startswith("Shelter assistance requested")
     assert value["11.5"] == "Food requested" and value["12.5"] == "Water requested"

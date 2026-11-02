@@ -4,6 +4,7 @@
 {% from "_trust.html" import signal_chips %}
 {% from "_deadline.html" import clock, deadline_notes %}
 {% from "_fill.html" import form_for with context %}
+{% from "_paper.html" import measured %}
 <header class="keep">
   <div>
     <h1>{{ c.title }} <span class="muted">{% if technical() %}· incident #{{ c.incident_id }}{% endif %}{% if c.barangay %} · {{ c.barangay }}{% endif %} · version {{ draft.version }}</span></h1>
@@ -57,11 +58,8 @@
                 </ul>
                 {% if j.notes %}<div class="muted">{{ "Agent" if technical() else "Ulat" }}: {{ j.notes }}</div>{% endif %}
               {% else %}<div class="muted">Not judged.</div>{% endif %}
-              {% set m = p.measurement %}
-              {% set parts = [] %}
-              {% if m and "roof_count" in m %}{% set _ = parts.append(m.roof_count ~ " roof" ~ ("s" if m.roof_count != 1 else "")) %}{% endif %}
-              {% if m and "floodwater_present" in m %}{% set _ = parts.append(("floodwater over " ~ "%.0f"|format(m.floodwater_fraction * 100) ~ "% of the photo") if m.floodwater_present else "no floodwater") %}{% endif %}
-              {% if parts %}<div class="muted">{{ "SAM 3.1 measured" if technical() else "Measured" }} ({{ c.sam_label }}): {{ parts|join(", ") }}</div>{% endif %}
+              {% set m = measured(p.measurement) %}
+              {% if m %}<div class="muted">{{ "SAM 3.1 measured" if technical() else "Measured" }} ({{ c.sam_label }}): {{ m }}</div>{% endif %}
             </div>
           {% else %}<span class="muted">No photo.</span>{% endfor %}
         </td>

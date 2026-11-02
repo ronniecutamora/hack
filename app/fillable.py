@@ -115,8 +115,9 @@ def check_field(field: Field, where: str) -> None:
         raise ValueError(f"{where}: unknown control {control.kind!r}")
     if control.kind in CHOICES and not field.options:
         raise ValueError(f"{where}: a {control.kind} control needs options")
-    if control.kind == "multi" and any(MULTI_SEPARATOR in o for o in field.options):
-        raise ValueError(f"{where}: a multi-choice option may not contain {MULTI_SEPARATOR!r}")
+    for old, new in getattr(field, "renamed", ()):
+        if old in field.options or not set(new) <= set(field.options):
+            raise ValueError(f"{where}: renamed option {old!r} must map to current options")
     if not (field.help or "").strip() or not (field.help_source or "").strip():
         raise ValueError(f"{where}: every field needs help and a help_source")
     if len(field.help) > HELP_MAX:
@@ -214,13 +215,34 @@ def normalize(field: Field, values: Sequence[str], now: datetime) -> str | None:
     return text
 
 
+def parts(field: Field, value: str) -> list[str]:
+    """A stored value as the pieces it names: a multi-choice value split back into its options
+    (an option may itself hold the separator, as "Banditry, Hold-up" does: the longest option
+    wins), a choice as its one answer. An option the form has since reworded (`renamed`) reads
+    as its current wording, so a value saved before still ticks the right boxes."""
+    choice = field.control.kind == "choice"
+    pieces = [value] if choice else value.split(MULTI_SEPARATOR)
+    renamed = dict(getattr(field, "renamed", ()))
+    known = set(field.options) | set(renamed)
+    out, i = [], 0
+    while i < len(pieces):
+        j = next(
+            (j for j in range(len(pieces), i, -1) if MULTI_SEPARATOR.join(pieces[i:j]) in known),
+            i + 1,
+        )
+        piece = MULTI_SEPARATOR.join(pieces[i:j])
+        out.extend(renamed.get(piece, (piece,)))
+        i = j
+    return out
+
+
 def fits(field: Field, value: str | None, now: datetime) -> str | None:
     """A generated value as the control would hold it, or None when it does not fit the
     control (then the page shows it as "From the reports" beside an empty control)."""
     if value is None:
         return None
     try:
-        values = value.split(MULTI_SEPARATOR) if field.control.kind == "multi" else [value]
+        values = parts(field, value) if field.control.kind in CHOICES else [value]
         return normalize(field, values, now)
     except FieldError:
         return None
@@ -293,9 +315,13 @@ def read_post(
 def shown_value(
     field: Field, generated: str | None, entry: dict[str, Any] | None, now: datetime
 ) -> str | None:
-    """What the field's control holds when the page is drawn."""
+    """What the field's control holds when the page is drawn: an entry saved in an option's
+    old wording reads in the current one, so it is no change unless the officer makes one."""
     if entry is not None:
-        return entry.get("value")
+        value = entry.get("value")
+        if value and field.control.kind in CHOICES:
+            return fits(field, value, now) or value
+        return value
     return fits(field, generated, now)
 
 
@@ -403,9 +429,7 @@ def _options_in(field: Field, value: str | None) -> list[str]:
     """The form's options a value names: the one answer, or each of a multi-choice's."""
     if not value or not field.options:
         return []
-    named = value.split(MULTI_SEPARATOR) if field.control.kind == "multi" else [value]
-    if field.control.kind not in CHOICES:  # boxes printed beside a number or text
-        named = value.split(MULTI_SEPARATOR)
+    named = parts(field, value)  # beside a number or text: the boxes its text names
     return [o for o in field.options if o in named]
 
 

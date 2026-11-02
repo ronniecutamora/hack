@@ -1,67 +1,146 @@
-{# The printout: only what belongs on the official paper form, in its order and numbering.
-   Shown by the print stylesheet instead of the page; never on screen. Values are the version's
-   (the officer's entry, else the generated value); an empty field is a ruled blank line or empty
-   boxes. Personal fields are filled from this tab by app.js, else left blank to write by hand. #}
+{# The printout: the official paper form alone, in its own words, numbering and layout, with the
+   version's values on its blanks. Shown by the print stylesheet instead of the page; never on
+   screen. The RDANA layout comes from app.paper (Annex I's boxes, rows, option columns and page
+   breaks); the Notice of Loss is the PCIC letter. Personal fields are filled from this tab by
+   app.js, else left as blank lines to write by hand. Ulat's only words are the stamp line in
+   the page footer (what this paper is: draft or approved, version, date). #}
 
-{% macro boxes(v) -%}
-  <span class="paper__boxes">{% for o in v.options %}<span class="paper__box">{{ "☒" if o in v.printed else "☐" }} {{ o }}</span>{% endfor %}</span>
-{%- endmacro %}
+{% macro check(on) %}<span class="paper__check">{{ "☒" if on else "☐" }}</span>{% endmacro %}
 
-{% macro value(v) -%}
-  {%- set choices = v.control.kind in ("choice", "multi") -%}
-  {%- if v.personal -%}
-    <span class="paper__line" data-personal-print="{{ v.key }}"></span>
-  {%- else -%}
-    {%- if v.value and (not choices or not v.printed) -%}<span class="paper__value">{{ v.value }}{% if v.control.unit and v.entry %} {{ v.control.unit }}{% endif %}</span>{%- elif not v.options -%}<span class="paper__line"></span>{%- endif -%}
-    {%- if v.options %}{{ boxes(v) }}{% endif -%}
+{# A field's value on its ruled line: typed on this device (personal), the version's value, or
+   blank to write on. #}
+{% macro blank(v, extra="") -%}
+  {%- if v.personal -%}<span class="paper__line{{ extra }}" data-personal-print="{{ v.key }}"></span>
+  {%- else -%}<span class="paper__line{{ extra }}">{% if v.value %}{{ v.value }}{% if v.control.unit and v.entry %} {{ v.control.unit }}{% endif %}{% endif %}</span>
   {%- endif -%}
 {%- endmacro %}
 
-{% macro stamp_line(stamp) %}<p class="paper__stamp">{{ stamp }}</p>{% endmacro %}
+{% macro option(o) -%}
+  <span class="paper__opt"{% if o.end %} style="grid-column: {{ o.col }} / -1"{% endif %}>{{ check(o.checked) }}{% for p in o.pieces %}{% if p.blank %} <span class="paper__line paper__line--short">{{ p.value }}</span>{% else %} {{ p.text }}{% endif %}{% endfor %}</span>
+{%- endmacro %}
 
-{% macro rdana(form, c, stamp) %}
-<div class="paper print-only">
+{% macro boxes(item) -%}
+  <span class="paper__groups{{ ' paper__groups--inline' if item.groups[0].inline }}{{ ' paper__groups--split' if item.groups|length > 1 }}">
+  {%- for g in item.groups %}<span class="paper__opts" style="--cols: {{ g.cols }}">{% for o in g.options %}{{ option(o) }}{% endfor %}</span>{% endfor -%}
+  </span>
+{%- endmacro %}
+
+{% macro label(item) %}<span class="paper__label">{% if item.number %}<span class="paper__num">{{ item.number }}</span> {% endif %}{{ item.label }}{{ item.sep }}</span>{% endmacro %}
+
+{% macro text(item) %}{% if item.text %}<span class="paper__value paper__value--note">{{ item.text }}</span>{% endif %}{% endmacro %}
+
+{% macro item(it) %}{% set v = it.view %}
+  {%- if it.kind == "heading" -%}<p class="paper__heading">{{ it.number }} {{ it.label }}</p>
+  {%- elif it.kind == "note" -%}<p class="paper__note">{{ it.text }}</p>
+  {%- elif it.style == "line" -%}
+    <div class="paper__item paper__item--line">{{ label(it) }} {{ blank(v, " paper__line--mark" if it.mark else "") }}{{ it.mark }}{% if it.required %} <span class="paper__req">(required)</span>{% endif %}{% if it.options %} {{ boxes(it) }}{% endif %}</div>
+  {%- elif it.style == "pair" -%}
+    <span class="paper__pair-label">{{ it.label }}</span><span class="paper__pair-value">{{ blank(v, " paper__line--cell") }}</span>
+  {%- elif it.style == "area" -%}
+    <div class="paper__item paper__item--area">{{ label(it) }}{% if v.value %}<p class="paper__value paper__value--area">{{ v.value }}</p>{% else %}<span class="paper__ruled" style="--lines: {{ it.lines }}"></span>{% endif %}</div>
+  {%- elif it.style == "table" -%}
+    <div class="paper__item paper__item--table">{{ label(it) }}
+      <table class="paper__grid">
+        <thead>
+          <tr>{% for name, subs in it.head %}<th{% if subs %} colspan="{{ subs|length }}"{% else %} rowspan="2"{% endif %}>{{ name }}</th>{% endfor %}</tr>
+          <tr>{% for name, subs in it.head %}{% for s in subs %}<th>{{ s }}</th>{% endfor %}{% endfor %}</tr>
+        </thead>
+        <tbody>{% for row in it.rows %}<tr>{% if row %}<td colspan="{{ it.width }}" class="paper__value">{{ row }}</td>{% else %}{% for _ in range(it.width) %}<td></td>{% endfor %}{% endif %}</tr>{% endfor %}</tbody>
+      </table>
+    </div>
+  {%- elif it.style == "matrix" -%}
+    <div class="paper__item">{{ label(it) }}
+      <div class="paper__matrix">{% for m in it.matrix %}<span>{{ m.text }}</span><span>{% for a in m.answers %}<span class="paper__opt">{{ check(a.checked) }} {{ a.text }}</span>{% endfor %}</span>{% endfor %}</div>
+    </div>
+  {%- elif it.style == "cells" -%}
+    <div class="paper__item">{{ label(it) }}
+      <span class="paper__cells">{% for o in it.options %}<span>{{ o.option }}: <span class="paper__value">{{ o.amount }}</span></span>{% endfor %}</span>{{ text(it) }}
+    </div>
+  {%- else -%}{# boxes, amounts #}
+    <div class="paper__item">{{ label(it) }} {{ boxes(it) }}{{ text(it) }}</div>
+  {%- endif -%}
+{% endmacro %}
+
+{# The one line Ulat adds (what this paper is: draft or approved, version, date, and which page
+   of how many, so a loose sheet can be put back), printed in the bottom margin of every page by
+   the page's own margin box, never inside the form. #}
+{% macro stamp_line(stamp) %}<style>@page { @bottom-left { content: "{{ stamp.css }} · page " counter(page) " of " counter(pages); } }</style>{% endmacro %}
+
+{% macro box(b, section) %}
+  <div class="paper__box{{ ' paper__box--split' if b.cells|length > 1 }}{{ ' paper__box--pairs' if not section.number }}">
+  {% for cell in b.cells %}<div class="paper__cell">
+    {% for row in cell %}<div class="paper__row{{ ' paper__row--many' if row|length > 1 }}" style="--n: {{ row|length }}">{% for it in row %}{{ item(it) }}{% endfor %}</div>{% endfor %}
+  </div>{% endfor %}
+  </div>
+{% endmacro %}
+
+{% macro rdana(form, stamp) %}{% set p = form.paper %}
+<div class="paper paper--rdana print-only">
   {{ stamp_line(stamp) }}
-  <div class="paper__head"><p class="paper__annex">Annex I</p><h1 class="paper__title">{{ c.title }}</h1><p class="paper__subtitle">{{ c.subtitle }}</p></div>
-  {% for section in form.sections %}
-    <table class="paper__table">
-      <thead><tr><th colspan="3" class="paper__section">{% if section.number %}{{ section.number }}. {% endif %}{{ section.title }}</th></tr></thead>
-      <tbody>
-      {% for f in section.fields %}
-        {% if f.heading is defined %}
-          <tr class="paper__sub"><td colspan="3">{{ f.heading.number }} {{ f.heading.label }}</td></tr>
-        {% else %}
-          <tr{% if f.control.kind == 'long' %} class="paper__row--long"{% endif %}>
-            <td class="paper__num">{{ f.number }}</td>
-            <td class="paper__label">{{ f.label }}{% if f.required %} <span class="paper__req">(required)</span>{% endif %}</td>
-            <td class="paper__cell">{{ value(f) }}</td>
-          </tr>
-        {% endif %}
-      {% endfor %}
-      {% if section.note %}<tr class="paper__note"><td colspan="3">{{ section.note }}</td></tr>{% endif %}
-      </tbody>
-    </table>
+  <p class="paper__annex">{{ p.annex }}</p>
+  <div class="paper__titlebar"><h1 class="paper__title">{{ p.title }}</h1><p class="paper__subtitle">{{ p.subtitle }}</p></div>
+  {% for section in p.sections %}{% set first = section.boxes[0] %}
+    {# A section's title stays on the page of its first box. #}
+    <div class="paper__keep{{ ' paper__keep--page' if first.page_break }}">
+      {% if section.number %}<div class="paper__bar"><span class="paper__secnum">{{ section.number }}.</span> {{ section.title }}{% if section.title_note %} <span class="paper__title-note">{{ section.title_note }}</span>{% endif %}</div>
+      {% else %}<p class="paper__submitted">{{ section.title }}:</p>{% endif %}
+      {{ box(first, section) }}
+    </div>
+    {% for b in section.boxes[1:] %}{% if b.page_break %}<div class="paper__keep paper__keep--page">{{ box(b, section) }}</div>{% else %}{{ box(b, section) }}{% endif %}{% endfor %}
   {% endfor %}
-  <p class="paper__foot">{{ c.title }} · Barangay {{ c.barangay }} · {{ stamp }}</p>
 </div>
 {% endmacro %}
 
-{% macro nol(form, c, commodity, stamp) %}{% set f = form.by_key %}
-<div class="paper paper--letter print-only">
+{# A blank with the words the paper prints under its line ("Date", the type-of-policy hint). #}
+{% macro captioned(v) %}<span class="paper__captioned">{{ blank(v) }}<span class="paper__caption">{{ v.field.paper_label }}</span></span>{% endmacro %}
+
+{% macro nol(form, commodity, stamp) %}{% set f = form.by_key %}{% set office = commodity.office %}
+<div class="paper paper--nol print-only">
   {{ stamp_line(stamp) }}
-  <p class="paper__formid">{{ c.form_id }}<br>{{ c.revision }}</p>
-  <p class="paper__center"><strong>PHILIPPINE CROP INSURANCE CORPORATION</strong><br>{{ c.office.name }}</p>
-  <p class="paper__date">Date: {{ value(f["date"]) }}</p>
-  {% set title = c.title.split(" (", 1) %}<h1 class="paper__title">{{ title[0] }}{% if title|length > 1 %}<br>({{ title[1] }}{% endif %}</h1>
-  <p>TO: <strong>{{ c.office.addressee }}</strong><br>{{ c.office.name }}<br>{{ c.office.address }}</p>
-  <p>Dear Sir/Madam:</p>
-  <p class="paper__preamble">{% for piece, is_key in commodity.preamble_parts %}{% if is_key %}{{ value(f[piece]) }}{% else %}{{ piece }}{% endif %}{% endfor %}</p>
-  <ol class="paper__list">
+  <p class="paper__formid">{{ commodity.form_id }}<br>{{ commodity.revision }}</p>
+  <p class="paper__center paper__strong">PHILIPPINE CROP INSURANCE CORPORATION<br>Regional Office No. <span class="paper__line paper__line--fit">{{ office.number }}</span></p>
+  {% set title = commodity.title.split(" (", 1) %}<h1 class="paper__center paper__strong paper__nol-title">{{ title[0] }}{% if title|length > 1 %}<br>({{ title[1] }}{% endif %}</h1>
+  <div class="paper__date">{{ captioned(f["date"]) }}</div>
+  <div class="paper__to"><span>TO :</span><div><p>{{ office.addressee }}</p><span class="paper__line paper__line--block">{{ office.name }}</span><span class="paper__line paper__line--block">{{ office.address }}</span></div></div>
+  <p class="paper__salutation">Dear Sir/Madam:</p>
+  <p class="paper__preamble">{% for piece, is_key in commodity.preamble_parts %}{% if not is_key %}{{ piece }}{% elif f[piece].field.paper_label %}{{ captioned(f[piece]) }}{% else %}{{ blank(f[piece]) }}{% endif %}{% endfor %}</p>
+  <ol class="paper__particulars">
   {% for v in form.fields if v.field in commodity.fields %}
-    <li><span class="paper__num">{{ v.number }}.</span> <span class="paper__label">{{ v.label }}</span>: {{ value(v) }}</li>
+    <li><span class="paper__num">{{ v.number }}.</span><span class="paper__label">{{ v.label }}</span>{{ blank(v) }}</li>
   {% endfor %}
   </ol>
-  <div class="paper__closing">{% set lines = c.closing.split(" / ") %}<p>{{ lines[0] }}</p><p class="paper__sign"><span class="paper__line paper__line--sign"></span><br>{{ lines[1:]|join(" ") }}</p></div>
-  <p class="paper__foot">{{ c.form_id }} · {{ stamp }}</p>
+  {% set closing = commodity.closing.split(" / ") %}
+  <div class="paper__closing"><p>{{ closing[0] }}</p>
+    <p class="paper__sign"><span class="paper__line paper__line--sign" data-personal-print="1"></span>{% for line in closing[1:] %}<span>{{ line }}</span>{% endfor %}</p>
+  </div>
+</div>
+{% endmacro %}
+
+{# What SAM 3.1 measured in a photo, in words: shared by the screen annex and the photo page. #}
+{% macro measured(m) -%}
+  {%- set parts = [] -%}
+  {%- if m and "roof_count" in m %}{% set _ = parts.append(m.roof_count ~ " roof" ~ ("s" if m.roof_count != 1 else "")) %}{% endif -%}
+  {%- if m and "floodwater_present" in m %}{% set _ = parts.append(("floodwater over " ~ "%.0f"|format(m.floodwater_fraction * 100) ~ "% of the photo") if m.floodwater_present else "no floodwater") %}{% endif -%}
+  {{- parts|join(", ") -}}
+{%- endmacro %}
+
+{# The optional page after the Notice of Loss (the print checklist's "Include the photo
+   evidence page", off by default): the incident's photos with their measurements, titled as an
+   attachment, never inside the form. #}
+{% macro nol_photos(c, commodity, stamp, available_media) %}
+<div class="paper paper--attachment print-only" data-print-attachment>
+  {{ stamp_line(stamp) }}
+  <h1 class="paper__attach-title">Attachment to the Notice of Loss ({{ commodity.form_id }}): photo evidence</h1>
+  <p class="paper__attach-note">Not part of the PCIC form. Photos sent with the reports of this loss, oldest first. Each measurement is {{ c.sam_label }}.{% if c.sam_caveat %} {{ c.sam_caveat|plain }}{% endif %}</p>
+  <div class="paper__shots">
+  {% for e in c.annex if e.photos %}{% for p in e.photos %}
+    <figure class="paper__shot">
+      <div class="paper__shot-images">
+        {% for id in [p.media_id, p.overlay_media_id] if id %}{% if id in available_media %}<img src="/media/{{ id }}" alt="{{ 'Measured photo' if id == p.overlay_media_id else 'Photo' }} from the report of {{ e.at }}">{% else %}<span class="paper__shot-gone">{{ "Measured photo" if id == p.overlay_media_id else "Photo" }} deleted after the retention period.</span>{% endif %}{% endfor %}
+      </div>
+      <figcaption>Report of {{ e.at }}.{% set m = measured(p.measurement) %}{% if m %} Measured: {{ m }}.{% endif %}</figcaption>
+    </figure>
+  {% endfor %}{% endfor %}
+  </div>
 </div>
 {% endmacro %}

@@ -67,6 +67,9 @@ class NolField:
     options: tuple[str, ...] = ()
     help: str | None = None  # the "?" text: what to enter, with an example
     help_source: str | None = None
+    # The words the paper prints at the blank, under its line, where they are not the label:
+    # the type-of-policy blank prints "(Type of Policy i.e. ...)".
+    paper_label: str | None = None
 
     @property
     def key(self) -> str:
@@ -96,6 +99,7 @@ class Office:
     """The PCIC office a Notice of Loss is addressed to, with where that was read."""
 
     name: str
+    number: str  # the form's "Regional Office No. ____"
     addressee: str
     address: str
     email: str
@@ -153,6 +157,7 @@ class Commodity:
 
 PCIC_REGION_IV = Office(
     name="PCIC Regional Office No. IV",
+    number="IV",
     addressee="THE REGIONAL MANAGER",
     address="2/F Rizal Commercial Center, J.P. Rizal St. corner MH Del Pilar, Calamba City, Laguna",
     email="ro4@pcic.gov.ph",
@@ -192,6 +197,7 @@ FISHERIES = Commodity(
                 "the deadline is on Drafts."
             ),
             help_source=f"{BROCHURE}, p. 1: Notice of Loss",
+            paper_label="Date",
         ),
         NolField(
             "policy_type",
@@ -203,6 +209,7 @@ FISHERIES = Commodity(
                 "Insurance or Milkfish Insurance, the two the form itself gives."
             ),
             help_source=NL_LABEL,
+            paper_label="(Type of Policy i.e. Milkfish Insurance, Fish Cage Insurance)",
         ),
     ),
     fields=(
@@ -351,7 +358,8 @@ FISHERIES = Commodity(
         "and below 90%; no loss 10% and below. This draft does not classify the loss."
     ),
     loss_bands_source=BROCHURE,
-    closing="Very truly yours, / Signature Over Printed Name of the Assured/Claimant",
+    # As printed, one line per " / ": the closing, then the caption under the signature line.
+    closing="Very truly yours, / Signature Over Printed Name / of the Assured/Claimant",
 )
 
 COMMODITIES: dict[str, Commodity] = {FISHERIES.key: FISHERIES}

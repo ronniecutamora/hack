@@ -157,7 +157,9 @@
 
   // Printing: "Print final form" or "Print draft for checking". The paper shows the saved
   // version, so unsaved changes come first ("Save first"); then the fields the office must
-  // answer that are still empty ("Fill them"); otherwise it prints straight away.
+  // answer that are still empty ("Fill them"); otherwise it prints straight away, unless the
+  // checklist offers an option (the Notice of Loss's "Include the photo evidence page", off
+  // by default), which it then shows on its own.
   const plural = (n, word) => n + " " + word + (n !== 1 ? "s" : "");
   function openPrintCheck() {
     const dialog = document.getElementById("print-check");
@@ -165,15 +167,17 @@
     const unsaved = form ? countChanges() : 0;
     const gaps = dialog && dialog.querySelector("[data-print-gaps]");
     const empty = gaps ? Number(gaps.dataset.count) : 0;
-    if (!dialog || !dialog.showModal || (!unsaved && !empty)) { window.print(); return; }
-    dialog.dataset.mode = unsaved ? "unsaved" : "gaps";
+    const options = dialog ? [...dialog.querySelectorAll("[data-print-option]")] : [];
+    options.forEach((option) => { option.checked = false; });
+    if (!dialog || !dialog.showModal || (!unsaved && !empty && !options.length)) { printPaper(); return; }
+    dialog.dataset.mode = unsaved ? "unsaved" : (empty ? "gaps" : "ready");
     dialog.querySelector("[data-print-title]").textContent = unsaved
       ? plural(unsaved, "change") + (unsaved !== 1 ? " are" : " is") + " not saved yet"
-      : plural(empty, "field") + (empty !== 1 ? " are" : " is") + " still empty";
+      : empty ? plural(empty, "field") + (empty !== 1 ? " are" : " is") + " still empty" : "Print the form";
     dialog.querySelector("[data-print-unsaved]").hidden = !unsaved;
-    gaps.hidden = !!unsaved;
-    dialog.querySelector("[data-print-back]").textContent = unsaved ? "Save first" : (empty !== 1 ? "Fill them" : "Fill it");
-    dialog.querySelector("[data-print-go]").textContent = unsaved ? "Print without them" : "Print anyway";
+    gaps.hidden = !!unsaved || !empty;
+    dialog.querySelector("[data-print-back]").textContent = unsaved ? "Save first" : !empty ? "Cancel" : (empty !== 1 ? "Fill them" : "Fill it");
+    dialog.querySelector("[data-print-go]").textContent = unsaved ? "Print without them" : empty ? "Print anyway" : "Print";
     const blank = form ? [...form.querySelectorAll("[data-personal]")].filter((input) => !input.value.trim()).length : 0;
     const personal = dialog.querySelector("[data-print-personal]");
     personal.hidden = !blank;
@@ -181,6 +185,12 @@
     dialog.returnValue = "";
     dialog.showModal();
   }
+  // The attachment page prints only when asked for, for this one print.
+  function printPaper(attachment) {
+    document.documentElement.toggleAttribute("data-print-attachment", !!attachment);
+    window.print();
+  }
+  window.addEventListener("afterprint", () => document.documentElement.removeAttribute("data-print-attachment"));
   function jumpToField(key) {
     const field = document.getElementById("f-" + key);
     if (!field) return;
@@ -192,9 +202,12 @@
   document.addEventListener("close", (event) => {
     const dialog = event.target;
     if (dialog.id !== "print-check") return;
-    if (dialog.returnValue === "print") setTimeout(() => window.print(), 0);  // after the dialog is gone
+    if (dialog.returnValue === "print") {
+      const attach = dialog.querySelector("[data-print-option='attachment']");
+      setTimeout(() => printPaper(attach && attach.checked), 0);  // after the dialog is gone
+    }
     else if (dialog.returnValue === "fill" && dialog.dataset.mode === "unsaved") { const form = fillForm(); if (form) form.requestSubmit(); }
-    else if (dialog.returnValue === "fill") { const first = dialog.querySelector("[data-fill-jump]"); if (first) jumpToField(first.dataset.fillJump); }
+    else if (dialog.returnValue === "fill" && dialog.dataset.mode === "gaps") { const first = dialog.querySelector("[data-fill-jump]"); if (first) jumpToField(first.dataset.fillJump); }
   }, true);
   document.addEventListener("click", (event) => {
     const target = event.target.closest ? event.target : null;

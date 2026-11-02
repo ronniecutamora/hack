@@ -22,6 +22,7 @@ from app.rdana_form import (
     FORM_SUBTITLE,
     FORM_TITLE,
     SECTIONS,
+    WATER_SRR,
     FormField,
 )
 from app.rdana_summary import SummaryResult
@@ -275,7 +276,7 @@ def _srr_type(ctx: RuleContext):
         if rescue and water:
             refs.append(incident_ref(incident, sorted(set(rescue) | set(water))))
     note = "Rescue requested in an incident with flood or storm surge."
-    return filled("Water", "reports", refs, note) if refs else None
+    return filled(WATER_SRR, "reports", refs, note) if refs else None
 
 
 def _need(name: str) -> Callable[[RuleContext], dict[str, Any] | None]:

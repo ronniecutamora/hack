@@ -225,7 +225,7 @@ enrolled by the CDRRMO).
 The first officer output is a draft of the **RDANA form in force**: Annex I of NDRRMC Memorandum No. 107, s. 2021
 (the 2021 RDANA SOP), "to be accomplished within the first 72 hours after a disaster". Ulat drafts one form per
 barangay at `/drafts`, in the form's official order and numbering (its own numbering typos are kept and marked
-"sic"), printable on A4. The form is defined once as data in [app/rdana_form.py](app/rdana_form.py); each field is
+"sic"), printable on A4 in the paper form's own layout. The form is defined once as data in [app/rdana_form.py](app/rdana_form.py); each field is
 fixed (region, province, city), entered by the officer (event name, persons interviewed, overall assessment,
 submitted by), filled by a deterministic rule over typed report facts, or written by the agent (the summary).
 
@@ -281,10 +281,20 @@ once. Left empty, or with JavaScript off, they print as blank lines to write by 
 **Printing.** Fill the whole form on screen, then print it: **Print final form** on an approved version, **Print
 draft for checking** before. The printout is the saved version, so the button first says if changes are not saved
 yet (Save first, or print without them), then lists the office's questions that are still empty ("3 fields are still
-empty": fill them, or print anyway); otherwise it prints at once. It prints the paper form alone (`app/templates/_paper.html`): A4, black on
-white, the form's own numbering and order, filled values, ruled blank lines and empty boxes for what is still
-empty, and a status line (DRAFT, NOT APPROVED or APPROVED, with the version, date and initials). The app bar,
-navigation, buttons, hints, provenance notes, evidence links, the annex and the trace never print.
+empty": fill them, or print anyway); otherwise it prints at once. It prints the paper form alone (`app/templates/_paper.html`, laid out by
+`app/paper.py`), audited element by element against the official scans: the RDANA form as Annex I's four A4 pages
+(grey title bar, ruled boxes, two-column cells, option columns, the 6.3 and 7.2 tables, the 15.3 Yes/No matrix, the
+"Submitted by" grid and the paper's page breaks) and the Notice of Loss as the one-page PCIC letter (FIP CAS Form
+No. 1: "Regional Office No.", the date and type-of-policy captions under their lines, 12 particulars on ruled lines,
+the signature block). Every label and option prints in the paper's own words, kept as data in
+`app/rdana_form.py` and `app/nol_form.py` (`paper_label` only where the screen needs other words); options renamed
+to the paper's wording still tick from entries saved in the old wording. The only words Ulat adds are one line in
+the bottom page margin: "DRAFT, NOT APPROVED · version N · date" or "APPROVED · version N · date · initials", with
+"page N of M" (Chrome and Edge print it; Firefox and Safari don't print page-margin text). For a Notice of Loss with
+photos, the print dialog offers **Include the photo evidence page** (off by default): one page after the form,
+titled as an attachment and not part of the PCIC form, with the photos, Ulat's measurements and the note that they
+are evidence for the adjuster, not the loss figure. The app bar, navigation, buttons, hints, provenance notes,
+evidence links, the on-screen annex and the trace never print.
 
 **Counting rule.** Reports in one incident describe the same houses and people, so their numbers are never added.
 Per incident, the latest correction replaces earlier figures; otherwise, and for figures reported after that
@@ -726,6 +736,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-11-02 | Safe admin commands for a deployed app (`app/admin.py`, `app/reseed.py`): `python -m app.deploy reseed` swaps the aged synthetic demo for a fresh `--anchor-now` load so the filing countdowns are live again, and `screen` sets aside messages stored before the not-a-report screen existed. Both run inside the target's one live container (a method of the Modal class, so never a second SQLite writer), pin a snapshot first that is never pruned and print its name for `restore`, take `--dry-run` (no change, no `--yes`), need `--yes` on production and print counts and ids only. The reseed loads the new demo in a scratch database whose ids count on above every live id, then swaps it in one transaction that refuses (listing ids) an incident or reporter that mixes demo and real reports, keeps incidents and drafts that real rows point at, and rolls back unless every real report and its rows are unchanged |
 | 2026-11-02 | Fillable RDANA form and Notice of Loss (`app/fillable.py`): every field a typed input defined as data (control, the paper form's own options, hint, asked-first, personal), validated on the server; saving makes an append-only version with an "edited" audit of field keys; approval names the exact version; regeneration carries the officer's entries and flags evidence that moved under them; Simple mode's "What you need to fill in" with progress; personal fields typed for the printout only, never posted or stored; a print view that is the paper form alone (A4, ruled blanks, DRAFT/APPROVED status line); no "not in reports" placeholders left |
 | 2026-11-02 | Fill the whole form on screen, then print it; a "?" help on every field: each RDANA and Notice of Loss field carries a short help (what to enter, an example) and its source as data, read from the official PDFs (the RDANA SOP's Annex I note and headings and section 7.5.2, the PCIC fisheries brochure, application form and farm plan) or, where no document explains it, the form's own label with its Annex I page; a test and the start-up check refuse a field without one. The "?" is a 48 px icon button with a native popover (a bottom sheet on a phone, beside the button on wider screens; Escape and a tap outside close it; hidden in print). Personal details say they are kept on this device only, warn once about shared computers and have a Clear personal details button. Print final form (approved) and Print draft for checking first flag unsaved changes and the office's empty fields |
+| 2026-11-02 | Print fidelity: every printed element of the RDANA form and the Notice of Loss audited against the official scans (62 RDANA labels and section titles and 27 options put back into the paper's own words, the old wording still read from saved entries); the printout now follows each form's layout (Annex I's boxes, columns, tables, matrix, title bar and page breaks from a layout table in `app/rdana_form.py`; the PCIC letter's captions, ruled lines and signature block); Ulat's additions removed except one stamp line with the page count in the page margin; an optional, off-by-default "Include the photo evidence page" prints the Notice of Loss photos and measurements as a separate attachment |
 
 ### Third-party code and assets
 

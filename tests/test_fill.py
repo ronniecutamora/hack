@@ -5,7 +5,9 @@ import dataclasses
 import json
 import logging
 import re
+from collections import Counter
 from datetime import timedelta
+from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -19,8 +21,19 @@ from app.drafts import form_fields
 from app.main import create_app
 from app.models import Draft, DraftEvent
 from app.nol_form import FISHERIES
-from app.rdana_form import all_fields
-from tests.test_nol import Clock, fisherfolk_incident
+from app.paper import Stamp, amounts
+from app.rdana_form import (
+    BLANK,
+    FORM_ANNEX,
+    FORM_SUBTITLE,
+    FORM_TITLE,
+    OTHERS,
+    PAPER_FIELDS,
+    SECTIONS,
+    Paper,
+    all_fields,
+)
+from tests.test_nol import Clock, add_photo, fisherfolk_incident
 from tests.test_nol import generate as generate_nol
 from tests.test_rdana import AT, SummaryLLM, add_incident, add_report, cite_all
 
@@ -194,7 +207,7 @@ def test_saving_makes_a_version_and_an_audit_with_field_keys_only(client, engine
             ("3.2", ""),
             ("3.2", "Foot"),
             ("3.2", "Boat"),
-            ("20.1", "People facing serious problems"),
+            ("20.1", "People are facing serious problems in the area"),
             ("10.2", "4"),  # unchanged: the reports' value
         ],
         officer="RC",
@@ -208,7 +221,7 @@ def test_saving_makes_a_version_and_an_audit_with_field_keys_only(client, engine
         "1.1.1": "Typhoon Kristine response",
         "2.2": "1250",
         "3.2": "Foot, Boat",
-        "20.1": "People facing serious problems",
+        "20.1": "People are facing serious problems in the area",
     }
     assert all(v["by"] == "RC" for v in new.entries.values())
     (edited,) = draft_events(engine, new_id)
@@ -378,17 +391,82 @@ def paper(page: str) -> str:
     return page[page.index('<div class="paper') :].split("</main>")[0]
 
 
+class _Text(HTMLParser):
+    """The text a printout shows outside its value slots (blanks and typed values), so it can
+    be checked against the form's own wording."""
+
+    VALUE = ("paper__line", "paper__value")
+
+    def __init__(self):
+        super().__init__()
+        self.stack: list[bool] = []
+        self.words: list[str] = []
+        self.styles: list[str] = []
+
+    def handle_starttag(self, tag, attrs):
+        classes = (dict(attrs).get("class") or "").split()
+        if tag not in ("br", "img", "input"):
+            value = tag == "style" or any(c in self.VALUE for c in classes)
+            self.stack.append(value or any(self.stack[-1:]))
+
+    def handle_endtag(self, tag):
+        if tag not in ("br", "img", "input") and self.stack:
+            self.stack.pop()
+
+    def handle_data(self, data):
+        if self.lasttag == "style":
+            self.styles.append(data)
+        elif data.strip() and not any(self.stack[-1:]):
+            self.words.append(" ".join(data.split()))
+
+
+def printed_words(sheet: str) -> list[str]:
+    parser = _Text()
+    parser.feed(sheet)
+    return parser.words
+
+
+def stamps(sheet: str) -> list[str]:
+    """The stamp lines a printout puts in its page margin (the @page margin box)."""
+    found = (
+        r'@page \{ @bottom-left \{ content: "([^"]*) · page " counter\(page\) " of "'
+        r" counter\(pages\); \} \}"
+    )
+    return re.findall(found, sheet)
+
+
+def rdana_wording() -> set[str]:
+    """Every piece of text Annex I prints, read from the form definition (not the template)."""
+    words = {FORM_ANNEX, FORM_TITLE, FORM_SUBTITLE, "Submitted by:", "☐", "☒", "#", "(required)"}
+    for section in SECTIONS:
+        words |= {f"{section.number}.", section.title, section.title_note or ""}
+        words.add(section.note or "")
+        for f in section.fields:
+            if f.heading:
+                words.add(f"{f.key} {f.label}")
+                continue
+            paper = PAPER_FIELDS.get(f.key, Paper())
+            label = f.paper_label or f.label
+            words |= {f.number, label, label + paper.sep}
+            printed = dict(OTHERS) | dict(paper.printed)
+            for o in f.options:
+                words |= {o, f"{o}:"}
+                words |= {p.strip() for p in printed.get(o, o).split(BLANK) if p.strip()}
+            words |= set(paper.answers)
+            words |= {name for name, _ in paper.head} | {s for _, subs in paper.head for s in subs}
+    return words - {""}
+
+
 def test_the_printout_is_the_paper_form_only(client, engine):
     draft_id = rdana(engine, client)
     v2 = saved_id(fill(client, draft_id, [("1.1.1", "Typhoon Kristine response")]))
     page = client.get(f"/drafts/{v2}").text
     sheet = paper(page)
     assert "DRAFT, NOT APPROVED · version 2" in sheet and "edited by RC" in sheet
-    assert "RDANA FORM" in sheet and "To be accomplished within the first 72 HOURS" in sheet
     assert "Typhoon Kristine response" in sheet and ">4<" in sheet
-    assert "1.3.1" in sheet and 'data-personal-print="1.3.1"' in sheet
-    assert '<td class="paper__num"></td>' in sheet and 'paper__num">submitted' not in sheet
-    assert "☐ Yes" in sheet and "☐ No" in sheet  # empty boxes for 3.1
+    assert 'data-personal-print="1.3.1"' in sheet
+    assert '<span class="paper__pair-label">NAME</span>' in sheet
+    assert '<span class="paper__check">☐</span> Yes' in sheet  # empty boxes for 3.1
     for absent in (
         "<form",
         "<input",
@@ -402,9 +480,90 @@ def test_the_printout_is_the_paper_form_only(client, engine):
         "chip",
         "fill-hint",
         "Drafted ",
+        "Barangay Malaban ·",  # the old in-form footer
     ):
         assert absent not in sheet, absent
     assert '<div class="screen-only">' in page  # the rest of the page is screen only
+
+
+def test_the_rdana_printout_says_only_what_the_paper_form_says(client, engine):
+    """Every word outside the value slots is the form's own (label, option, heading, note,
+    table head) or the stamp; "(required)" only where Annex I prints it."""
+    draft_id = rdana(engine, client)
+    sheet = paper(client.get(f"/drafts/{draft_id}").text)
+    (stamp,) = stamps(sheet)
+    assert stamp.startswith("DRAFT, NOT APPROVED · version 1 · ")
+    extra = [w for w in printed_words(sheet) if w not in rdana_wording()]
+    assert extra == []
+    required = [f.key for f in all_fields() if f.required]
+    assert required == ["1.2.1", "1.2.2", "1.2.3", "1.2.4", "1.2.7"]  # as on the scan
+    assert sheet.count('<span class="paper__req">(required)</span>') == len(required)
+
+
+def test_the_rdana_printout_pins_the_official_wording(client, engine):
+    draft_id = rdana(engine, client)
+    sheet = paper(client.get(f"/drafts/{draft_id}").text)
+    for words in (
+        '<p class="paper__annex">Annex I</p>',
+        '<h1 class="paper__title">RDANA FORM</h1>',
+        "To be accomplished within the first 72 HOURS after a disaster.</p>",
+        "PROFILE OF THE DISASTER &amp; RDANA MISSION",
+        "Are their road segments or bridges that are damaged?",  # sic, as printed
+        "Is their electricity in the community?",
+        "Based on current situation, please identify your most immediate need on access: "
+        "[check all that applies]",
+        "Banditry, Hold-up",
+        "No [Skip to next section]",
+        "No power even before the disaster (proceed to next section)",
+        'RELIEF ASSISTANCE <span class="paper__title-note">(e.g., Family Food Packs,',
+        "NAME or ORGANIZATION (required)",
+        '<span class="paper__num">117.5</span> What are the most urgent educational needs',
+        '<span class="paper__num">21.1</span> When you consider the general situation in the '
+        "area, would you say:",
+        "(not to be asked from the key informant, but as a concluding observation of the "
+        "enumerator)",
+        '<p class="paper__submitted">Submitted by:</p>',
+    ):
+        assert words in sheet, words
+    # Each field printed once, under the number the form prints (its typos included).
+    numbers = Counter(re.findall(r'<span class="paper__num">([^<]+)</span>', sheet))
+    assert numbers == Counter(f.number for f in all_fields() if not f.heading and f.number)
+    # The paper's page breaks: before 6.3, 13.2 and 20.2 (Annex I, PDF pages 14, 15 and 16).
+    assert sheet.count("paper__keep--page") == 3
+
+
+def test_saved_values_in_an_options_old_wording_still_tick_its_boxes():
+    fields = {f.key: f for f in all_fields()}
+    srr, threats, view = fields["8.2"], fields["9.2"], fillable.view
+    assert fillable.parts(threats, "Looting, Banditry, Hold-up, Others") == [
+        "Looting",
+        "Banditry, Hold-up",
+        "Others",
+    ]
+    assert fillable.parts(threats, "Violence against children/women") == [
+        "Violence against Children",
+        "Violence against Women",
+    ]
+    now = AT
+    assert fillable.fits(srr, "Water", now) == "Water Search and Rescue"
+    entry = {"value": "Water, Maritime", "by": "RC", "at": "2026-10-28T00:00:00", "base": None}
+    shown = view(srr, None, entry, now)
+    assert shown["printed"] == ["Water Search and Rescue", "Maritime Search and Rescue"]
+    assert shown["selected"] == set(shown["printed"])
+    old = {"value": "People facing serious problems", "by": "RC", "at": "2026-10-28T00:00:00"}
+    assert view(fields["20.1"], None, old, now)["printed"] == [
+        "People are facing serious problems in the area"
+    ]
+    with pytest.raises(fillable.FieldError):  # the form posts only the current wording
+        fillable.normalize(srr, ["Water"], now)
+
+
+def test_amounts_fill_the_cells_and_quantity_blanks():
+    options = ["Age 0-2", "Age 3-5", "Age 6-12", "Age 13-17"]
+    assert amounts("Age 0-2: 4; Age 3-5: 6", options) == ({"Age 0-2": "4", "Age 3-5": "6"}, [])
+    power = [o for o in {f.key: f for f in all_fields()}["4.4"].options]
+    found, rest = amounts("Generators: 2; Diesel: 40 L; fuel for boats", power)
+    assert found == {power[0]: "2", power[2]: "40 L"} and rest == ["fuel for boats"]
 
 
 def test_the_print_stylesheet_hides_everything_but_the_paper():
@@ -416,24 +575,81 @@ def test_the_print_stylesheet_hides_everything_but_the_paper():
         ".screen-only, .fill-bar, .help-btn, .help-pop, .print-check, .fill-private, "
         ".fill-private-note { display: none !important; }",
         ".print-only { display: block !important; }",
-        "@page { size: A4;",
+        "@page { size: A4; }",
+        "@bottom-left { font: 700 7pt Arial",  # the stamp, in the margin of every page
+        ".paper--attachment { display: none !important; }",  # off unless asked for
+        "html[data-print-attachment] .paper--attachment { display: block !important;",
+        ".paper__keep--page { break-before: page; }",
     ):
         assert rule in css, rule
 
 
-def test_the_nol_printout_is_the_letter(client, engine):
+def nol_wording() -> set[str]:
+    c = FISHERIES
+    words = {c.form_id, c.revision, "PHILIPPINE CROP INSURANCE CORPORATION", "Regional Office No."}
+    words |= {"NOTICE OF LOSS", "(Fisheries Insurance)", "TO :", c.office.addressee}
+    words |= {"Dear Sir/Madam:", *c.closing.split(" / ")}
+    words |= {p.strip() for p, is_key in c.preamble_parts if not is_key}
+    for f in (*c.letter_fields, *c.fields):
+        words |= {f"{f.number}.", f.label, f.paper_label or ""}
+    return words - {""}
+
+
+def test_the_nol_printout_is_the_pcic_letter_word_for_word(client, engine):
     incident, _first, _second = fisherfolk_incident(engine)
     nol_id = generate_nol(client, incident)
     response = approve(client, nol_id, decided_by="RC", version="1", reason="Checked on site.")
     assert response.status_code == 303, response.text
-    sheet = paper(client.get(f"/drafts/{nol_id}").text)
-    assert sheet.startswith('<div class="paper paper--letter print-only">')
-    assert "APPROVED · version 1" in sheet and "· RC" in sheet
-    assert "FIP CAS Form No. 1" in sheet and "THE REGIONAL MANAGER" in sheet
-    assert "with Insurance Policy No. <span" in sheet and 'data-personal-print="10"' in sheet
+    page = client.get(f"/drafts/{nol_id}").text
+    sheet = paper(page)
+    assert sheet.startswith('<div class="paper paper--nol print-only">')
+    (stamp,) = stamps(sheet)
+    assert stamp.startswith("APPROVED · version 1 · ") and stamp.endswith("· RC")
+    assert [w for w in printed_words(sheet) if w not in nol_wording()] == []
+    for words in (
+        "FIP CAS Form No. 1<br>REV. 2022/MAY",
+        "PHILIPPINE CROP INSURANCE CORPORATION<br>Regional Office No. "
+        '<span class="paper__line paper__line--fit">IV</span>',
+        "NOTICE OF LOSS<br>(Fisheries Insurance)</h1>",
+        '<span class="paper__caption">Date</span>',
+        "This is to file a NOTICE OF LOSS with respect to the ",
+        '<span class="paper__caption">(Type of Policy i.e. Milkfish Insurance, Fish Cage '
+        "Insurance)</span>",
+        ' with Insurance Policy No. <span class="paper__line" data-personal-print="10">',
+        "<span>Signature Over Printed Name</span><span>of the Assured/Claimant</span>",
+        '<span class="paper__label">Expected date of harvest (if applicable)</span>',
+    ):
+        assert words in sheet, words
     assert "Flood, Strong wind" in sheet
     for absent in ("<form", "<a ", "annex", "Annex", "PHOTO REUSED", "Filing clock", "chip"):
         assert absent not in sheet, absent
+    # No photos in this incident: no photo page to offer.
+    assert "paper--attachment" not in page and "data-print-option" not in page
+
+
+def test_the_photo_evidence_page_is_an_option_and_an_attachment(client, engine):
+    incident, first, _second = fisherfolk_incident(engine)
+    photo, overlay = add_photo(engine, first)
+    nol_id = generate_nol(client, incident)
+    page = client.get(f"/drafts/{nol_id}").text
+    dialog = page.split('id="print-check"')[1].split("</dialog>")[0]
+    assert '<input type="checkbox" data-print-option="attachment">' in dialog  # off by default
+    assert "Include the photo evidence page" in dialog
+    form, attachment = paper(page).split('<div class="paper paper--attachment', 1)
+    assert "Attachment to the Notice of Loss" not in form and "<img" not in form
+    assert "Attachment to the Notice of Loss (FIP CAS Form No. 1): photo evidence" in attachment
+    assert "Not part of the PCIC form." in attachment
+    assert "evidence for the adjuster, not the loss figure" in attachment
+    for media_id in (photo, overlay):
+        assert f'<img src="/media/{media_id}"' in attachment
+    assert "Measured: floodwater over 40% of the photo." in attachment
+    assert stamps(attachment)[0].startswith("DRAFT, NOT APPROVED · version 1")
+
+
+def test_the_stamp_cannot_break_out_of_its_css_string():
+    stamp = Stamp('APPROVED · version 2 · R"; } } body { display: none } </style><b>')
+    assert stamp.css.startswith("APPROVED · version 2 · R\\000022\\00003b ")
+    assert not set(stamp.css) & set('"<>;{}/')
 
 
 def test_a_whole_form_save_fits_the_size_limit(client, engine):
@@ -497,7 +713,7 @@ def test_print_is_final_on_an_approved_version_and_checks_for_empty_fields(clien
     entries = [
         ("1.1.1", "Typhoon Kristine response"),
         ("1.1.2", "Typhoon and flood"),
-        ("20.1", "People facing serious problems"),
+        ("20.1", "People are facing serious problems in the area"),
         ("20.2", "Flooded puroks."),
         ("submitted.designation", "CDRRMO Head"),
         ("submitted.organization", "Biñan City DRRM Office"),

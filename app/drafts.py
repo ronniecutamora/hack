@@ -54,6 +54,7 @@ from app.nol import (
 from app.nol import fingerprint as nol_fingerprint
 from app.nol_form import COMMODITIES, Commodity, commodity_for_kind
 from app.nol_form import all_fields as nol_fields
+from app.paper import Stamp, rdana_paper
 from app.rdana import EventInput, count_field, fill_rdana, summary_counts
 from app.rdana_form import CITY, PROVINCE, REGION, SECTIONS
 from app.rdana_form import all_fields as rdana_fields
@@ -229,6 +230,7 @@ class FormView:
     done: int  # of the fields only the office answers and Ulat keeps
     asked: int
     officer_count: int  # fields with an officer entry on this version
+    paper: dict[str, Any] | None = None  # RDANA: the printout in Annex I's layout (app.paper)
 
     @property
     def by_key(self) -> dict[str, dict[str, Any]]:
@@ -275,10 +277,11 @@ def form_view(
     else:
         sections = [{"number": "", "title": "", "note": None, "fields": views}]
     done, asked = fillable.progress(views)
-    return FormView(views, sections, done, asked, sum(v["entry"] is not None for v in views))
+    paper = rdana_paper(by_key) if draft.kind == KIND_RDANA else None
+    return FormView(views, sections, done, asked, sum(v["entry"] is not None for v in views), paper)
 
 
-def print_stamp(draft: Draft, events: list[DraftEvent]) -> str:
+def print_stamp(draft: Draft, events: list[DraftEvent]) -> Stamp:
     """The printout's status line: what this paper is, which version, when and by whom."""
     made = next((e for e in events if e.action in (DRAFT_GENERATED, DRAFT_EDITED)), None)
     if draft.status == DRAFT_APPROVED:
@@ -291,7 +294,7 @@ def print_stamp(draft: Draft, events: list[DraftEvent]) -> str:
         by = made.actor if made is not None and made.action == DRAFT_EDITED else None
         parts = ["DRAFT, NOT APPROVED", manila_time(draft.created_at), by and f"edited by {by}"]
     head, *rest = [p for p in parts if p]
-    return " · ".join([head, f"version {draft.version}", *rest])
+    return Stamp(" · ".join([head, f"version {draft.version}", *rest]))
 
 
 HOUSE_COLUMNS = {"totally": "houses_totally_damaged", "partially": "houses_partially_damaged"}
