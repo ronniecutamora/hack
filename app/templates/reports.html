@@ -33,7 +33,7 @@
         </div>
         {% endif %}
         {% if r.status == 'held' %}<p class="chip warn">On hold{% if r.hold_reason %}: {{ r.hold_reason }}{% endif %}</p>{% endif %}
-        <p>{% if r.incident_id %}<a href="/incidents/{{ r.incident_id }}">Open its incident</a>{% else %}<span class="muted">Not grouped yet</span>{% endif %}</p>
+        <p>{% if r.incident_id %}<a href="/incidents/{{ r.incident_id }}">Open its incident</a>{% else %}<span class="muted">Not added to an incident yet</span>{% endif %}</p>
       </li>
     {% endfor %}
     </ul>

@@ -779,6 +779,8 @@ td.field-label { width: 38%; }
 .ask-once { max-width: 26rem; }
 .ask-once form { display: grid; gap: var(--space-3); }
 .ask-once input { font-size: 1.25rem; text-transform: uppercase; }
+.all-drafts > summary { cursor: pointer; }
+.all-drafts > summary h2 { display: inline; }
 .snackbar__action { min-height: var(--target); margin: 0; padding-inline: .75rem; background: transparent; color: var(--md-sys-color-inverse-primary); }
 .snackbar__action[hidden] { display: none; }
 @media (max-width: 22.5rem) { .q { padding: var(--space-3); } .q--compare .q__evidence { grid-template-columns: 1fr; } }
