@@ -1,8 +1,9 @@
 """Damage facts from a report's text or voice transcript, extracted by the agent LLM.
 
 The fields follow what LGU reports need (RDANA Form 1 and the damaged-houses table, PCIC
-Notices of Loss) and what reporters actually say in the Taglish test notes: flood depth by
-body part, houses totally or partially damaged, families evacuated, crops and hectares,
+claims: the fisheries Notice of Loss, the rice Claim for Indemnity) and what reporters actually
+say in the Taglish test notes: flood depth by body part, houses totally or partially damaged,
+families evacuated, crops (with their stage and how they were damaged) and hectares,
 livestock, blocked roads and needs. Fields not stated in the report are null, never guessed.
 
 Fields are only ever added, never renamed: stored facts from older schemas stay valid, and
@@ -59,6 +60,11 @@ FACTS_SCHEMA: dict[str, Any] = {
         "crop": {"type": "string", "enum": ["none", "rice", "corn", "vegetables", "other"]},
         "crop_area_hectares": {"type": ["number", "null"], "minimum": 0},
         "crop_damage_percent": {"type": ["number", "null"], "minimum": 0, "maximum": 100},
+        "crop_stage": {
+            "type": "string",
+            "enum": ["none", "seedling", "vegetative", "reproductive", "ripening", "unknown"],
+        },
+        "crop_damage": _enum_list("submerged", "lodged", "other"),
         "fish_cages_or_pens_damaged": _count("fish cages or pens damaged"),
         "fishery_area_hectares": {"type": ["number", "null"], "minimum": 0},
         "livelihood_damage": _enum_list(*LIVELIHOOD_DAMAGE),
@@ -105,7 +111,19 @@ FACTS_SYSTEM = (
     '"hanggang baywang" = waist, "hanggang dibdib" = chest, "lampas tao" = above_head; '
     "a foot of water = ankle); unknown if flooding is mentioned without a depth, none if no "
     "flooding.\n"
-    "- crop is none unless crops or farmland are damaged.\n"
+    "- crop is none unless crops or farmland are damaged. Palay, palayan and bukid (a rice "
+    "field) are rice; palaisdaan is a fishpond, not a crop. crop_area_hectares: the area of "
+    'damaged or flooded crops if stated ("isang ektarya" = 1, "kalahating ektarya" = 0.5), '
+    "else null. crop_damage_percent: the share of the crop "
+    "the report says was lost, else null.\n"
+    "- crop_stage: how far the crop had grown when the damage happened: seedling (punla, "
+    "bagong tanim), vegetative (tillering, nagsusuwi), reproductive (booting, heading or "
+    "flowering: nagbubuntis, namumulaklak), ripening (milk to mature grain: nahihinog, "
+    "malapit nang anihin); unknown if a crop is damaged but the stage is not said; none if no "
+    "crop is damaged.\n"
+    '- crop_damage: submerged ("lubog", "nakalubog", under floodwater), lodged (plants '
+    'flattened: "nadapa", "natumba", "nahiga"), other for any other stated crop damage; [] '
+    "if no crop is damaged.\n"
     "- livelihood_damage: every livelihood asset the report says was damaged, destroyed, washed "
     "away or is still unrepaired, even without a number: fish_pens_or_cages (fish cage, fish "
     "pen, baklad, kulungan ng isda, including their nets or lambat and bamboo poles or "
@@ -246,6 +264,10 @@ def fact_lines(facts: dict[str, Any] | None) -> list[str]:
             crop += f", {facts['crop_area_hectares']:g} ha"
         if facts.get("crop_damage_percent") is not None:
             crop += f", {facts['crop_damage_percent']:g}% damaged"
+        if facts.get("crop_damage"):
+            crop += f", {' and '.join(facts['crop_damage'])}"
+        if facts.get("crop_stage") not in (None, "none", "unknown"):
+            crop += f", at the {facts['crop_stage']} stage"
         lines.append(crop)
     if facts.get("fishery_area_hectares") is not None:
         lines.append(f"{facts['fishery_area_hectares']:g} ha of fish pens, cages or ponds")

@@ -113,7 +113,6 @@ from app.models import (
 from app.modes import (
     GLOSSARY,
     GUIDE_COOKIE,
-    GUIDE_STEPS,
     MODE_COOKIE,
     MODE_MAX_AGE_S,
     MODE_PARAM,
@@ -121,6 +120,9 @@ from app.modes import (
     PLAIN_DONE,
     PLAIN_VERDICTS,
     current_mode,
+    drafts_help,
+    glossary,
+    guide_steps,
     plain,
     plain_reason,
     plain_signal,
@@ -131,7 +133,8 @@ from app.modes import (
 )
 from app.nav import NAV, destinations, more_current, nav_current, technical_only
 from app.nol import deadline_table
-from app.nol_form import COMMODITIES, commodity_for_kind
+from app.nol_form import commodity_for_kind
+from app.pcic_lines import enabled as enabled_commodities
 from app.questions import PLACE_LISTED_REASON, current, plan, questions
 from app.questions import photos as question_photos
 from app.rdana import RDANA_DEADLINE, EventInput
@@ -223,7 +226,10 @@ templates.env.globals["PERSONAL_NOTE"] = PERSONAL_NOTE
 templates.env.globals["destinations"] = destinations
 templates.env.globals["technical_only"] = technical_only
 templates.env.globals["GLOSSARY"] = GLOSSARY
-templates.env.globals["GUIDE_STEPS"] = GUIDE_STEPS
+templates.env.globals["guide_steps"] = guide_steps
+templates.env.globals["drafts_help"] = drafts_help
+# The PCIC claims this office drafts (app.pcic_lines), for any page that names them.
+templates.env.globals["claims"] = lambda request: enabled_commodities(request.app.state.settings)
 templates.env.globals["PLAIN_VERDICTS"] = PLAIN_VERDICTS
 templates.env.globals["report_link"] = report_href
 templates.env.globals["plain_output_label"] = plain_output_label
@@ -499,6 +505,7 @@ def create_app(
 
     app = FastAPI(title="Typhoon damage reports", lifespan=lifespan)
     app.state.auth = auth
+    app.state.settings = settings  # what this deployment drafts (app.pcic_lines) reads it
     app.state.results_path = RESULTS_PATH  # the recorded accuracy results; tests point elsewhere
     # Middleware runs last-added first: host check, then same-origin, then the mode, then the
     # login gate.
@@ -685,7 +692,11 @@ def create_app(
     def help_page(request: Request) -> HTMLResponse:
         """How Ulat works and what its official terms mean; the first-run guide's steps."""
         hidden = request.cookies.get(GUIDE_COOKIE) == "hidden"
-        return templates.TemplateResponse(request, "help.html", {"guide_hidden": hidden})
+        context = {
+            "guide_hidden": hidden,
+            "terms": glossary(enabled_commodities(request.app.state.settings)),
+        }
+        return templates.TemplateResponse(request, "help.html", context)
 
     @app.post("/help/guide")
     async def guide(request: Request) -> RedirectResponse:
@@ -953,7 +964,7 @@ def create_app(
         city, statuses, history = request.app.state.drafts.overview()
         context = {
             "nol_statuses": request.app.state.drafts.nol_statuses(city, history),
-            "commodities": list(COMMODITIES.values()),
+            "commodities": enabled_commodities(request.app.state.settings),
             "statuses": statuses,
             "history": history,
             "unplaced": city.unplaced,

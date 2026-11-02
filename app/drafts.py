@@ -9,8 +9,9 @@ reject writes an append-only DraftEvent. No database transaction is held across 
 model call.
 
 Versioning, staleness, approval and the audit are the same for every output; an output is
-identified by its kind, barangay and incident. Notice of Loss kinds come from the commodity
-entries in app.nol_form, so this module never names a commodity.
+identified by its kind, barangay and incident. PCIC claim kinds (a Notice of Loss, a Claim for
+Indemnity) come from the commodity entries in app.nol_form, and which ones this office drafts
+from app.pcic_lines, so this module never names a commodity.
 """
 
 import csv
@@ -45,6 +46,7 @@ from app.models import (
 )
 from app.nol import (
     annex,
+    claim_place,
     countdowns,
     deadline_rows,
     eligible_incidents,
@@ -55,6 +57,7 @@ from app.nol import fingerprint as nol_fingerprint
 from app.nol_form import COMMODITIES, Commodity, commodity_for_kind
 from app.nol_form import all_fields as nol_fields
 from app.paper import Stamp, rdana_paper
+from app.pcic_lines import enabled as enabled_commodities
 from app.rdana import EventInput, count_field, fill_rdana, summary_counts
 from app.rdana_form import CITY, PROVINCE, REGION, SECTIONS
 from app.rdana_form import all_fields as rdana_fields
@@ -175,8 +178,10 @@ def same_output(draft: Draft):
 def output_label(draft: Draft) -> str:
     """How the drafts list names a draft's output."""
     if (commodity := commodity_for_kind(draft.kind)) is not None:
-        where = f" · {draft.barangay}" if draft.barangay else ""
-        return f"PCIC Notice of Loss ({commodity.name}) · incident #{draft.incident_id}{where}"
+        where = f" · {place}" if (place := claim_place(draft)) else ""
+        return (
+            f"PCIC {commodity.document} ({commodity.name}) · incident #{draft.incident_id}{where}"
+        )
     if draft.kind == KIND_RDANA:
         return f"RDANA · {draft.barangay}"
     return "Damaged houses · city"
@@ -211,10 +216,11 @@ def form_fields(draft: Draft) -> list[Any]:
 
 
 def generated_fields(content: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """A version's generated values by field key (RDANA sections or Notice of Loss fields)."""
+    """A version's generated values by field key (RDANA sections or PCIC claim fields; a claim
+    drafted before slice 7m keys its fields by number, which was their key)."""
     if "sections" in content:
         return {f["key"]: f for s in content["sections"] for f in s["fields"]}
-    return {f["number"]: f for f in content.get("fields", [])}
+    return {f.get("key", f["number"]): f for f in content.get("fields", [])}
 
 
 def generated_values(content: dict[str, Any]) -> dict[str, str | None]:
@@ -507,10 +513,13 @@ class DraftService:
         return self._insert(draft, {"rows": len(table["rows"]), "total": table["total"]["total"]})
 
     def generate_nol(self, commodity_key: str, incident_id: int) -> Draft:
-        """One incident's Notice of Loss for a commodity. Deterministic: no model call."""
+        """One incident's PCIC claim for a commodity this office drafts. Deterministic: no
+        model call."""
         commodity = COMMODITIES.get(commodity_key)
         if commodity is None:
             raise DraftError(f"Unknown insurance commodity {commodity_key!r}.")
+        if commodity not in enabled_commodities(self.settings):
+            raise DraftError(f"This office does not draft PCIC {commodity.name} claims.")
         with Session(self.engine) as session:
             city = collect(session)
             incident = next(
@@ -790,7 +799,8 @@ class DraftService:
         drafts: list[Draft] | None = None,
         incident_id: int | None = None,
     ) -> list[NolStatus]:
-        """Every incident eligible for a Notice of Loss, per commodity, with its live clock."""
+        """Every incident eligible for a PCIC claim, per commodity this office drafts, with its
+        live clock."""
         if city is None or drafts is None:
             with Session(self.engine) as session:
                 city = collect(session)
@@ -798,7 +808,7 @@ class DraftService:
                 drafts = list(session.exec(per_incident).all())
         now = self.clock()
         statuses = []
-        for commodity in COMMODITIES.values():
+        for commodity in enabled_commodities(self.settings):
             for incident in eligible_incidents(commodity, city):
                 if incident_id is not None and incident.incident_id != incident_id:
                     continue

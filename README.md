@@ -4,7 +4,7 @@
 
 **Status:** live prototype. Since 2026-10-30 it runs on Modal: the officer dashboard at
 <https://ronniecutamora47--ulat.modal.run>, seeded with a synthetic typhoon scenario, and the Telegram bot
-[@UlatPH_bot](https://t.me/UlatPH_bot) (see [Demo](#demo)). It is a hackathon prototype, not a service of Biñan City. Typhoon and flood damage reporting for Philippine LGUs, plus fisheries insurance claims: one agent turns photos, Taglish voice notes, and texts from barangays and fisherfolk into an officer-approved RDANA report, a damaged-houses table, and a PCIC Notice of Loss for each fish cage or pen loss. Crop insurance (rice, corn) is later work. Demo area: Biñan City, Laguna.
+[@UlatPH_bot](https://t.me/UlatPH_bot) (see [Demo](#demo)). It is a hackathon prototype, not a service of Biñan City. Typhoon and flood damage reporting for Philippine LGUs, plus PCIC insurance claims: one agent turns photos, Taglish voice notes, and texts from barangays, fisherfolk and rice farmers into an officer-approved RDANA report, a damaged-houses table, a PCIC Notice of Loss for each fish cage or pen loss, and a PCIC Claim for Indemnity for each flooded or flattened rice field. Corn and other crops are later work. Demo area: Biñan City, Laguna.
 
 ---
 
@@ -38,7 +38,7 @@ prototype for that gap; the city has not adopted it.
 2. Deterministic place/time/GPS filters find candidate incidents. A text-only Meta pair judge decides whether reports describe the same situation; uncertainty stays separate for officer review. Every candidate is judged, not just the first, so a correction ("mali po… dalawang bahay lang, hindi tatlo") lands in the incident that holds the figure it corrects.
 3. Officers read incident timelines, depth changes and the stored reasons for grouping, and resolve what the agent could not settle in a review queue: merge, keep separate, set the place, check trust signals, confirm fallen trees, block a reporter (see [Officer review](#officer-review)). Reported totals explicitly warn about double-counting, including corrections.
 4. The agent drafts each barangay's RDANA form and the city's damaged-houses table from that evidence; the officer checks every value against its linked reports, then approves or rejects the draft (see [Officer outputs](#officer-outputs)).
-5. For each incident of fish cage, fish pen or fishpond damage, the agent drafts the fisherfolk's PCIC Notice of Loss with an evidence annex for the adjuster and counts down its 2-day filing deadline; the officer approves it for filing, and the assured files it (see [Insurance: fisheries Notice of Loss](#insurance-fisheries-notice-of-loss)). Crop insurance is later work.
+5. For each incident of fish cage, fish pen or fishpond damage, the agent drafts the fisherfolk's PCIC Notice of Loss with an evidence annex for the adjuster and counts down its 2-day filing deadline; the officer approves it for filing, and the assured files it (see [Insurance: fisheries Notice of Loss](#insurance-fisheries-notice-of-loss)). For a flooded or flattened rice field it drafts the farmer's PCIC Claim for Indemnity (RC-CAS-01) the same way, with its 20-day clock, where the office turns rice on (see [Insurance: rice Claim for Indemnity](#insurance-rice-claim-for-indemnity)). Corn and other crops are later work.
 
 Every report on `/reports` and on its incident timeline has an expandable **agent trace**: each pipeline step in order (transcribe, read the facts, judge each photo, SAM roofs and floodwater, screen the message, find the barangay, check trust signals, group into an incident) with the Meta model that ran it, its latency, whether it came from the cache and its estimated cost, next to the one-line result it produced ("roof damage: partial", "2 roofs found", "barangay Malaban (photo GPS)", "different from incident #2, 96% → kept apart, in incident #3"). Deterministic steps are labeled "Rule, no model", officer overrides follow as "Officer" steps, and the totals give the report's model time and cost. The trace shows only derived results the dashboard already shows, never prompts, replies or the officer's notes. An RDANA draft page lists the model calls that wrote its summary. Reports assessed before 2026-10-30 say "trace not recorded". How often each model is right is on the dashboard's `/accuracy` page (see [How well it works](#how-well-it-works)).
 
@@ -432,6 +432,7 @@ its source; adding a row (crops later) is data only.
 |---|---|---|---|
 | PCIC fisheries Notice of Loss | 2 calendar days | occurrence of loss | [PCIC Fisheries Insurance general information, 2024 V4](https://pcic.gov.ph/wp-content/uploads/2024/09/Fisheries-Insurance-2024-V4.pdf) |
 | PCIC fisheries Claim for Indemnity | 7 calendar days | occurrence of loss | same brochure |
+| PCIC rice Claim for Indemnity | 20 calendar days, and before the scheduled harvest | occurrence of loss | [PCIC Rice Crop Insurance general information, April 2024 V12](https://pcic.gov.ph/wp-content/uploads/2024/09/HO-RICE-2024-APRIL-V12.pdf), "Claim for Indemnity" |
 | Completed RDANA forms to the EOC | 72 hours | deployment at the assessment site | [NDRRMC Memorandum No. 107, s. 2021](https://ndrrmc.gov.ph/wp-content/uploads/2026/05/09-22-2021-NDRRMC-Memorandum-No.-107-s-2021-NDRRMC-Rapid-Damage-Assessment-Needs-Analysis-RDANA-Standard-Operating-Procedures.pdf), section 7.5.2 |
 
 ⚠️ Whether PCIC relaxed the fisheries deadlines for declared calamities after 2024 is not confirmed; the 2024 brochure
@@ -450,8 +451,50 @@ files it.
 PCIC form fields and numbering, the deadline-table rows it uses, the facts that make an incident eligible, the
 evidence it requires, and how each field is filled (`assured` or an `evidence` rule; the office is fixed). The
 drafting, deadline and approval code never names a commodity; a test adds a dummy commodity with no code change.
-Only fisheries is built: crop insurance (rice, corn, high-value crops) is later work, one more entry once its PCIC
-deadlines are verified for Biñan.
+Fisheries and rice are built; corn and high-value crops are later work, one more entry each.
+
+### Insurance: rice Claim for Indemnity
+
+Rice has **no separate Notice of Loss**: an insured rice farmer's first filing after a typhoon or flood is the
+**Claim for Indemnity** ([RC-CAS-01, Rev. 2017/FEB](https://pcic.gov.ph/wp-content/uploads/2024/02/RC-CAS-01_Claim-for-Indemnity.pdf)),
+due within 20 calendar days of the loss and before the scheduled harvest (PCIC rice brochure, April 2024 V12,
+"Claim for Indemnity"; the PCIC Citizen's Charter 2026 lists RC-CAS-01 as the claim document for rice and corn).
+Ulat drafts it from the same reports, through the same pipeline and pages as the fisheries notice:
+
+- **Facts.** The agent reads "lubog ang palay" (submerged), "nadapa" or "natumba" (lodged, flattened), "isang
+  ektarya" and stage words ("namumulaklak": flowering) into typed facts: `crop`, `crop_area_hectares`,
+  `crop_damage_percent`, and two new ones, `crop_stage` and `crop_damage`. "Palaisdaan" is a fishpond, not a crop.
+  A report about a fish pen and a rice field is eligible for both claims, each drafted from its own facts.
+- **Photos.** The photo judge says whether a rice field is flooded, lodged or not visibly damaged (κ 0.75 to 0.83
+  on 19 real photos; see [How well it works](#how-well-it-works)). SAM 3.1 could not outline flooded fields, so no
+  "water over N % of the field" figure is shown.
+- **The form.** All 17 numbered items in RC-CAS-01's order and section numbering (I.1 to I.11, II.1 to II.6) with the
+  paper's English and Filipino labels. The agent fills I.4 location (place details and pin), I.5 Palay, II.1 cause
+  (for example "Flood (rice submerged)"), II.2 the first report, II.3 the stage, II.4 the damaged area and II.5 the
+  share lost, each only as stated in the reports. The farmer's name, address, phone and CIC number are typed for the
+  printout only and never stored; Section III, the sketch of the damaged lots with the neighboring farmers' names, is
+  written by hand on the printout. Every field has its "?" help with a source.
+- **The printout** is RC-CAS-01 word for word and in its layout (Cambria, the bilingual labels, "( )" options, the
+  sketch table and the signature block), audited field by field like the fisheries letter.
+
+**Which claims an office drafts** is data: [app/data/pcic_lines.json](app/data/pcic_lines.json) has one row per
+commodity, on or off, each with its source. Fisheries is on for Biñan (the City Agriculturist registers fisherfolk and
+fish pens, Citizen's Charter 2026 pp. 203–204). ⚠️ **Rice is off for Biñan**: the same charter (p. 198) lists a seed
+and fertilizer subsidy for "Registered Biñan Rice Farmers", but no source found gives a rice area or names a
+barangay, so Biñan's rice area is unconfirmed. Rice is built because the product serves any Laguna de Bay LGU:
+around the lake, NIA's Sta. Cruz River Irrigation System serves
+[1,542 farmers in Sta. Cruz and Pila](https://nia.gov.ph/press_release/automated-feature-sta-cruz-ris-diversion-dam-installed-laguna/).
+Turn rice on with one setting, no code change:
+
+```
+PCIC_COMMODITIES=fisheries,rice
+```
+
+(`Settings.pcic_commodities`; for a deploy target, add it to that target's `env` in `app/deploy_targets.py`). The demo
+loader reads the same setting: with rice on, `python -m app.demo load` adds two example rice reports from "Example
+Farm", a farm in a Laguna de Bay town, pinned outside Biñan's barangays (the dashboard flags the pin as outside
+Biñan, honestly) and never placed in a Biñan barangay. One has an AI-generated photo, stamped as such like every
+demo photo.
 
 ### Officer dashboard
 
@@ -803,6 +846,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-11-02 | US English everywhere: every page, bot reply, form help, README line, comment and private name now uses US spelling (center, color, labeled, canceled, gray, neighbor, acknowledgment, -ize; about 190 words in 56 files), and `tests/test_us_english.py` fails on any British form from its word list, with the few kept forms named and explained (ARIA and asyncio names, the cached photo schema name `DamageJudgement`, and the Muse Image prompts whose hash names the stored photos) |
 | 2026-11-02 | Spark and SAM check each other on every photo (`app/crosscheck.py`): a table of rules pairs each Spark judgment with the SAM 3.1 measurement that should back it. When Spark sees floodwater or a partly damaged roof that SAM cannot outline, the report gets a trust signal, and Simple mode's Review asks "Is there floodwater?" with the photo and its outline side by side; the answer is the existing signal review, with what the officer saw as its note. Two more rules are measured only. `scripts.eval_crosscheck` scores every rule for free from the cached photo runs (results file, README and `/accuracy`): Spark 1.3 and SAM disagreed on 22 of 65 labeled photos, the hand label sided with Spark in all 22, and Review asked about 0. The outline is explained where it is shown (Reports, the Notice of Loss annex, Review) |
 | 2026-11-02 | Voice Transcribe hears Biñan's streets: `scripts/build_places.py` queries OpenStreetMap (Overpass) for Biñan's named streets, subdivisions, sitios and landmarks, clips them to the barangay polygons, normalizes "St." and "Brgy.", drops ordinary-word, numbered and private-home names and writes `app/data/binan_places.json` (560 names, with its query and data date; ODbL, credited below); the bot sends the barangays first, then those names up to the API's 500-keyword, 30-character limits (found by testing; the docs give none). `scripts.eval_transcribe` gained the two list sizes and a false-insertions count: with 471 OSM names WER was 19.1% against 20.3% for the barangays alone, with 0 false insertions, so the long list ships; no note names a street, so its benefit is not measured yet |
+| 2026-11-02 | PCIC rice claims through the same pipeline: the rice Claim for Indemnity (RC-CAS-01, Rev. 2017/FEB; rice has no separate Notice of Loss) as a second commodity entry with all 17 items in the paper's bilingual numbering and wording, "?" help with sources, the farmer's identity and CIC number never stored, and a printout in RC-CAS-01's layout (audited field by field); its 20-day, before-harvest deadline row with source; new crop facts (`crop_stage`, `crop_damage`) and Taglish rice words in the facts prompt; the photo judge says whether a rice field is flooded, lodged or not visibly damaged, with a 19-photo kill test in the results file (SAM could not outline flooded fields, so no field water share is shown); drafts, Home's to-do, the help and the guide name each claim from data; which claims an office drafts is data with a source per line (`app/data/pcic_lines.json`: fisheries on, rice off for Biñan until a source shows a rice area) and one setting, `PCIC_COMMODITIES`; two example rice reports in the demo load only with rice on, pinned outside Biñan; the eval spend ledger now upgrades an older database instead of failing after a paid call |
 
 ### Third-party code and assets
 
@@ -880,7 +924,9 @@ app/
   review.py            Officer review queue and audited overrides (merge, keep, place, trust, trees, block)
   rdana_form.py        The 2021 RDANA form as data (sections, numbering, fill modes)
   rdana.py             Evidence rules that fill the form; rdana_summary.py: the validated 1.4 summary
-  nol_form.py, nol.py  PCIC Notice of Loss commodities as data (fisheries) and the deterministic filling
+  nol_form.py, nol.py  PCIC claim forms as commodity data (fisheries Notice of Loss, rice Claim for
+                       Indemnity) and the deterministic filling
+  pcic_lines.py        Which PCIC claims an office drafts (data/pcic_lines.json, PCIC_COMMODITIES)
   drafts.py            Versioned drafts, approve/reject, audit, damaged-houses table and CSV
   deadlines.py         Filing deadlines from data/deadlines.json (with sources) and countdowns
   pair_judge.py        Text-only pair schema and redacted evidence prompts

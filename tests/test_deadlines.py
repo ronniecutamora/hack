@@ -17,6 +17,7 @@ def test_the_table_has_the_rows_in_scope_each_with_its_source():
     assert {key: d.window_text for key, d in DEADLINES.items()} == {
         "pcic_fisheries_nl": "2 calendar days",
         "pcic_fisheries_ci": "7 calendar days",
+        "pcic_rice_ci": "20 calendar days",
         "rdana_eoc": "72 hours",
     }
     for row in DEADLINES.values():
@@ -24,6 +25,9 @@ def test_the_table_has_the_rows_in_scope_each_with_its_source():
     for key in ("pcic_fisheries_nl", "pcic_fisheries_ci"):
         assert "Fisheries Insurance general information, 2024 V4" in deadline(key).source
         assert deadline(key).caveat.startswith("⚠️")
+    assert "Rice Crop Insurance general information" in deadline("pcic_rice_ci").source
+    assert "before the scheduled harvest" in deadline("pcic_rice_ci").caveat
+    assert "Claim for Indemnity must follow" in deadline("pcic_rice_ci").first_notice["text"]
     assert "7.5.2" in deadline("rdana_eoc").source
     first_notice = deadline("pcic_fisheries_nl").first_notice
     assert "Citizen's Charter 2026" in first_notice["source"]

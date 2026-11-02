@@ -78,9 +78,13 @@ class Settings(BaseSettings):
         default=["localhost", "127.0.0.1"], min_length=1
     )
 
-    @field_validator("allowed_hosts", mode="before")
+    # The PCIC claim lines (commodity keys, comma-separated: "fisheries,rice") this deployment
+    # drafts; unset reads app/data/pcic_lines.json, where each line has its source (app.pcic_lines).
+    pcic_commodities: Annotated[list[str] | None, NoDecode] = None
+
+    @field_validator("allowed_hosts", "pcic_commodities", mode="before")
     @classmethod
-    def split_hosts(cls, value: object) -> object:
+    def split_commas(cls, value: object) -> object:
         if isinstance(value, str):
             return [host.strip() for host in value.split(",") if host.strip()]
         return value

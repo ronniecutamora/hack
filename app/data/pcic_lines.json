@@ -1,0 +1,17 @@
+{
+  "office": "Office of the City Agriculturist, Biñan City, Laguna",
+  "lines": [
+    {
+      "commodity": "fisheries",
+      "on": true,
+      "source": "Biñan City 2026 Citizen's Charter, 1st Edition: the Office of the City Agriculturist runs the Municipal Fisherfolk Registration Program (FishR, p. 203) and Fish Pen Registration (p. 204)",
+      "url": "https://www.binan.gov.ph/wp-content/uploads/2026/04/LGU-BINAN_-2026-CITIZENS-CHARTER-1st-Edition.pdf"
+    },
+    {
+      "commodity": "rice",
+      "on": false,
+      "source": "⚠️ Off for Biñan: no source found for a rice area or a rice barangay in Biñan (slice 7m research, 2026-11-02). The same Citizen's Charter (p. 198) lists a seed and fertilizer subsidy for \"Registered Biñan Rice Farmers\" on a rice farmers' master list, but gives no hectares or barangays. Turn it on with PCIC_COMMODITIES once the City Agriculture Office confirms where rice is grown.",
+      "url": "https://www.binan.gov.ph/wp-content/uploads/2026/04/LGU-BINAN_-2026-CITIZENS-CHARTER-1st-Edition.pdf"
+    }
+  ]
+}

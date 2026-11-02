@@ -1110,7 +1110,8 @@ legend.fill-head { display: flex; }
 /* The paper form (_paper.html, app.paper): the official form's own layout, black on white, in a
    form face (Calibri, as both scans are set, else its metric twin Carlito, else Arial). The
    RDANA form is NDRRMC Memo 107 s.2021 Annex I: ruled boxes, two-column cells, option grids and
-   its page breaks; the Notice of Loss is PCIC FIP CAS Form No. 1, a one-page letter. Ulat's only
+   its page breaks; the Notice of Loss is PCIC FIP CAS Form No. 1, a one-page letter; the rice
+   Claim for Indemnity is PCIC RC-CAS-01, a one-page bilingual form. Ulat's only
    addition is the stamp line with the page count, in the bottom-left page margin (_paper.html
    writes it there). Everything else on a form's page is .screen-only. */
 @page { margin: 10mm 10mm 13mm; @bottom-left { font: 700 7pt Arial, sans-serif; } }
@@ -1208,6 +1209,46 @@ legend.fill-head { display: flex; }
   .paper__closing { margin: 26mm 0 0 11mm; }
   .paper__sign { display: inline-flex; flex-direction: column; align-items: center; margin-top: 11mm !important; }
   .paper__line--sign { width: 58mm; text-align: center; }
+  /* The rice Claim for Indemnity, PCIC RC-CAS-01 (Rev. 2017/FEB): a one-page bilingual form set
+     in Cambria (else its metric twin Caladea). Offsets are measured on the A4 scan, less the
+     10 mm page margin. */
+  .paper--claim { font: 8.6pt/1.3 Cambria, Caladea, Georgia, "Liberation Serif", serif; }
+  .paper--claim .paper__formid { font-size: 6.6pt; margin: 9mm 24mm 0 0 !important; }
+  .paper__claim-title { text-align: center; font: 700 13pt/1.1 Cambria, Caladea, Georgia, serif; margin-top: 4mm !important; }
+  .paper__claim-subtitle { text-align: center; font-weight: 700; font-style: italic; font-size: 9.2pt; }
+  .paper__claim-date { text-align: right; margin: 3mm 23mm 0 0 !important; }
+  .paper__claim-date .paper__line { min-width: 30mm; }
+  .paper__claim-date .paper__caption { font-weight: 700; font-size: 7.4pt; }
+  .paper__claim-to { display: grid; grid-template-columns: 9mm 10mm auto; margin: 3mm 0 0 18mm !important; }
+  .paper__claim-request { margin: 4.5mm 0 0 28mm !important; }
+  .paper__claim-section { font-weight: 700; margin: 3.5mm 0 0 18mm !important; display: grid; grid-template-columns: 5mm auto; }
+  .paper__claim-section .paper__secnum { min-width: 0; }
+  .paper__claim-items { list-style: none; margin: 1.8mm 14mm 0 28mm; padding: 0; }
+  .paper__ci { display: flex; align-items: baseline; gap: 1mm; min-height: 4.4mm; break-inside: avoid; }
+  .paper__ci > .paper__num { flex: none; width: 5mm; }
+  .paper__ci > .paper__label { flex: none; }
+  .paper__ci > .paper__line { flex: 1; min-width: 0; min-height: 0; }
+  .paper__ci--short > .paper__line { flex: 0 1 auto; width: 100%; max-width: 64mm; }
+  .paper__ci--unit > .paper__line { flex: 0 1 auto; width: 100%; max-width: 36mm; }
+  .paper__unit { flex: none; font-weight: 700; }
+  .paper__choices { display: grid; grid-template-columns: repeat(var(--cols), auto); column-gap: 7mm; margin-left: 3mm; }
+  .paper__paren { white-space: pre; }
+  .paper__line--other { min-width: 30mm; }
+  .paper__claim-sketch { margin-top: 3mm; break-inside: avoid; }
+  .paper__claim-sketch .paper__claim-section { grid-template-columns: 5mm auto; }
+  .paper__claim-note { margin: 0 0 0 23mm !important; }
+  .paper__lsp { border-collapse: collapse; margin: 3mm 0 0 28mm; font-weight: 700; }
+  .paper__lsp th, .paper__lsp td { padding: 0 0 .6mm; text-align: left; font-weight: inherit; }
+  .paper__lsp td:first-child { width: 5mm; }
+  .paper__lsp td:nth-child(2) { width: 24mm; }
+  .paper__lsp th:nth-child(n+3), .paper__lsp td:nth-child(n+3) { width: 28.5mm; padding-right: 6mm; text-align: center; }
+  .paper__line--lot { min-width: 6mm; }
+  .paper__line--cell-rule { display: block; min-width: 0; width: 100%; }
+  .paper__claim-thanks { margin: 11mm 0 0 18mm !important; font-weight: 700; }
+  .paper__claim-closing { margin: 3mm 0 0 97mm; font-weight: 700; }
+  .paper__claim-sign { display: inline-flex; flex-direction: column; align-items: center; margin-top: 6mm !important; }
+  .paper__claim-sign .paper__line--sign { width: 73mm; }
+  .paper__claim-sign i { font-weight: 700; }
   /* The photo evidence attachment (optional): a separate sheet, titled as one. */
   .paper__attach-title { font: 700 12pt/1.3 Arial, sans-serif; }
   .paper__attach-note { margin: 2mm 0 4mm !important; font-size: 9pt; }

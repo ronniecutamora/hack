@@ -27,6 +27,21 @@
       "caveat": "⚠️ Not confirmed: whether PCIC relaxed fisheries deadlines for declared calamities after 2024. The 2024 brochure is the newest official text found."
     },
     {
+      "key": "pcic_rice_ci",
+      "label": "PCIC Claim for Indemnity (rice)",
+      "amount": 20,
+      "unit": "calendar_days",
+      "start": "occurrence of loss",
+      "source": "PCIC Rice Crop Insurance general information, revised April 2024 (V12), section \"Claim for Indemnity\": a Claim for Indemnity shall be sent to the PCIC RO or PEO within twenty (20) calendar days from occurrence of loss, and before the scheduled date of harvest",
+      "url": "https://pcic.gov.ph/wp-content/uploads/2024/09/HO-RICE-2024-APRIL-V12.pdf",
+      "caveat": "Also due before the scheduled harvest (field II.6), which can come first. Where damage is gradual and its full extent is not immediately apparent, the claim is filed on discovery but not later than 20 calendar days before the expected harvest (same section). Rice has no separate Notice of Loss: the Claim for Indemnity is the first filing (PCIC Citizen's Charter 2026, Rice and Corn Crop Insurance checklist).",
+      "first_notice": {
+        "text": "A first notice may be sent by text message, official email or official FB Messenger to the PCIC Regional or Extension Office, with the assured's name and address, the type of insurance, and the date and cause of loss; the written Claim for Indemnity must follow.",
+        "source": "PCIC Citizen's Charter 2026, 1st Edition (13 Jul 2026), printed p. 62: \"a written NL/CI shall be submitted thereafter\"; for rice the written filing is the CI",
+        "url": "https://pcic.gov.ph/wp-content/uploads/2026/07/PCIC-Citizens-Charter_2026_1st-Edition_07132026.pdf"
+      }
+    },
+    {
       "key": "rdana_eoc",
       "label": "Completed RDANA forms to the EOC",
       "amount": 72,

@@ -1,7 +1,7 @@
 """Officer entries on a draft form: each field's control, server-side validation, and the view
 that merges the generated values with what the officer typed.
 
-The RDANA form (app.rdana_form) and a Notice of Loss (app.nol_form) give every field a
+The RDANA form (app.rdana_form) and a PCIC claim form (app.nol_form) give every field a
 `control` (one of the presets below), its `options`, a plain-language `hint`, whether only the
 office can answer it (`ask`) and whether it is `personal`. Templates and validation read those;
 no template names a field.
@@ -75,6 +75,7 @@ CLASSROOMS = Control("number", min=0, max=10_000)
 DAYS = Control("number", min=0, max=365, unit="days")
 AGE = Control("number", min=0, max=120)
 HECTARES = Control("number", min=0, max=100_000, integer=False, unit="ha")
+PERCENT = Control("number", min=0, max=100, integer=False, unit="%")
 DATE = Control("date")
 PAST_DATE = Control("date", past_only=True)
 PAST_DATETIME = Control("datetime", past_only=True)

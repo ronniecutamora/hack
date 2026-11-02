@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_help.html" import guide_steps %}
+{% from "_help.html" import how_it_works %}
 {% block title %}Help{% endblock %}
 {% block content %}
   <header>
@@ -8,7 +8,7 @@
   </header>
   <section class="card guide" aria-labelledby="steps-title">
     <h2 id="steps-title" class="visually-hidden">The three steps</h2>
-    {{ guide_steps() }}
+    {{ how_it_works(claims(request)) }}
     <form method="post" action="/help/guide" data-done="{{ 'The guide is back on Home' if guide_hidden else 'The guide stays on Home' }}">
       <input type="hidden" name="guide" value="show">
       <button type="submit" class="button--tonal">{{ "Show this guide on Home again" if guide_hidden else "Open Home with this guide" }}</button>
@@ -21,7 +21,7 @@
       <dt>Home</dt><dd>Everything that needs you, most urgent first. Each card has one button.</dd>
       <dt>Review</dt><dd>Reports Ulat could not settle alone: a report that may repeat another, an unknown barangay, something to double-check or a fallen tree to confirm. The number on Review is how many wait.</dd>
       <dt>Incidents</dt><dd>Reports about the same flood or damage, put together per barangay, with their photos and timeline.</dd>
-      <dt>Drafts</dt><dd>The RDANA forms, the damaged-houses table and the Notices of Loss. Nothing is sent or filed until you approve it, and the fisherfolk file their own Notice of Loss.</dd>
+      <dt>Drafts</dt><dd>{{ drafts_help(claims(request)) }}</dd>
       <dt>More</dt><dd>All reports, the map, the damaged-houses table and this page.</dd>
     </dl>
   </section>
@@ -29,7 +29,7 @@
   <section aria-labelledby="terms-title">
     <h2 id="terms-title">Words you will see</h2>
     <dl class="help-list">
-      {% for key, (term, text) in GLOSSARY.items() %}<dt id="term-{{ key }}">{{ term }}</dt><dd>{{ text }}</dd>{% endfor %}
+      {% for key, (term, text) in terms.items() %}<dt id="term-{{ key }}">{{ term }}</dt><dd>{{ text }}</dd>{% endfor %}
     </dl>
   </section>
 

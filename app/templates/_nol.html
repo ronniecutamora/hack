@@ -1,4 +1,5 @@
-{# A PCIC Notice of Loss draft (content from app.nol.fill_nol), included by draft.html. #}
+{# A PCIC claim draft (content from app.nol.fill_nol: a Notice of Loss or a Claim for Indemnity),
+   included by draft.html. #}
 {% from "_evidence.html" import evidence_refs %}
 {% from "_links.html" import report_href %}
 {% from "_trust.html" import signal_chips %}
@@ -7,8 +8,8 @@
 {% from "_paper.html" import measured %}
 <header class="keep">
   <div>
-    <h1>{{ c.title }} <span class="muted">{% if technical() %}· incident #{{ c.incident_id }}{% endif %}{% if c.barangay %} · {{ c.barangay }}{% endif %} · version {{ draft.version }}</span></h1>
-    <p class="muted">Form: <a href="{{ c.form_url }}">{{ c.form_source }}</a>. Fields in the form's order and numbering. Drafted {{ c.drafted_at }} from {{ c.report_ids|length }} report{{ 's' if c.report_ids|length != 1 }}{% if technical() %} without a model call{% endif %}; {{ c.filled_count }} field{{ 's' if c.filled_count != 1 }} filled from the reports{% if form.officer_count %}, {{ form.officer_count }} by the office{% endif %}. Fill in the rest here with the assured, then print it for them to sign.</p>
+    <h1>{{ c.title }} <span class="muted">{% if technical() %}· incident #{{ c.incident_id }}{% endif %}{% set where = c.barangay or c.place %}{% if where %} · {{ where }}{% endif %} · version {{ draft.version }}</span></h1>
+    <p class="muted">Form: <a href="{{ c.form_url }}">{{ c.form_source }}</a>. Fields in the form's order and numbering. Drafted {{ c.drafted_at }} from {{ c.report_ids|length }} report{{ 's' if c.report_ids|length != 1 }}{% if technical() %} without a model call{% endif %}; {{ c.filled_count }} field{{ 's' if c.filled_count != 1 }} filled from the reports{% if form.officer_count %}, {{ form.officer_count }} by the office{% endif %}. Fill in the rest here with the {{ commodity.claimant }}, then print it for them to sign.</p>
   </div>
 </header>
 {% if c.reused_photos %}
@@ -22,12 +23,12 @@
 <section class="keep">
   <h2>Filing clock</h2>
   {% for row, cd in clocks %}<div>{{ clock(row, cd) }}</div>{% endfor %}
-  <p class="muted">Counted from the first report in this incident, {{ c.fields|selectattr("number", "equalto", "5")|map(attribute="value")|first or "" }}: the loss may be earlier, which makes every deadline earlier. Approving this draft does not stop the clock; filing does, and only the assured can file.</p>
+  <p class="muted">Counted from the first report in this incident, {{ c.first_reported or c.fields|selectattr("number", "equalto", "5")|map(attribute="value")|first or "" }}: the loss may be earlier, which makes every deadline earlier. Approving this draft does not stop the clock; filing does, and only the assured can file.</p>
   {{ deadline_notes(c.deadlines) }}
 </section>
 
 <section aria-labelledby="letter-title">
-  <h2 id="letter-title">The notice</h2>
+  <h2 id="letter-title">The {{ commodity.plain }}</h2>
   {% if technical() %}<p class="muted">Addressed to {{ c.office.addressee }}, {{ c.office.name }}, {{ c.office.address }} ({{ c.office.email }} · {{ c.office.phone }}; address from {{ c.office.source }}).</p>{% endif %}
   {{ form_for(draft, form, "More details") }}
 </section>
@@ -51,7 +52,9 @@
               {% set j = p.judgment %}
               {% if j %}
                 <ul class="chips">
-                  {% if j.roof_damage is defined %}<li class="chip">roof damage: {{ j.roof_damage }}</li>{% endif %}
+                  {% set field = j.crop_field if j.crop_field and j.crop_field != "none" %}
+                  {% if field %}<li class="chip">crop field: {{ field|replace("_", " ") }}</li>{% endif %}
+                  {% if j.roof_damage is defined and not (field and j.roof_damage == "none") %}<li class="chip">roof damage: {{ j.roof_damage }}</li>{% endif %}
                   {% if j.floodwater %}<li class="chip">floodwater</li>{% endif %}
                   {% if j.debris %}<li class="chip">debris</li>{% endif %}
                   {% if j.tarpaulin %}<li class="chip">tarpaulin</li>{% endif %}

@@ -61,6 +61,8 @@ async def test_extract_facts_sends_redacted_text_with_the_schema():
         hazards=["flood"],
         flood_depth="knee",
         crop="none",
+        crop_stage="none",
+        crop_damage=[],
         infrastructure=[],
         livelihood_damage=[],
         needs=["water"],

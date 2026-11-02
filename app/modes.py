@@ -15,7 +15,7 @@ from contextvars import ContextVar
 from typing import Literal, get_args
 
 from app.deadlines import deadline
-from app.nol_form import COMMODITIES
+from app.nol_form import COMMODITIES, Commodity
 from app.rdana import RDANA_DEADLINE
 
 Mode = Literal["simple", "technical"]
@@ -42,30 +42,64 @@ def resolve(asked: str | None, stored: str | None, default: str) -> str:
     return default
 
 
-# "How Ulat works": the first-run guide on Home and the Help page show these same steps.
-GUIDE_STEPS: tuple[tuple[str, str], ...] = (
-    (
-        "Reports come in",
-        "Residents, barangay officials and fisherfolk send photos, voice notes and texts to "
-        "the Ulat Telegram bot.",
-    ),
-    (
-        "Ulat sorts them and drafts the forms",
-        "It reads each report, puts reports about the same flood together and fills in the "
-        "RDANA form and the fisherfolk's Notices of Loss.",
-    ),
-    (
-        "You check and approve",
-        "Home lists what needs you. Nothing is sent or filed by itself: a form counts only "
-        "after you approve it.",
-    ),
-)
+def _people(commodities: list[Commodity]) -> list[str]:
+    return [c.claimants for c in commodities]
 
 
-def _nol_window() -> str:
-    """The Notice of Loss filing window from the deadlines table, for every commodity."""
-    windows = sorted({deadline(c.deadline).window_text for c in COMMODITIES.values()})
-    return " or ".join(windows)
+def _possessive(people: str) -> str:
+    """The possessive of a plural or collective noun: fisherfolk's, rice farmers'."""
+    return people + ("'" if people.endswith("s") else "'s")
+
+
+def _and(words: list[str]) -> str:
+    """Words joined as a list: a; a and b; a, b and c."""
+    return " and ".join(filter(None, [", ".join(words[:-1]), *words[-1:]]))
+
+
+def guide_steps(commodities: list[Commodity]) -> tuple[tuple[str, str], ...]:
+    """The "How Ulat works" steps the first-run guide on Home and the Help page show, naming
+    the PCIC claims this office drafts (app.pcic_lines)."""
+    claims = [f"the {_possessive(c.claimants)} {c.documents}" for c in commodities]
+    return (
+        (
+            "Reports come in",
+            f"{_and(['Residents', 'barangay officials', *_people(commodities)])} send photos, "
+            "voice notes and texts to the Ulat Telegram bot.",
+        ),
+        (
+            "Ulat sorts them and drafts the forms",
+            "It reads each report, puts reports about the same flood together and fills in the "
+            f"{_and(['RDANA form', *claims])}.",
+        ),
+        (
+            "You check and approve",
+            "Home lists what needs you. Nothing is sent or filed by itself: a form counts only "
+            "after you approve it.",
+        ),
+    )
+
+
+def drafts_help(commodities: list[Commodity]) -> str:
+    """The Help page's line on Drafts, with the claims this office drafts."""
+    documents = [f"the {c.documents}" for c in commodities]
+    outputs = _and(["The RDANA forms", "the damaged-houses table", *documents])
+    text = f"{outputs}. Nothing is sent or filed until you approve it"
+    if not commodities:
+        return text + "."
+    own = commodities[0].document if len(commodities) == 1 else "claims"
+    return f"{text}, and the {_and(_people(commodities))} file their own {own}."
+
+
+def _claim_terms() -> dict[str, tuple[str, str]]:
+    """Each PCIC claim form's "What's this?" entry, its filing window from the deadlines table."""
+    return {
+        c.glossary[0]: (
+            c.glossary[1],
+            c.glossary[2].format(window=deadline(c.deadline).window_text),
+        )
+        for c in COMMODITIES.values()
+        if c.glossary
+    }
 
 
 # Official terms, explained once where they appear ("What's this?"); templates ask by key.
@@ -83,13 +117,7 @@ GLOSSARY: dict[str, tuple[str, str]] = {
         "Center). Ulat's damaged-houses table uses its columns: houses totally and partially "
         "damaged, per barangay.",
     ),
-    "nol": (
-        "Notice of Loss",
-        "The form an insured fisherfolk sends to PCIC (the Philippine Crop Insurance "
-        "Corporation) to say their fish cage or pen was damaged. It is due within "
-        f"{_nol_window()} of the damage, so Ulat counts down the time. Ulat drafts it with the "
-        "photos as evidence; the fisherfolk files it.",
-    ),
+    **_claim_terms(),
     "incident": (
         "Incident",
         "Reports about the same flood or damage in one barangay, put together by Ulat so one "
@@ -102,6 +130,15 @@ GLOSSARY: dict[str, tuple[str, str]] = {
         "second: roofs in orange, floodwater in blue. It is evidence, not the loss figure.",
     ),
 }
+
+CLAIM_TERMS = {c.glossary[0] for c in COMMODITIES.values() if c.glossary}
+
+
+def glossary(commodities: list[Commodity]) -> dict[str, tuple[str, str]]:
+    """The Help page's terms: every term, but only the claim forms this office drafts."""
+    shown = {c.glossary[0] for c in commodities if c.glossary}
+    return {k: v for k, v in GLOSSARY.items() if k not in CLAIM_TERMS or k in shown}
+
 
 # Internal statuses, said plainly (Simple mode); Technical mode shows the raw value.
 PLAIN_STATUS: dict[str, str] = {

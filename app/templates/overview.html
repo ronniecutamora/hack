@@ -4,7 +4,7 @@
 {% from "_links.html" import report_href %}
 {% import "_map.html" as m %}
 {% from "_todo.html" import todo_list %}
-{% from "_help.html" import hint, guide_steps, whats_this %}
+{% from "_help.html" import hint, how_it_works, whats_this %}
 {% from "_icons.html" import icon %}
 {% block title %}{{ "Overview" if technical() else "Home" }}{% endblock %}
 {% block content %}
@@ -25,7 +25,7 @@
         <button type="submit" class="button--text">Got it, hide this</button>
       </form>
     </div>
-    {{ guide_steps() }}
+    {{ how_it_works(claims(request)) }}
   </section>
   {% endif %}
   {% if todo %}
@@ -105,7 +105,7 @@
           <span class="kpi__sub">no filing deadline still ahead</span>
         {% else %}
           <span class="kpi__value kpi__value--text" data-kpi="next_deadline">None</span>
-          <span class="kpi__sub">no Notice of Loss clock running</span>
+          <span class="kpi__sub">no PCIC claim clock running</span>
         {% endif %}
       </a>
     </li>

@@ -1,7 +1,8 @@
 {# The printout: the official paper form alone, in its own words, numbering and layout, with the
    version's values on its blanks. Shown by the print stylesheet instead of the page; never on
    screen. The RDANA layout comes from app.paper (Annex I's boxes, rows, option columns and page
-   breaks); the Notice of Loss is the PCIC letter. Personal fields are filled from this tab by
+   breaks); the fisheries Notice of Loss is the PCIC letter and the rice Claim for Indemnity
+   the bilingual RC-CAS-01 (each commodity's data in app.nol_form). Personal fields are filled from this tab by
    app.js, else left as blank lines to write by hand. Ulat's only words are the stamp line in
    the page footer (what this paper is: draft or approved, version, date). #}
 
@@ -9,9 +10,9 @@
 
 {# A field's value on its ruled line: typed on this device (personal), the version's value, or
    blank to write on. #}
-{% macro blank(v, extra="") -%}
+{% macro blank(v, extra="", unit=true) -%}
   {%- if v.personal -%}<span class="paper__line{{ extra }}" data-personal-print="{{ v.key }}"></span>
-  {%- else -%}<span class="paper__line{{ extra }}">{% if v.value %}{{ v.value }}{% if v.control.unit and v.entry %} {{ v.control.unit }}{% endif %}{% endif %}</span>
+  {%- else -%}<span class="paper__line{{ extra }}">{% if v.value %}{{ v.value }}{% if unit and v.control.unit and v.entry %} {{ v.control.unit }}{% endif %}{% endif %}</span>
   {%- endif -%}
 {%- endmacro %}
 
@@ -94,7 +95,60 @@
 {# A blank with the words the paper prints under its line ("Date", the type-of-policy hint). #}
 {% macro captioned(v) %}<span class="paper__captioned">{{ blank(v) }}<span class="paper__caption">{{ v.field.paper_label }}</span></span>{% endmacro %}
 
-{% macro nol(form, commodity, stamp) %}{% set f = form.by_key %}{% set office = commodity.office %}
+{# A bilingual claim form (RC-CAS-01): the English label, the Filipino in italics, numbered
+   sections, "( )" options and the unit the paper prints after a blank ("ha. (ektarya)"). The
+   sketch of Section III is written by hand: it names the neighboring farmers. #}
+{% macro paren(on) %}<span class="paper__paren">({{ "✓" if on else " " }})</span>{% endmacro %}
+
+{% macro bilingual(text, fil) %}{{ text }}{% if fil %} <i>({{ fil }})</i>{% endif %}{% endmacro %}
+
+{% macro claim_item(v, paper) %}{% set fd = v.field %}
+  <li class="paper__ci{{ ' paper__ci--short' if v.key in paper.short_lines }}{{ ' paper__ci--unit' if fd.paper_unit }}">
+    <span class="paper__num">{{ fd.number }}.</span>
+    <span class="paper__label">{{ bilingual(v.label, fd.label_fil) }}:</span>
+    {%- if v.options %}
+      <span class="paper__choices" style="--cols: {{ [v.options|length, 4]|min }}">{% for o in v.options %}<span class="paper__opt">{{ paren(o in v.printed) }} {{ o }}{% if o in paper.write_in %}: <span class="paper__line paper__line--other"></span>{% endif %}</span>{% endfor %}</span>
+    {%- else %}
+      {{ blank(v, unit=not fd.paper_unit) }}{% if fd.paper_unit %}<span class="paper__unit">{{ fd.paper_unit[0] }} <i>({{ fd.paper_unit[1] }})</i></span>{% endif %}
+    {%- endif %}
+  </li>
+{%- endmacro %}
+
+{% macro claim(form, commodity, stamp) %}{% set f = form.by_key %}{% set paper = commodity.claim_paper %}{% set date = f[commodity.letter_fields[0].key] %}
+<div class="paper paper--claim print-only">
+  {{ stamp_line(stamp) }}
+  <p class="paper__formid paper__strong">{{ commodity.form_id }}<br>{{ commodity.revision }}</p>
+  <h1 class="paper__claim-title">{{ commodity.title }}</h1>
+  <p class="paper__claim-subtitle">{{ paper.title_fil }}</p>
+  <div class="paper__claim-date"><span class="paper__captioned">{{ blank(date) }}<span class="paper__caption">{{ bilingual(date.field.paper_label, date.field.label_fil) }}</span></span></div>
+  <div class="paper__claim-to"><span>TO</span><span>:</span><div>{% for line in paper.to %}<p>{{ line }}</p>{% endfor %}</div></div>
+  <div class="paper__claim-request">{% for line in paper.request %}<p>{% for text, italic in line %}{% if italic %}<i>{{ text }}</i>{% else %}{{ text }}{% endif %}{% endfor %}</p>{% endfor %}</div>
+  {% for section in paper.sections %}
+    <p class="paper__claim-section"><span class="paper__secnum">{{ section.numeral }}</span> {{ section.title }} <i>({{ section.title_fil }})</i>{{ ":" if loop.first }}</p>
+    <ol class="paper__claim-items">
+    {% for v in form.fields if v.field.section ~ "." == section.numeral %}{{ claim_item(v, paper) }}{% endfor %}
+    </ol>
+  {% endfor %}
+  {% set sketch = paper.sketch %}
+  <div class="paper__claim-sketch">
+    <p class="paper__claim-section"><span class="paper__secnum">{{ sketch.numeral }}</span> {{ sketch.title }}<br><i>({{ sketch.title_fil }})</i></p>
+    <p class="paper__claim-note"><i>{{ paper.sketch_note }}</i></p>
+    <table class="paper__lsp">
+      <thead><tr><th></th><th></th>{% for n in range(1, paper.sketch_lots + 1) %}<th>Lot {{ n }} <span class="paper__line paper__line--lot"></span> ha.</th>{% endfor %}</tr></thead>
+      <tbody>{% for direction, fil in paper.sketch_rows %}<tr><td class="paper__num">{{ loop.index }}.</td><td>{{ direction }} <i>({{ fil }})</i></td>{% for _ in range(paper.sketch_lots) %}<td><span class="paper__line paper__line--cell-rule"></span></td>{% endfor %}</tr>{% endfor %}</tbody>
+    </table>
+  </div>
+  <p class="paper__claim-thanks">{{ paper.thanks }}</p>
+  <div class="paper__claim-closing">
+    <p>{{ paper.closing }}</p>
+    <p class="paper__claim-sign"><span class="paper__line paper__line--sign" data-personal-print="{{ commodity.signer }}"></span><strong>{{ paper.signature }}</strong><i>({{ paper.signature_fil }})</i></p>
+  </div>
+</div>
+{% endmacro %}
+
+{# The claim's printout: the commodity's bilingual claim form, else the PCIC letter (the
+   fisheries Notice of Loss, FIP CAS Form No. 1). #}
+{% macro nol(form, commodity, stamp) %}{% if commodity.claim_paper %}{{ claim(form, commodity, stamp) }}{% else %}{% set f = form.by_key %}{% set office = commodity.office %}
 <div class="paper paper--nol print-only">
   {{ stamp_line(stamp) }}
   <p class="paper__formid">{{ commodity.form_id }}<br>{{ commodity.revision }}</p>
@@ -111,10 +165,10 @@
   </ol>
   {% set closing = commodity.closing.split(" / ") %}
   <div class="paper__closing"><p>{{ closing[0] }}</p>
-    <p class="paper__sign"><span class="paper__line paper__line--sign" data-personal-print="1"></span>{% for line in closing[1:] %}<span>{{ line }}</span>{% endfor %}</p>
+    <p class="paper__sign"><span class="paper__line paper__line--sign" data-personal-print="{{ commodity.signer }}"></span>{% for line in closing[1:] %}<span>{{ line }}</span>{% endfor %}</p>
   </div>
 </div>
-{% endmacro %}
+{% endif %}{% endmacro %}
 
 {# What SAM 3.1 measured in a photo, in words: shared by the screen annex and the photo page. #}
 {% macro measured(m) -%}
@@ -124,13 +178,13 @@
   {{- parts|join(", ") -}}
 {%- endmacro %}
 
-{# The optional page after the Notice of Loss (the print checklist's "Include the photo
+{# The optional page after the claim form (the print checklist's "Include the photo
    evidence page", off by default): the incident's photos with their measurements, titled as an
    attachment, never inside the form. #}
 {% macro nol_photos(c, commodity, stamp, available_media) %}
 <div class="paper paper--attachment print-only" data-print-attachment>
   {{ stamp_line(stamp) }}
-  <h1 class="paper__attach-title">Attachment to the Notice of Loss ({{ commodity.form_id }}): photo evidence</h1>
+  <h1 class="paper__attach-title">Attachment to the {{ commodity.document }} ({{ commodity.form_id }}): photo evidence</h1>
   <p class="paper__attach-note">Not part of the PCIC form. Photos sent with the reports of this loss, oldest first. Each measurement is {{ c.sam_label }}.{% if c.sam_caveat %} {{ c.sam_caveat|plain }}{% endif %}</p>
   <div class="paper__shots">
   {% for e in c.annex if e.photos %}{% for p in e.photos %}

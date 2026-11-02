@@ -73,9 +73,9 @@
   {% for commodity in commodities %}
   {% set rows = nol_statuses|selectattr("commodity.key", "equalto", commodity.key)|list %}
   <section id="nol-{{ commodity.key }}">
-    <h2>PCIC Notice of Loss ({{ commodity.name }})</h2>
-    {% if not technical() %}{{ whats_this("nol") }}{% endif %}
-    <p>One draft of the {{ commodity.form_id }} ({{ commodity.revision }}) per incident whose reports state damage to {{ commodity.eligible_livelihood|map("replace", "_", " ")|join(", or ") }}. The agent fills {{ commodity.fields|selectattr("mode", "equalto", "evidence")|map(attribute="label")|join(", ") }} from the reports and packages the evidence for the PCIC adjuster; you fill in {{ commodity.fields|selectattr("mode", "equalto", "assured")|rejectattr("personal")|map(attribute="label")|join(", ") }} with the assured on the draft. {% set personal = commodity.fields|selectattr("personal")|map(attribute="label")|list %}{% if personal %}{{ personal|join(", ") }} are typed only for the printout and never saved.{% endif %} Nothing is filed: the assured files with PCIC.</p>
+    <h2>PCIC {{ commodity.document }} ({{ commodity.name }})</h2>
+    {% if not technical() %}{{ whats_this(commodity.glossary[0]) }}{% endif %}
+    <p>One draft of the {{ commodity.form_id }} ({{ commodity.revision }}) per incident whose reports state damage to {{ commodity.eligibility }}. The agent fills {{ commodity.fields|selectattr("mode", "equalto", "evidence")|map(attribute="label")|join(", ") }} from the reports and packages the evidence for the PCIC adjuster; you fill in {{ commodity.fields|selectattr("mode", "equalto", "assured")|rejectattr("personal")|map(attribute="label")|join(", ") }} with the assured on the draft. {% set personal = commodity.fields|selectattr("personal")|map(attribute="label")|list %}{% if personal %}{{ personal|join(", ") }} are typed only for the printout and never saved.{% endif %} {% if commodity.by_hand %}{{ commodity.by_hand }} {% endif %}Nothing is filed: the {{ commodity.claimant }} files with PCIC.</p>
     {% if not rows %}
       <p class="empty">No assessed report states {{ commodity.name }} damage yet.</p>
     {% else %}
@@ -85,8 +85,8 @@
       <tbody>
       {% for n in rows %}
         <tr id="{{ n.anchor }}">
-          <td data-label="Incident"><a href="/incidents/{{ n.incident.incident_id }}">{% if technical() %}Incident #{{ n.incident.incident_id }}</a> · {{ n.incident.barangay or "Location unknown" }}{% else %}{{ n.incident.barangay or "Location unknown" }}</a>{% endif %}
-            <div class="muted">{{ n.incident.report_ids|length }} report{{ 's' if n.incident.report_ids|length != 1 }} · first {{ n.incident.members[0].at|manila_time }}{% if n.incident.place() %} · {{ n.incident.place() }}{% endif %}</div>
+          <td data-label="Incident"><a href="/incidents/{{ n.incident.incident_id }}">{% set where = n.incident.barangay or n.incident.place() or "Location unknown" %}{% if technical() %}Incident #{{ n.incident.incident_id }}</a> · {{ where }}{% else %}{{ where }}</a>{% endif %}
+            <div class="muted">{{ n.incident.report_ids|length }} report{{ 's' if n.incident.report_ids|length != 1 }} · first {{ n.incident.members[0].at|manila_time }}{% if n.incident.barangay and n.incident.place() %} · {{ n.incident.place() }}{% endif %}</div>
             {% if n.incident.reporter_count == 1 %}<span class="chip warn">single source</span>{% endif %}
             {% if n.incident.pending %}<span class="chip warn">{{ "grouping needs officer review" if technical() else "needs your check on Review" }}</span>{% endif %}
             {% if n.flagged_report_ids %}<span class="chip alert">{% if technical() %}flagged: report{{ 's' if n.flagged_report_ids|length != 1 }} {{ n.flagged_report_ids|join(", ") }}{% else %}{{ n.flagged_report_ids|length }} report{{ 's' if n.flagged_report_ids|length != 1 }} to double-check{% endif %}</span>{% endif %}
@@ -101,10 +101,10 @@
             {% else %}<span class="muted">None yet</span>{% endif %}
           </td>
           <td class="no-print">
-            <form method="post" action="/drafts/notice-of-loss" data-done="{{ 'Notice of Loss draft generated for incident #' ~ n.incident.incident_id if technical() else 'Notice of Loss draft made' }}">
+            <form method="post" action="/drafts/notice-of-loss" data-done="{{ commodity.document ~ ' draft generated for incident #' ~ n.incident.incident_id if technical() else commodity.plain[:1]|upper ~ commodity.plain[1:] ~ ' draft made' }}">
               <input type="hidden" name="commodity" value="{{ commodity.key }}">
               <input type="hidden" name="incident_id" value="{{ n.incident.incident_id }}">
-              <button type="submit">Generate Notice of Loss draft</button>
+              <button type="submit">Generate {{ commodity.document }} draft</button>
             </form>
           </td>
         </tr>

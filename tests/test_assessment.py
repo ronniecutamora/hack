@@ -27,6 +27,8 @@ def facts(**fields):
         hazards=[],
         flood_depth="unknown",
         crop="none",
+        crop_stage="none",
+        crop_damage=[],
         infrastructure=[],
         livelihood_damage=[],
         needs=[],

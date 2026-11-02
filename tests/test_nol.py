@@ -9,6 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
+from app import pcic_lines
 from app.db import init_db, make_engine
 from app.deadlines import DEADLINES, Deadline
 from app.main import create_app
@@ -267,7 +268,7 @@ def test_only_incidents_with_fisheries_damage_are_offered(client, engine):
         "/drafts/notice-of-loss", data={"commodity": "fisheries", "incident_id": str(flood)}
     )
     assert refused.status_code == 422 and "no assessed report of fisheries damage" in refused.text
-    unknown = client.post("/drafts/notice-of-loss", data={"commodity": "rice", "incident_id": "1"})
+    unknown = client.post("/drafts/notice-of-loss", data={"commodity": "corn", "incident_id": "1"})
     assert unknown.status_code == 422 and "Unknown insurance commodity" in unknown.text
     bad = client.post("/drafts/notice-of-loss", data={"commodity": "fisheries", "incident_id": "x"})
     assert bad.status_code == 422
@@ -499,6 +500,9 @@ def test_a_new_commodity_needs_one_definition_and_no_code_change(client, engine,
     )
     check(crops)  # the same checks as the built-in entries
     monkeypatch.setitem(COMMODITIES, crops.key, crops)
+    # The office's lines are data too: one row turns the new claim on.
+    line = pcic_lines.Line(crops, True, "A test-only source", "https://example.org/lines")
+    monkeypatch.setattr(pcic_lines, "LINES", [*pcic_lines.LINES, line])
     incident = add_incident(engine, barangay="Casile")
     add_report(
         engine, incident=incident, barangay="Casile", hazards=["flood"], livelihood_damage=["crops"]

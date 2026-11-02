@@ -19,7 +19,7 @@
   <div>{{ incident_trust(trust) }}</div>
   {% for n in nol_statuses %}
     {% set row, cd = n.clocks[0] %}
-    <p>{{ clock(row, cd) }} <a href="/drafts#{{ n.anchor }}">{% if n.latest %}Notice of Loss draft v{{ n.latest.version }} ({{ "approved for filing, not filed" if n.latest.status == "approved" else (n.latest.status if technical() else n.latest.status|plain_status|lower) }}){% else %}Draft the Notice of Loss{% endif %}</a></p>
+    <p>{{ clock(row, cd) }} <a href="/drafts#{{ n.anchor }}">{% if n.latest %}{{ n.commodity.document }} draft v{{ n.latest.version }} ({{ "approved for filing, not filed" if n.latest.status == "approved" else (n.latest.status if technical() else n.latest.status|plain_status|lower) }}){% else %}Draft the {{ n.commodity.document }}{% endif %}</a></p>
   {% endfor %}
   <p>Latest flood depth: <strong>{{ incident.latest_facts.get("latest_depth", "unknown")|replace("_", " ") }}</strong> · Maximum seen: <strong>{{ incident.latest_facts.get("max_depth", "unknown")|replace("_", " ") }}</strong></p>
   <ul class="chips">

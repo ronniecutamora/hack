@@ -5,7 +5,7 @@
 {% from "_help.html" import whats_this %}
 {% from "_fill.html" import form_for, print_action with context %}
 {% from "_paper.html" import rdana as paper_rdana, nol as paper_nol, nol_photos as paper_nol_photos %}
-{% block title %}{% if draft.kind == 'rdana' %}RDANA draft · {{ draft.barangay }} v{{ draft.version }}{% elif nol %}Notice of Loss draft · {{ "incident #" ~ draft.incident_id if technical() else (draft.barangay or "place unknown") }} v{{ draft.version }}{% else %}Damaged houses v{{ draft.version }}{% endif %}{% endblock %}
+{% block title %}{% if draft.kind == 'rdana' %}RDANA draft · {{ draft.barangay }} v{{ draft.version }}{% elif nol %}{{ commodity.document }} draft · {{ "incident #" ~ draft.incident_id if technical() else (draft.barangay or c.place or "place unknown") }} v{{ draft.version }}{% else %}Damaged houses v{{ draft.version }}{% endif %}{% endblock %}
 {% block content %}
 {% set photographed = nol and c.annex|selectattr("photos")|list %}
 <div id="live-draft" data-live="drafts reports incidents">
@@ -71,7 +71,7 @@
     </section>
     {% endif %}
   {% elif nol %}
-    {% if not technical() %}{{ whats_this("nol") }}{% endif %}
+    {% if not technical() %}{{ whats_this(commodity.glossary[0]) }}{% endif %}
     {% include "_nol.html" %}
   {% else %}
     <h1>Damaged houses by barangay <span class="muted">· version {{ draft.version }}</span></h1>
@@ -85,7 +85,7 @@
       <h2>Officer decision</h2>
       <p class="muted">Write your designation so the audit shows who decided (the sign-in passcode is shared, so it cannot tell officers apart).</p>
       <div class="decision-forms">
-        <form method="post" action="/drafts/{{ draft.id }}/approve" data-done="{{ 'Approved for filing. Ulat files nothing: the assured files with PCIC.' if nol else 'Draft approved' }}">
+        <form method="post" action="/drafts/{{ draft.id }}/approve" data-done="{{ 'Approved for filing. Ulat files nothing: the ' ~ commodity.claimant ~ ' files with PCIC.' if nol else 'Draft approved' }}">
           <fieldset><legend>Approve version {{ draft.version }}</legend>
             <input type="hidden" name="version" value="{{ draft.version }}">
             <label>Decided by (designation) <input type="text" name="decided_by" maxlength="{{ decided_by_max }}" value="{{ current_officer() }}" placeholder="e.g. CDRRMO Head"></label>
@@ -93,7 +93,7 @@
             {% else %}<label>Note (optional) <textarea name="reason" maxlength="{{ reason_max }}" rows="2"></textarea></label>{% endif %}
             {% if stale %}<label><input type="checkbox" name="confirm_stale" value="1" required> Approve this version as it is, although new evidence arrived</label>{% endif %}
             <button type="submit">{% if technical() %}{{ "Approve for filing (Ulat files nothing)" if nol else "Approve this version" }}{% else %}Approve for filing{% endif %}</button>
-            {% if not technical() %}<p class="muted">{{ "Ulat sends nothing: the fisherfolk files it with PCIC." if nol else "Ulat sends nothing: print or download it for the Emergency Operations Center." }}</p>{% endif %}
+            {% if not technical() %}<p class="muted">{{ "Ulat sends nothing: the " ~ commodity.claimant ~ " files it with PCIC." if nol else "Ulat sends nothing: print or download it for the Emergency Operations Center." }}</p>{% endif %}
           </fieldset>
         </form>
         <form method="post" action="/drafts/{{ draft.id }}/reject" data-done="Draft rejected">

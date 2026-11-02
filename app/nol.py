@@ -1,4 +1,5 @@
-"""Fill a PCIC Notice of Loss (a commodity of app.nol_form) for one incident.
+"""Fill a PCIC claim form (a commodity of app.nol_form: a Notice of Loss or a Claim for
+Indemnity) for one incident.
 
 Deterministic: no model call. Every evidence field is a rule over the incident's typed report
 facts, with the reports behind it; identity, policy, lot and harvest fields are the assured's,
@@ -27,7 +28,7 @@ from app.rdana_form import CITY, PROVINCE
 
 NOT_FILED = (
     "Approved for filing, not filed: Ulat never sends anything. The assured (or the City "
-    "Agriculturist on their behalf) files the Notice of Loss with PCIC."
+    "Agriculturist on their behalf) files the {document} with PCIC."
 )
 SAM_LABEL = "evidence for the adjuster, not the loss figure"
 EXCERPT_MAX = 280
@@ -38,6 +39,7 @@ JUDGMENT_KEYS = (
     "tarpaulin",
     "fallen_tree",
     "house_count_estimate",
+    "crop_field",
     "notes",
 )
 
@@ -53,15 +55,24 @@ def _reporting(incident: IncidentEvidence, list_field: str, values: tuple[str, .
     return ids, [v for v in values if v in found]
 
 
-def eligible(commodity: Commodity, incident: IncidentEvidence) -> bool:
-    """A report in the incident states the commodity's damage, with or without a count."""
-    if _reporting(incident, "livelihood_damage", commodity.eligible_livelihood)[0]:
-        return True
-    return any(
-        (incident.facts(m).get(name) or 0) > 0
+def stating(commodity: Commodity, incident: IncidentEvidence) -> list[int]:
+    """The reports in the incident that state the commodity's damage: a livelihood damage, a
+    positive count or a typed fact ("crop": "rice"), with or without a figure."""
+    return [
+        m.id
         for m in incident.members
-        for name in commodity.eligible_counts
-    )
+        if any(v in (incident.facts(m).get("livelihood_damage") or [])
+               for v in commodity.eligible_livelihood)
+        or any((incident.facts(m).get(name) or 0) > 0 for name in commodity.eligible_counts)
+        or any(incident.facts(m).get(name) == value for name, value in commodity.eligible_facts)
+    ]  # fmt: skip
+
+
+def eligible(commodity: Commodity, incident: IncidentEvidence) -> bool:
+    """A report in the incident states the commodity's damage. A report about two insured
+    livelihoods (a fish pen and a rice field) makes the incident eligible for both claims,
+    each drafted from its own facts."""
+    return bool(stating(commodity, incident))
 
 
 def eligible_incidents(commodity: Commodity, city: CityEvidence) -> list[IncidentEvidence]:
@@ -89,7 +100,7 @@ def occurred_at(incident: IncidentEvidence) -> datetime:
 
 
 def deadline_table(commodity: Commodity) -> list[dict[str, Any]]:
-    """The commodity's deadline rows: the Notice of Loss first, then the later ones."""
+    """The commodity's deadline rows: its first filing first, then the later ones."""
     return [DEADLINES[key].as_dict() for key in (commodity.deadline, *commodity.later_deadlines)]
 
 
@@ -193,10 +204,11 @@ class NolContext:
 
 
 def _location(ctx: NolContext):
+    """The barangay, city and province when the incident has a barangay; without one, only
+    what the reports say and the pin: a place outside Biñan's barangays is never called
+    Biñan."""
     incident = ctx.incident
-    where = ", ".join(
-        p for p in (incident.barangay and f"Barangay {incident.barangay}", CITY, PROVINCE) if p
-    )
+    where = incident.barangay and f"Barangay {incident.barangay}, {CITY}, {PROVINCE}"
     place, pin = incident.place(), mean_pin(list(incident.members))
     if not incident.barangay and not place and not pin:
         return None
@@ -209,12 +221,21 @@ def _location(ctx: NolContext):
 
 
 def _cause(ctx: NolContext):
+    commodity = ctx.commodity
     ids, found = _reporting(ctx.incident, "hazards", tuple(HAZARD_TYPES))
-    if not found:
+    detail_ids, details = [], []
+    if commodity.cause_detail_fact:
+        words = dict(commodity.cause_detail)
+        detail_ids, details = _reporting(ctx.incident, commodity.cause_detail_fact, tuple(words))
+        details = [words[d] for d in details]
+    if not found and not details:
         return None
-    value = ", ".join(HAZARD_TYPES[h] for h in found)
+    value = ", ".join(HAZARD_TYPES[h] for h in found) or "Not stated"
+    if details:
+        value += f" ({', '.join(details)})"
     note = "As reported; PCIC's adjusters verify the cause of loss."
-    return filled(value, "reports", [incident_ref(ctx.incident, ids)], note)
+    refs = [incident_ref(ctx.incident, sorted({*ids, *detail_ids}))]
+    return filled(value, "reports", refs, note)
 
 
 def _first_reported(ctx: NolContext):
@@ -227,16 +248,48 @@ def _first_reported(ctx: NolContext):
     return filled(f"{manila_time(first.at)} (first reported)", "reports", refs, note)
 
 
-def _stated_area(ctx: NolContext):
-    unit = f" {ctx.commodity.area_unit}"
-    for name in ctx.commodity.area_facts:
+def _stated(ctx: NolContext, names: tuple[str, ...], unit: str, what: str):
+    """The first stated figure among `names` (the counting rule), as reported."""
+    for name in names:
         if (stated := count([ctx.incident], name)) is not None:
-            area = count_field(stated)
+            figure = count_field(stated)
             note = "As stated in the reports; never estimated from photos or SAM masks."
             return filled(
-                f"{figure_text(stated, unit)} (as reported)", "reports", area["evidence"], note
+                f"{figure_text(stated, unit)} (as reported)", "reports", figure["evidence"], note
             )
-    return filled(None, None, (), "No report states an area; it is never estimated from photos.")
+    return filled(None, None, (), f"No report states {what}; it is never estimated from photos.")
+
+
+def _stated_area(ctx: NolContext):
+    unit = f" {ctx.commodity.area_unit}" if ctx.commodity.area_unit else ""
+    return _stated(ctx, ctx.commodity.area_facts, unit, "an area")
+
+
+def _stated_percent(ctx: NolContext):
+    return _stated(ctx, ctx.commodity.percent_facts, "", "a share of the crop lost")
+
+
+def _insured(ctx: NolContext):
+    """The commodity's own option ("Palay"): the reports are about it. The policy decides."""
+    ids = stating(ctx.commodity, ctx.incident)
+    note = "The reports are about this crop; check it against the assured's policy."
+    return filled(ctx.commodity.insured_option, "reports", [incident_ref(ctx.incident, ids)], note)
+
+
+def _stage(ctx: NolContext):
+    """The latest stage a report states, in the form's words."""
+    commodity, incident = ctx.commodity, ctx.incident
+    labels = dict(commodity.stage_labels)
+    for member in reversed(incident.members):
+        stage = incident.facts(member).get(commodity.stage_fact or "")
+        if stage in labels:
+            note = (
+                "As reported; the farmer gives the age in days. The stage of cultivation at the "
+                "time of loss sets the indemnity."
+            )
+            refs = [incident_ref(incident, [member.id])]
+            return filled(f"{labels[stage]} (as reported)", "reports", refs, note)
+    return None
 
 
 def _extent(ctx: NolContext):
@@ -270,12 +323,22 @@ RULES: dict[str, Callable[[NolContext], dict[str, Any] | None]] = {
     "first_reported": _first_reported,
     "stated_area": _stated_area,
     "extent": _extent,
+    "insured": _insured,
+    "stage": _stage,
+    "stated_percent": _stated_percent,
 }
+
+
+def claim_place(draft: Any) -> str | None:
+    """Where a claim draft is: its barangay, else the reports' place detail (an example farm
+    outside the city's barangays); drafts made before the place was stored have only the first."""
+    return draft.barangay or (draft.content or {}).get("place")
 
 
 def fill_field(form_field: NolField, ctx: NolContext) -> dict[str, Any]:
     result = RULES[form_field.rule](ctx) if form_field.mode == "evidence" else None
     return {
+        "key": form_field.key,
         "number": form_field.number,
         "label": form_field.label,
         "mode": form_field.mode,
@@ -305,6 +368,7 @@ def fill_nol(
     return {
         "commodity": commodity.key,
         "commodity_name": commodity.name,
+        "document": commodity.document,
         "title": commodity.title,
         "form_id": commodity.form_id,
         "revision": commodity.revision,
@@ -316,8 +380,10 @@ def fill_nol(
         "closing": commodity.closing,
         "incident_id": incident.incident_id,
         "barangay": incident.barangay or None,
+        "place": incident.place(),  # the reports' place detail, for a draft with no barangay
         "drafted_at": manila_time(drafted_at),
         "occurred_at": occurred.isoformat(),
+        "first_reported": manila_time(occurred),
         "deadlines": deadline_rows(commodity, occurred),
         "fields": fields,
         "filled_count": sum(f["value"] is not None for f in fields),
@@ -326,7 +392,7 @@ def fill_nol(
         "loss_bands_source": commodity.loss_bands_source,
         "sam_label": SAM_LABEL,
         "sam_caveat": commodity.sam_caveat,
-        "not_filed": NOT_FILED,
+        "not_filed": NOT_FILED.format(document=commodity.document),
         "annex": entries,
         "reused_photos": reused,
         "missing_evidence": missing,

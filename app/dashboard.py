@@ -22,6 +22,7 @@ from app.models import (
     utcnow,
 )
 from app.modes import plain_reason, technical
+from app.nol import claim_place
 from app.nol_form import commodity_for_kind
 from app.questions import plan, summary
 from app.review import ReviewCard, queue
@@ -52,7 +53,7 @@ def plain_output_label(draft: Any) -> str:
     """How Simple mode names a draft's output: the form and the place, no incident number
     (app.drafts.output_label is Technical mode's)."""
     if (commodity := commodity_for_kind(draft.kind)) is not None:
-        return f"PCIC Notice of Loss ({commodity.name}) · {draft.barangay or 'place unknown'}"
+        return f"PCIC {commodity.plain_title} · {claim_place(draft) or 'place unknown'}"
     if draft.kind == KIND_RDANA:
         return f"RDANA · {draft.barangay}"
     return "Damaged houses · city"
@@ -310,8 +311,9 @@ def _review_item(cards: list[ReviewCard]) -> TodoItem | None:
 
 
 def _nol_items(statuses: list[Any], now: datetime) -> list[TodoItem]:
-    """A Notice of Loss whose filing clock runs and that still needs the officer: a draft to
-    approve, or none yet (or a rejected or out-of-date one) to make. Approved ones are done."""
+    """A PCIC claim (a Notice of Loss, a Claim for Indemnity) whose filing clock runs and that
+    still needs the officer: a draft to approve, or none yet (or a rejected or out-of-date one)
+    to make. Approved ones are done."""
     items = []
     for status in statuses:
         if not status.clocks:
@@ -320,18 +322,21 @@ def _nol_items(statuses: list[Any], now: datetime) -> list[TodoItem]:
         latest = status.latest
         if latest is not None and latest.status == DRAFT_APPROVED and not status.stale:
             continue
-        place = status.incident.barangay or "Place unknown"
-        name = f"{place} {status.commodity.name}"
+        commodity = status.commodity
+        place = status.incident.barangay or status.incident.place() or "Place unknown"
+        # "De La Paz fisheries: Notice of Loss"; "Pila: rice claim" names the commodity once.
+        where = place if commodity.name in commodity.plain else f"{place} {commodity.name}"
+        name = f"{where}: {commodity.plain}"
         rank = URGENT if clock.overdue else SOON_DUE if clock.due_at - now < SOON else LATER_DUE
         if latest is not None and latest.status == DRAFT_OPEN:
             title, href, action = (
-                f"{name}: Notice of Loss ready to approve",
+                f"{name} ready to approve",
                 f"/drafts/{latest.id}",
                 "Check and approve",
             )
         else:  # the countdown is shown beside the title (it keeps ticking on the page)
             title, href, action = (
-                f"{name}: Notice of Loss",
+                name,
                 f"/drafts#{status.anchor}",
                 "Make the draft",
             )
@@ -339,8 +344,8 @@ def _nol_items(statuses: list[Any], now: datetime) -> list[TodoItem]:
             TodoItem(
                 rank,
                 title,
-                "The fisherfolk must file it with PCIC in time. Ulat drafts it from the "
-                "reports and photos; it is filed only by them.",
+                f"The {commodity.claimant} must file it with PCIC in time. Ulat drafts it "
+                "from the reports and photos; it is filed only by them.",
                 href,
                 action,
                 "schedule",
