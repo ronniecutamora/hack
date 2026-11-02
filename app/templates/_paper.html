@@ -181,10 +181,10 @@
 {# The optional page after the claim form (the print checklist's "Include the photo
    evidence page", off by default): the incident's photos with their measurements, titled as an
    attachment, never inside the form. #}
-{% macro nol_photos(c, commodity, stamp, available_media) %}
+{% macro nol_photos(c, commodity, stamp, available_media, photo_evidence) %}
 <div class="paper paper--attachment print-only" data-print-attachment>
   {{ stamp_line(stamp) }}
-  <h1 class="paper__attach-title">Attachment to the {{ commodity.document }} ({{ commodity.form_id }}): photo evidence</h1>
+  <h1 class="paper__attach-title">Attachment to the {{ commodity.document }} ({{ commodity.form_id }}): {{ photo_evidence }}</h1>
   <p class="paper__attach-note">Not part of the PCIC form. Photos sent with the reports of this loss, oldest first. Each measurement is {{ c.sam_label }}.{% if c.sam_caveat %} {{ c.sam_caveat|plain }}{% endif %}</p>
   <div class="paper__shots">
   {% for e in c.annex if e.photos %}{% for p in e.photos %}

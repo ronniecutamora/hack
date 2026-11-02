@@ -132,7 +132,7 @@ from app.modes import (
     technical,
 )
 from app.nav import NAV, destinations, more_current, nav_current, technical_only
-from app.nol import deadline_table
+from app.nol import PHOTO_EVIDENCE, PHOTO_PAGE, deadline_table
 from app.nol_form import commodity_for_kind
 from app.pcic_lines import enabled as enabled_commodities
 from app.questions import PLACE_LISTED_REASON, current, plan, questions
@@ -1024,6 +1024,8 @@ def create_app(
             "regenerate": regenerate_form(draft),
             "nol": commodity_for_kind(draft.kind) is not None,
             "commodity": commodity_for_kind(draft.kind),
+            "photo_evidence": PHOTO_EVIDENCE,
+            "photo_page": PHOTO_PAGE,
             "stamp": print_stamp(draft, events),
             "clocks": drafts.clocks(draft),
             "available_media": available_media(request.app.state.engine, draft),

@@ -11,7 +11,7 @@
 <div id="live-draft" data-live="drafts reports incidents">
   {# With a fillable form, the printout is the paper form alone (_paper.html), not this page. #}
   <div class="{{ 'screen-only' if form }}">
-  <div class="no-print toolbar"><a class="button button--text" href="/drafts">{{ icon("arrow_back") }}Drafts</a> {% if form and nol and photographed %}{% call print_action(draft, form) %}<label class="print-check__option"><input type="checkbox" data-print-option="attachment"> Include the photo evidence page<span class="muted">One page after the form, for the PCIC adjuster: the photos with Ulat's measurements. Not part of the PCIC form.</span></label>{% endcall %}{% elif form %}{{ print_action(draft, form) }}{% else %}<button type="button" onclick="window.print()">{{ icon("print") }}Print</button>{% endif %}{% if draft.kind == 'damaged_houses' %} <a class="button button--text" href="/drafts/{{ draft.id }}.csv" download hx-boost="false">{{ icon("download") }}Download this version as CSV</a>{% endif %}</div>
+  <div class="no-print toolbar"><a class="button button--text" href="/drafts">{{ icon("arrow_back") }}Drafts</a> {% if form and nol and photographed %}{% call print_action(draft, form) %}<label class="print-check__option"><input type="checkbox" data-print-option="attachment"> Include the {{ photo_page }}<span class="muted">One page after the form, for the PCIC adjuster: the photos with Ulat's measurements. Not part of the PCIC form.</span></label>{% endcall %}{% elif form %}{{ print_action(draft, form) }}{% else %}<button type="button" onclick="window.print()">{{ icon("print") }}Print</button>{% endif %}{% if draft.kind == 'damaged_houses' %} <a class="button button--text" href="/drafts/{{ draft.id }}.csv" download hx-boost="false">{{ icon("download") }}Download this version as CSV</a>{% endif %}</div>
 
   {% if draft.status == 'approved' %}
     <p class="banner ok keep"><strong>{{ "APPROVED FOR FILING, NOT FILED" if nol else "APPROVED" }}</strong> {{ draft.decided_at|manila_time }}{% if draft.decided_by %} by {{ draft.decided_by }}{% endif %}{% if draft.decision_reason %} · {{ draft.decision_reason }}{% endif %}. This version is frozen.{% if nol %} {{ c.not_filed }} The filing clock keeps running.{% endif %}</p>
@@ -117,6 +117,6 @@
     </ol>
   </section>
   </div>
-  {% if form and nol %}{{ paper_nol(form, commodity, stamp) }}{% if photographed %}{{ paper_nol_photos(c, commodity, stamp, available_media) }}{% endif %}{% elif form %}{{ paper_rdana(form, stamp) }}{% endif %}
+  {% if form and nol %}{{ paper_nol(form, commodity, stamp) }}{% if photographed %}{{ paper_nol_photos(c, commodity, stamp, available_media, photo_evidence) }}{% endif %}{% elif form %}{{ paper_rdana(form, stamp) }}{% endif %}
 </div>
 {% endblock %}

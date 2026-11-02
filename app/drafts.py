@@ -48,6 +48,7 @@ from app.nol import (
     annex,
     claim_place,
     countdowns,
+    current_photo_reference,
     deadline_rows,
     eligible_incidents,
     fill_nol,
@@ -220,7 +221,11 @@ def generated_fields(content: dict[str, Any]) -> dict[str, dict[str, Any]]:
     drafted before slice 7m keys its fields by number, which was their key)."""
     if "sections" in content:
         return {f["key"]: f for s in content["sections"] for f in s["fields"]}
-    return {f.get("key", f["number"]): f for f in content.get("fields", [])}
+    # Existing snapshots stay frozen; only their generated wording is presented differently.
+    return {
+        f.get("key", f["number"]): {**f, "value": current_photo_reference(f.get("value"))}
+        for f in content.get("fields", [])
+    }
 
 
 def generated_values(content: dict[str, Any]) -> dict[str, str | None]:
@@ -255,6 +260,13 @@ def form_view(
     if not definitions:
         return None
     generated, entries = generated_fields(draft.content), draft.entries or {}
+    if commodity_for_kind(draft.kind):
+        # Compare an older entry's baseline in the same wording as the generated value, so
+        # this display correction does not falsely report that the underlying evidence moved.
+        entries = {
+            key: {**entry, "base": current_photo_reference(entry.get("base"))}
+            for key, entry in entries.items()
+        }
     views = [
         fillable.view(
             f,

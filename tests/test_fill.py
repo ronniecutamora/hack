@@ -20,6 +20,7 @@ from app import fillable
 from app.drafts import form_fields
 from app.main import create_app
 from app.models import Draft, DraftEvent
+from app.nol import LEGACY_PHOTO_REFERENCE, PHOTO_REFERENCE, RULES
 from app.nol_form import FISHERIES
 from app.paper import Stamp, amounts
 from app.rdana_form import (
@@ -644,6 +645,41 @@ def test_the_photo_evidence_page_is_an_option_and_an_attachment(client, engine):
         assert f'<img src="/media/{media_id}"' in attachment
     assert "Measured: floodwater over 40% of the photo." in attachment
     assert stamps(attachment)[0].startswith("DRAFT, NOT APPROVED · version 1")
+
+
+def test_old_generated_photo_wording_is_corrected_without_changing_the_snapshot(
+    client, engine, clock, monkeypatch
+):
+    from app.drafts import form_view
+
+    incident, first, _ = fisherfolk_incident(engine)
+    add_photo(engine, first)
+    extent = RULES["extent"]
+
+    def old_extent(ctx):
+        result = extent(ctx)
+        result["value"] = result["value"].replace(f"; {PHOTO_REFERENCE}", LEGACY_PHOTO_REFERENCE)
+        return result
+
+    monkeypatch.setitem(RULES, "extent", old_extent)
+    draft_id = generate_nol(client, incident)
+    monkeypatch.setitem(RULES, "extent", extent)
+    with Session(engine) as session:
+        draft = session.get(Draft, draft_id)
+        original = next(f["value"] for f in draft.content["fields"] if f["key"] == "9")
+        assert LEGACY_PHOTO_REFERENCE in original
+        current = form_view(draft, clock.now).by_key["9"]
+        assert PHOTO_REFERENCE in current["current"]
+        draft.entries = {"9": {"value": "Officer's description", "base": original, "by": "RC"}}
+        assert form_view(draft, clock.now).by_key["9"]["moved"] is None
+    page = client.get(f"/drafts/{draft_id}").text
+    assert LEGACY_PHOTO_REFERENCE not in page
+    assert PHOTO_REFERENCE in paper(page)
+    response = fill(client, draft_id, [("9", current["current"])])
+    assert response.status_code == 303 and "saved=0" in response.headers["location"]
+    with Session(engine) as session:
+        snapshot = session.get(Draft, draft_id).content
+    assert next(f["value"] for f in snapshot["fields"] if f["key"] == "9") == original
 
 
 def test_the_stamp_cannot_break_out_of_its_css_string():

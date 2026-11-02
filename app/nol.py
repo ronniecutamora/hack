@@ -31,6 +31,12 @@ NOT_FILED = (
     "Agriculturist on their behalf) files the {document} with PCIC."
 )
 SAM_LABEL = "evidence for the adjuster, not the loss figure"
+PHOTO_EVIDENCE = "photo evidence"
+PHOTO_PAGE = f"{PHOTO_EVIDENCE} page"
+PHOTO_REFERENCE = f"measurements can be included on a separate {PHOTO_PAGE} ({SAM_LABEL})"
+LEGACY_PHOTO_REFERENCE = (
+    f", with the agent's judgments and SAM 3.1 measurements in the annex ({SAM_LABEL})"
+)
 EXCERPT_MAX = 280
 JUDGMENT_KEYS = (
     "roof_damage",
@@ -42,6 +48,11 @@ JUDGMENT_KEYS = (
     "crop_field",
     "notes",
 )
+
+
+def current_photo_reference(text: str | None) -> str | None:
+    """Correct the old generated wording when displaying an immutable saved draft."""
+    return text.replace(LEGACY_PHOTO_REFERENCE, f"; {PHOTO_REFERENCE}") if text else text
 
 
 def _reporting(incident: IncidentEvidence, list_field: str, values: tuple[str, ...]):
@@ -306,8 +317,8 @@ def _extent(ctx: NolContext):
     photographed = [e["report_id"] for e in ctx.annex if e["photos"]]
     if photographed:
         parts.append(
-            f"photos from {len(photographed)} report{'s' if len(photographed) != 1 else ''}, "
-            f"with the agent's judgments and SAM 3.1 measurements in the annex ({SAM_LABEL})"
+            f"photos from {len(photographed)} report{'s' if len(photographed) != 1 else ''}; "
+            f"{PHOTO_REFERENCE}"
         )
         refs.append(incident_ref(incident, photographed))
     if not parts:

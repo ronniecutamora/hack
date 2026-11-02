@@ -145,6 +145,8 @@ def test_evidence_fields_are_filled_and_identity_fields_are_left_for_the_assured
         "fish cages or pens damaged: 3 (reported count); photos from 1 report"
     )
     assert SAM_LABEL in f["9"]["value"]
+    assert "measurements can be included on a separate photo evidence page" in f["9"]["value"]
+    assert "measurements in the annex" not in f["9"]["value"]
     assert "90% and above" in f["9"]["note"] and "does not classify" in f["9"]["note"]
     for number in ("3", "4", "5", "9"):
         assert f[number]["mode"] == "evidence" and f[number]["evidence"], number
