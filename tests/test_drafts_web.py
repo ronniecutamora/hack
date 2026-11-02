@@ -11,7 +11,6 @@ from app.db import init_db, make_engine
 from app.drafts import CSV_BOM, CSV_HEADER, DraftService
 from app.main import create_app
 from app.models import Draft, DraftEvent, Report
-from app.rdana import NOT_IN_REPORTS
 from tests.test_rdana import AT, SummaryLLM, add_incident, add_report, cite_all
 
 SUMMARY = cite_all
@@ -322,7 +321,7 @@ async def test_init_db_upgrades_a_database_from_before_drafts(settings):
     engine.dispose()
 
 
-async def test_unfilled_fields_render_the_marker_and_filled_ones_link_evidence(settings):
+async def test_unfilled_fields_are_inputs_and_filled_ones_link_evidence(settings):
     engine = make_engine(settings)
     init_db(engine)
     incident = add_incident(engine)
@@ -333,14 +332,12 @@ async def test_unfilled_fields_render_the_marker_and_filled_ones_link_evidence(s
         create_app(settings, summary_llm=SummaryLLM()), base_url="http://localhost"
     ) as client:
         html = client.get(f"/drafts/{draft.id}").text
-    fields = {f["key"]: f for s in draft.content["sections"] for f in s["fields"]}
-    empty = [k for k, f in fields.items() if f["value"] is None and not f["heading"]]
-    assert html.count(NOT_IN_REPORTS) == len(empty) + 1  # +1 for the legend
-    row = html.split('id="f-10.2"')[1].split("</tr>")[0]
-    assert "<strong>4</strong>" in row
+    assert "not in reports" not in html
+    row = html.split('id="f-10.2"')[1].split('class="fill-field')[0]
+    assert 'name="f.10.2"' in row and 'value="4"' in row and 'inputmode="numeric"' in row
     assert f'href="/incidents/{incident}#report-{report}"' in row
     assert "1 reporter</span>" in row and "single source" in row
-    missing = html.split('id="f-2.1"')[1].split("</tr>")[0]
-    assert NOT_IN_REPORTS in missing
-    assert '15.5</strong> <span class="muted">(sic)</span>' in html
+    missing = html.split('id="f-2.1"')[1].split('class="fill-field')[0]
+    assert 'name="f.2.1"' in missing and 'value=""' in missing
+    assert '15.5</span> <span class="muted">(sic)</span>' in html
     assert "Counting rule: reports in one incident" in html  # the footnote on the draft

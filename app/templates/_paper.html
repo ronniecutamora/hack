@@ -1,0 +1,67 @@
+{# The printout: only what belongs on the official paper form, in its order and numbering.
+   Shown by the print stylesheet instead of the page; never on screen. Values are the version's
+   (the officer's entry, else the generated value); an empty field is a ruled blank line or empty
+   boxes. Personal fields are filled from this tab by app.js, else left blank to write by hand. #}
+
+{% macro boxes(v) -%}
+  <span class="paper__boxes">{% for o in v.options %}<span class="paper__box">{{ "☒" if o in v.printed else "☐" }} {{ o }}</span>{% endfor %}</span>
+{%- endmacro %}
+
+{% macro value(v) -%}
+  {%- set choices = v.control.kind in ("choice", "multi") -%}
+  {%- if v.personal -%}
+    <span class="paper__line" data-personal-print="{{ v.key }}"></span>
+  {%- else -%}
+    {%- if v.value and (not choices or not v.printed) -%}<span class="paper__value">{{ v.value }}{% if v.control.unit and v.entry %} {{ v.control.unit }}{% endif %}</span>{%- elif not v.options -%}<span class="paper__line"></span>{%- endif -%}
+    {%- if v.options %}{{ boxes(v) }}{% endif -%}
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro stamp_line(stamp) %}<p class="paper__stamp">{{ stamp }}</p>{% endmacro %}
+
+{% macro rdana(form, c, stamp) %}
+<div class="paper print-only">
+  {{ stamp_line(stamp) }}
+  <div class="paper__head"><p class="paper__annex">Annex I</p><h1 class="paper__title">{{ c.title }}</h1><p class="paper__subtitle">{{ c.subtitle }}</p></div>
+  {% for section in form.sections %}
+    <table class="paper__table">
+      <thead><tr><th colspan="3" class="paper__section">{% if section.number %}{{ section.number }}. {% endif %}{{ section.title }}</th></tr></thead>
+      <tbody>
+      {% for f in section.fields %}
+        {% if f.heading is defined %}
+          <tr class="paper__sub"><td colspan="3">{{ f.heading.number }} {{ f.heading.label }}</td></tr>
+        {% else %}
+          <tr{% if f.control.kind == 'long' %} class="paper__row--long"{% endif %}>
+            <td class="paper__num">{{ f.number }}</td>
+            <td class="paper__label">{{ f.label }}{% if f.required %} <span class="paper__req">(required)</span>{% endif %}</td>
+            <td class="paper__cell">{{ value(f) }}</td>
+          </tr>
+        {% endif %}
+      {% endfor %}
+      {% if section.note %}<tr class="paper__note"><td colspan="3">{{ section.note }}</td></tr>{% endif %}
+      </tbody>
+    </table>
+  {% endfor %}
+  <p class="paper__foot">{{ c.title }} · Barangay {{ c.barangay }} · {{ stamp }}</p>
+</div>
+{% endmacro %}
+
+{% macro nol(form, c, commodity, stamp) %}{% set f = form.by_key %}
+<div class="paper paper--letter print-only">
+  {{ stamp_line(stamp) }}
+  <p class="paper__formid">{{ c.form_id }}<br>{{ c.revision }}</p>
+  <p class="paper__center"><strong>PHILIPPINE CROP INSURANCE CORPORATION</strong><br>{{ c.office.name }}</p>
+  <p class="paper__date">Date: {{ value(f["date"]) }}</p>
+  {% set title = c.title.split(" (", 1) %}<h1 class="paper__title">{{ title[0] }}{% if title|length > 1 %}<br>({{ title[1] }}{% endif %}</h1>
+  <p>TO: <strong>{{ c.office.addressee }}</strong><br>{{ c.office.name }}<br>{{ c.office.address }}</p>
+  <p>Dear Sir/Madam:</p>
+  <p class="paper__preamble">{% for piece, is_key in commodity.preamble_parts %}{% if is_key %}{{ value(f[piece]) }}{% else %}{{ piece }}{% endif %}{% endfor %}</p>
+  <ol class="paper__list">
+  {% for v in form.fields if v.field in commodity.fields %}
+    <li><span class="paper__num">{{ v.number }}.</span> <span class="paper__label">{{ v.label }}</span>: {{ value(v) }}</li>
+  {% endfor %}
+  </ol>
+  <div class="paper__closing">{% set lines = c.closing.split(" / ") %}<p>{{ lines[0] }}</p><p class="paper__sign"><span class="paper__line paper__line--sign"></span><br>{{ lines[1:]|join(" ") }}</p></div>
+  <p class="paper__foot">{{ c.form_id }} · {{ stamp }}</p>
+</div>
+{% endmacro %}

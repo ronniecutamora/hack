@@ -19,7 +19,7 @@ from collections import defaultdict
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from datetime import datetime
-from functools import cache
+from functools import cache, partial
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit
@@ -73,14 +73,17 @@ from app.drafts import (
     REASON_MIN,
     DraftError,
     DraftService,
+    FillRefused,
     clean_text,
     csv_status,
     damaged_houses,
     damaged_houses_csv,
+    form_view,
     output_label,
     parse_event_at,
     pending_report_ids,
     predates_pending_bucket,
+    print_stamp,
     regenerate_form,
 )
 from app.eval_results import RESULTS_PATH
@@ -120,6 +123,7 @@ from app.modes import (
     plain_reason,
     plain_signal,
     plain_status,
+    presenter,
     resolve,
     technical,
 )
@@ -148,6 +152,7 @@ REPORT_LIMIT = 200
 STATE_CHANGING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 FORM_CONTENT_TYPE = "application/x-www-form-urlencoded"
 FORM_MAX_BYTES = 16_384
+FILL_MAX_BYTES = 131_072  # a whole RDANA form with long answers, percent-encoded
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 STATIC_DIR = Path(__file__).parent / "static"
@@ -295,23 +300,28 @@ def csv_response(text: str, filename: str) -> Response:
     )
 
 
-async def form_fields(request: Request) -> dict[str, str]:
-    """A small URL-encoded HTML form body, parsed without extra dependencies.
+async def form_pairs(request: Request, max_bytes: int = FORM_MAX_BYTES) -> list[tuple[str, str]]:
+    """A URL-encoded HTML form body as (name, value) pairs in order, repeated names kept (a
+    multi-choice posts one pair per ticked box), parsed without extra dependencies.
 
     An empty body is an empty form (a button-only POST); anything else must be URL-encoded.
     """
     body = await request.body()
-    if len(body) > FORM_MAX_BYTES:
+    if len(body) > max_bytes:
         raise HTTPException(413, "Form too large.")
     if not body:
-        return {}
+        return []
     if request.headers.get("content-type", "").split(";")[0].strip() != FORM_CONTENT_TYPE:
         raise HTTPException(415, f"Send the form as {FORM_CONTENT_TYPE}.")
     try:
-        pairs = parse_qsl(body.decode("utf-8"), keep_blank_values=True, strict_parsing=False)
+        return parse_qsl(body.decode("utf-8"), keep_blank_values=True, strict_parsing=False)
     except UnicodeDecodeError as exc:
         raise HTTPException(400, "Form is not UTF-8.") from exc
-    return dict(pairs)
+
+
+async def form_fields(request: Request) -> dict[str, str]:
+    """A small URL-encoded HTML form body as a dict (the last value of a repeated name)."""
+    return dict(await form_pairs(request))
 
 
 def foreign_origin(request: Request) -> str | None:
@@ -942,21 +952,40 @@ def create_app(
         draft = request.app.state.drafts.generate_damaged_houses()
         return RedirectResponse(f"/drafts/{draft.id}", status_code=303)
 
-    @app.get("/drafts/{draft_id:int}", response_class=HTMLResponse)
-    def draft_page(request: Request, draft_id: int) -> HTMLResponse:
-        draft, events, newest = request.app.state.drafts.get(draft_id)
+    def draft_page_response(
+        request: Request,
+        draft_id: int,
+        *,
+        refused: FillRefused | None = None,
+        officer: str | None = None,
+    ) -> HTMLResponse:
+        drafts: DraftService = request.app.state.drafts
+        draft, events, newest = drafts.get(draft_id)
         with Session(request.app.state.engine) as session:
             model_calls = draft_calls(session, draft_id)
+        saved = request.query_params.get("saved")
         context = {
             "draft": draft,
             "model_calls": model_calls,
-            "stale": request.app.state.drafts.is_stale(draft),
+            "stale": drafts.is_stale(draft),
             "predates_pending": predates_pending_bucket(draft),
             "regenerate": regenerate_form(draft),
             "nol": commodity_for_kind(draft.kind) is not None,
-            "clocks": request.app.state.drafts.clocks(draft),
+            "commodity": commodity_for_kind(draft.kind),
+            "stamp": print_stamp(draft, events),
+            "clocks": drafts.clocks(draft),
             "available_media": available_media(request.app.state.engine, draft),
             "c": draft.content,
+            "form": form_view(
+                draft,
+                drafts.clock(),
+                refused=refused.result if refused else None,
+                present=presenter(),
+            ),
+            "refused": refused,
+            "fill_officer": officer if officer is not None else current_officer.get(),
+            "saved": saved if saved in ("0", "1") else None,
+            "today": manila_time(drafts.clock())[:10],
             "events": events,
             "newest": newest,
             "pending": pending_report_ids(draft),
@@ -964,7 +993,35 @@ def create_app(
             "reason_max": REASON_MAX,
             "decided_by_max": DECIDED_BY_MAX,
         }
-        return templates.TemplateResponse(request, "draft.html", context)
+        return templates.TemplateResponse(
+            request, "draft.html", context, status_code=refused.status_code if refused else 200
+        )
+
+    @app.get("/drafts/{draft_id:int}", response_class=HTMLResponse)
+    def draft_page(request: Request, draft_id: int) -> HTMLResponse:
+        return draft_page_response(request, draft_id)
+
+    @app.post("/drafts/{draft_id:int}/fill", response_model=None)
+    async def fill_draft(request: Request, draft_id: int) -> HTMLResponse | RedirectResponse:
+        """Save the officer's entries as the next version. A refused value shows the page again
+        with everything that was typed and the message under each field; nothing is saved."""
+        pairs = await form_pairs(request, FILL_MAX_BYTES)
+        officer = next((v for k, v in reversed(pairs) if k == "officer"), "")
+        try:
+            saved = await run_in_threadpool(
+                partial(
+                    request.app.state.drafts.save_entries,
+                    draft_id,
+                    pairs,
+                    officer=officer,
+                    present=presenter(),
+                )
+            )
+        except FillRefused as refused:
+            return draft_page_response(request, draft_id, refused=refused, officer=officer)
+        if saved is None:
+            return RedirectResponse(f"/drafts/{draft_id}?saved=0", status_code=303)
+        return RedirectResponse(f"/drafts/{saved.id}?saved=1", status_code=303)
 
     @app.get("/drafts/{draft_id:int}.csv")
     def draft_csv(request: Request, draft_id: int) -> Response:
@@ -983,6 +1040,7 @@ def create_app(
             reason=form.get("reason"),
             decided_by=form.get("decided_by"),
             confirm_stale=form.get("confirm_stale") == "1",
+            version=int(form["version"]) if form.get("version", "").isdigit() else None,
         )
         return RedirectResponse(f"/drafts/{draft_id}", status_code=303)
 

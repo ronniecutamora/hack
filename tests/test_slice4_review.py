@@ -203,7 +203,7 @@ def test_pending_figures_show_on_the_form_csv_and_banner_and_approval_needs_a_re
     page = client.get(f"/drafts/{draft_id}").text
     assert "PENDING GROUPING REVIEW." in page and f"Reports {listed} may duplicate" in page
     assert "pending grouping review: 5, not added" in page
-    assert "15" not in page.split('id="f-10.2"')[1].split("</tr>")[0]
+    assert "15" not in page.split('id="f-10.2"')[1].split('class="fill-field')[0]
 
     lines = client.get("/damaged-houses.csv").text.removeprefix(CSV_BOM).split("\r\n")
     semicolons = ";".join(map(str, ids))

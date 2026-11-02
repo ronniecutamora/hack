@@ -240,10 +240,36 @@ submitted by), filled by a deterministic rule over typed report facts, or writte
 | 18.1, 18.2 | An evidence note on livelihood damage (fish pens or cages, fishponds, fishing gear or boats, crops, livestock; with a count only when one is stated); "Others" when reports ask for livelihood materials such as nets, bamboo or boats |
 
 Everything else, such as the male/female splits, accessibility, communications, evacuation centers, relief,
-law and order and the overall assessment, is marked "— not in reports (for the RDANA team)". Missing evidence is
-never turned into "No" or "0". Every filled value links to its incidents and reports, with the reporter count,
+law and order and the overall assessment, is an empty input the officer fills in on the draft (see "Filling in a
+draft" below), and a blank ruled line or empty boxes on the printout. Missing evidence is never turned into "No"
+or "0". Every filled value links to its incidents and reports, with the reporter count,
 a "single source" chip and flagged-report chips. A report in an incident links to its place on the incident
 timeline; any other report links to `/reports?around=<id>`, which shows the reports around it however old it is.
+
+**Filling in a draft.** Every field of the RDANA form and the Notice of Loss is a typed input on the draft page
+(`app/fillable.py`; the control, the form's own options, a plain hint, whether only the office can answer it and
+whether it is personal are data in `app/rdana_form.py` and `app/nol_form.py`): text, long text, numbers with
+limits, dates and date-times that may not be in the future, single and multiple choice. Values from the reports
+stay editable with their evidence links; an officer's change shows "Edited by RC · 14:20" with the value it
+replaced one tap away and a button to go back to it. Saving checks every value on the server (refused values come
+back with the message under the field and nothing typed lost) and makes the next version; the audit records the
+initials, the time and which fields changed (keys only, never values). Approve and reject name the exact version;
+editing an approved version makes a new one that needs approval again. When new reports make a draft stale,
+regenerating keeps the officer's entries and says under each one if the reports now say something else. Simple mode
+starts with **What you need to fill in** (event name, type and date, the overall assessment and its justification,
+who submits it; for a Notice of Loss the date, type of policy, loss time, area, harvest date and underwriter) with a
+progress line, then the values to check, with the questions for the RDANA team on site folded away.
+
+**Personal fields are never stored (RA 10173).** Names, ages, phone numbers, emails, addresses, lot and policy
+numbers (RDANA 1.3 persons interviewed, "submitted by" name and contact; the assured's details on a Notice of Loss)
+are typed into the page for the printout only: their inputs have no `name`, so the browser never posts them, they
+stay in that browser tab (sessionStorage) until it closes, and the server drops any that arrive. Left empty, they
+print as blank lines to write by hand.
+
+**Printing.** The draft page's Print button prints the paper form alone (`app/templates/_paper.html`): A4, black on
+white, the form's own numbering and order, filled values, ruled blank lines and empty boxes for what is still
+empty, and a status line (DRAFT, NOT APPROVED or APPROVED, with the version, date and initials). The app bar,
+navigation, buttons, hints, provenance notes, evidence links, the annex and the trace never print.
 
 **Counting rule.** Reports in one incident describe the same houses and people, so their numbers are never added.
 Per incident, the latest correction replaces earlier figures; otherwise, and for figures reported after that
@@ -327,7 +353,7 @@ audit and same-origin rules as the RDANA drafts.
 | 5 Date/time of loss | The earliest report in the incident, labelled "first reported": the loss may be earlier |
 | 6 Total area affected | Only an area a report states; never derived from photos or SAM masks |
 | 9 Extent of damage | The livelihood damage and counts as reported, and the photos with the agent's judgments and SAM 3.1 measurements, labelled "evidence for the adjuster, not the loss figure". The PCIC loss bands (total 90% and above, partial over 10% and below 90%) are shown; the agent never classifies the loss |
-| Left for the assured | Type of policy and policy number (preamble), 1 name, 2 address, 7 lot number, 8 expected harvest date, 10 policy number, 11 underwriter, 12 contact number, date and signature. Ulat stores no names, addresses or phone numbers |
+| Filled in with the assured | Date, type of policy, 5 date/time of loss, 6 area, 8 expected harvest date, 11 underwriter: entered on the draft and saved as a version. 1 name, 2 address, 7 lot number, 10 policy number (also in the opening line), 12 contact number: typed for the printout only, never stored. Signature by hand |
 
 An **evidence annex** for the PCIC adjuster lists every report in the incident: its time, links to the photo and the
 SAM overlay (until retention deletes the raw files), the photo judgments and the floodwater measurement (roof counts
@@ -683,6 +709,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-11-02 | Simple and Technical views (`app/modes.py`): decided on the server per request, remembered per browser in a cookie, switched from the account menu or with `?mode=technical`, default from `DASHBOARD_MODE`. Simple (the default) opens on a to-do list in plain words, most urgent first, one card and one button each (Notices of Loss by filing deadline, reports to check, drafts to approve, barangays with new reports for the RDANA form, new reports; "All caught up" otherwise), names no models, costs, ids, confidence or internal statuses, explains RDANA, DROMIC, Notice of Loss and incident in place, adds a one-line hint and empty state per page, a dismissible "How Ulat works" guide and a Help page, a count badge on Review, and hides Accuracy and the agent internals; Technical shows everything. Same officer actions in both (tested form by form). Screened-out messages get their own list with Restore. Accuracy charts drawn on the server as inline SVG from `data/eval/results.json` (`app/charts.py`): roof-damage confusion matrices, flag F1, the duplicate check, the screen and Voice Transcribe, with number tables. Lighthouse follow-ups: map markers are 48 px targets and close ones fan out, RDANA tables use real captions, and the font and map no longer shift the page (CLS 0.054 to 0.005 on a draft, 0.471 to 0.02 on the map); Lighthouse mobile on Home: 100 / 100 / 100 |
 | 2026-11-02 | Live updates that keep every word true: Home's heading and hint ("What needs you" or "All caught up") are redrawn in the same live region as the to-do list, from one template, so they never contradict the cards below them; the Technical overview keeps an empty to-do region on the page, so to-dos that arrive later appear without a reload; focus on a page heading survives a live redraw; and several sections refreshing on one change each get their update (htmx had dropped all but the first and last when they shared one request source). Checked in a real browser under Xvfb: an empty Home turns into "What needs you" when a report arrives and back when it is settled, and a section with focus inside waits behind its "New updates" notice. The count on Review is its own quiet live region in the navigation (`NavItem.badge_live` names its topics), so it follows the review queue on every page, Help included |
 | 2026-11-02 | Safe admin commands for a deployed app (`app/admin.py`, `app/reseed.py`): `python -m app.deploy reseed` swaps the aged synthetic demo for a fresh `--anchor-now` load so the filing countdowns are live again, and `screen` sets aside messages stored before the not-a-report screen existed. Both run inside the target's one live container (a method of the Modal class, so never a second SQLite writer), pin a snapshot first that is never pruned and print its name for `restore`, take `--dry-run` (no change, no `--yes`), need `--yes` on production and print counts and ids only. The reseed loads the new demo in a scratch database whose ids count on above every live id, then swaps it in one transaction that refuses (listing ids) an incident or reporter that mixes demo and real reports, keeps incidents and drafts that real rows point at, and rolls back unless every real report and its rows are unchanged |
+| 2026-11-02 | Fillable RDANA form and Notice of Loss (`app/fillable.py`): every field a typed input defined as data (control, the paper form's own options, hint, asked-first, personal), validated on the server; saving makes an append-only version with an "edited" audit of field keys; approval names the exact version; regeneration carries the officer's entries and flags evidence that moved under them; Simple mode's "What you need to fill in" with progress; personal fields typed for the printout only, never posted or stored; a print view that is the paper form alone (A4, ruled blanks, DRAFT/APPROVED status line); no "not in reports" placeholders left |
 
 ### Third-party code and assets
 

@@ -14,7 +14,7 @@ from app.deadlines import DEADLINES, Deadline
 from app.main import create_app
 from app.models import Draft, DraftEvent, Media, PhotoAssessment, utcnow
 from app.nol import SAM_LABEL
-from app.nol_form import ASSURED, COMMODITIES, FISHERIES, NolField, check
+from app.nol_form import COMMODITIES, FISHERIES, NolField, check
 from tests.test_rdana import AT, SummaryLLM, add_incident, add_report, cite_all
 
 PENS = "fish_pens_or_cages"
@@ -154,9 +154,12 @@ def test_evidence_fields_are_filled_and_identity_fields_are_left_for_the_assured
     assert draft.content["missing_evidence"] == []
 
     page = client.get(f"/drafts/{draft.id}").text
-    assert page.count(ASSURED) >= len(ASSURED_FIELDS) + 1  # plus the letter's date
+    assert "not in reports" not in page and "to be filled by" not in page
+    for number in ("8", "11", "date", "policy_type"):  # the assured's, entered on the page
+        assert f'name="f.{number}"' in page, number
+    for number in ("1", "2", "7", "10", "12"):  # personal: typed for the printout, never posted
+        assert f'data-personal="{number}"' in page and f'name="f.{number}"' not in page, number
     assert "Regional Office No. IV" in page and "Calamba City" in page
-    assert "Left for the assured: type of policy, insurance policy number." in page
     assert f"SAM 3.1 measured ({SAM_LABEL}): floodwater over 40% of the photo" in page
     assert "0 roofs" not in page  # roofs are not fisheries evidence
     assert "lake or pond water" in page  # SAM's "floodwater" also covers the lake around pens
@@ -476,6 +479,7 @@ def test_a_new_commodity_needs_one_definition_and_no_code_change(client, engine,
         key="testcrop",
         name="test crop",
         title="NOTICE OF LOSS (Test Crop)",
+        preamble_form="This is to file a NOTICE OF LOSS with the following particulars:",
         fields=(
             NolField("1", "Name of Farmer"),
             NolField("2", "Location of Farm", "evidence", "location"),
@@ -503,7 +507,7 @@ def test_a_new_commodity_needs_one_definition_and_no_code_change(client, engine,
     assert "Test crop notice: <strong" in html and "due in 67h 0m" in html
     section = html[html.index('id="nol-testcrop"') :]
     assert "fills Location of Farm, Cause, Extent from the reports" in section
-    assert "Name of Farmer are left for the assured" in section
+    assert "you fill in Name of Farmer with the assured" in section
     assert "underwriter" not in section.split("</section>")[0].lower()
     draft_id = generate(client, incident, commodity="testcrop")
     draft = stored(engine, draft_id)

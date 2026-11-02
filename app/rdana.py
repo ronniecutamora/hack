@@ -2,8 +2,9 @@
 
 Every value is either fixed, given by the officer, written by a deterministic rule over typed
 report facts (with the incidents and reports behind it), or the validated agent summary. No
-rule turns missing evidence into "No" or "0": a field without evidence stays empty and is shown
-as left for the RDANA team. The filled form is plain JSON, stored once and never recomputed.
+rule turns missing evidence into "No" or "0": a field without evidence stays empty, an input
+for the officer (app.fillable) and a blank line on paper. The filled form is plain JSON, stored
+once and never recomputed; the officer's entries are kept beside it on each version.
 """
 
 from collections.abc import Callable
@@ -25,7 +26,6 @@ from app.rdana_form import (
 )
 from app.rdana_summary import SummaryResult
 
-NOT_IN_REPORTS = "— not in reports (for the RDANA team)"
 RDANA_DEADLINE = "rdana_eoc"  # a row of app/data/deadlines.json
 NEED_VALUES = {
     "shelter": "Shelter assistance requested (the reports do not name the item)",
@@ -418,7 +418,6 @@ def fill_rdana(
         "sections": sections,
         "flood_depths": flood_support(evidence),
         "counting_rule": COUNTING_RULE,
-        "not_in_reports": NOT_IN_REPORTS,
         "report_ids": evidence.report_ids,
         "incident_count": len(evidence.incidents),
         "unassessed_report_ids": evidence.unassessed_report_ids,

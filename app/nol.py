@@ -1,10 +1,11 @@
 """Fill a PCIC Notice of Loss (a commodity of app.nol_form) for one incident.
 
 Deterministic: no model call. Every evidence field is a rule over the incident's typed report
-facts, with the reports behind it; identity, policy, lot and harvest fields are left for the
-assured. The evidence annex packages, per report, the time, photo and SAM overlay links, the
-photo judgments and SAM measurements (evidence for the adjuster, never the loss figure), a
-name-redacted excerpt of the message or voice note, and the trust signals. The filled form is
+facts, with the reports behind it; identity, policy, lot and harvest fields are the assured's,
+entered on the page (app.fillable). The evidence annex packages, per report, the time, photo
+and SAM overlay links, the photo judgments and SAM measurements (evidence for the adjuster,
+never the loss figure), a name-redacted excerpt of the message or voice note, and the trust
+signals. The filled form is
 stored once and never recomputed; the countdown is computed when the page is shown.
 """
 
@@ -19,7 +20,7 @@ from sqlmodel import Session, col, select
 from app.counting import CityEvidence, IncidentEvidence, count, digest
 from app.deadlines import DEADLINES, Countdown, countdown
 from app.models import Assessment, Media, PhotoAssessment, Report, manila_time
-from app.nol_form import ASSURED, SAM_CONCEPTS, Commodity, NolField
+from app.nol_form import SAM_CONCEPTS, Commodity, NolField
 from app.pair_judge import redact_personal
 from app.rdana import HAZARD_TYPES, count_field, figure_text, filled, incident_ref, mean_pin
 from app.rdana_form import CITY, PROVINCE
@@ -29,7 +30,6 @@ NOT_FILED = (
     "Agriculturist on their behalf) files the Notice of Loss with PCIC."
 )
 SAM_LABEL = "evidence for the adjuster, not the loss figure"
-NOT_IN_REPORTS = "— not in reports (for the assured)"
 EXCERPT_MAX = 280
 JUDGMENT_KEYS = (
     "roof_damage",
@@ -314,8 +314,6 @@ def fill_nol(
         "preamble": commodity.preamble,
         "preamble_blanks": list(commodity.preamble_blanks),
         "closing": commodity.closing,
-        "assured_marker": ASSURED,
-        "not_in_reports": NOT_IN_REPORTS,
         "incident_id": incident.incident_id,
         "barangay": incident.barangay or None,
         "drafted_at": manila_time(drafted_at),

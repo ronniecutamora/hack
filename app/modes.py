@@ -10,6 +10,7 @@ The mode lives in a context variable for the request, like the signed-in officer
 template and macro can ask `technical()` without passing it around.
 """
 
+from collections.abc import Callable
 from contextvars import ContextVar
 from typing import Literal, get_args
 
@@ -177,8 +178,19 @@ PLAIN_REPLACEMENTS: tuple[tuple[str, str], ...] = (
 def plain(text: str | None) -> str:
     """Drafted text for the current mode: model names replaced in Simple mode."""
     text = text or ""
-    if technical():
-        return text
+    return text if technical() else plain_words(text)
+
+
+def plain_words(text: str) -> str:
+    """Drafted text in Simple mode's words, whatever the current mode."""
     for old, new in PLAIN_REPLACEMENTS:
         text = text.replace(old, new)
     return text
+
+
+def presenter() -> Callable[[str | None], str | None]:
+    """How the current mode words generated text, as a function that can run anywhere (a
+    worker thread does not see the request's mode)."""
+    if technical():
+        return lambda text: text
+    return lambda text: None if text is None else plain_words(text)

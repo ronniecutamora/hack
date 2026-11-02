@@ -71,7 +71,7 @@ def init_db(engine: Engine) -> None:
             "media": {"phash": "VARCHAR"},
             "photoassessment": {"taken_at": "DATETIME"},
             "assessment": {"signals": "JSON"},
-            "draft": {"incident_id": "INTEGER REFERENCES incident(id)"},
+            "draft": {"incident_id": "INTEGER REFERENCES incident(id)", "entries": "JSON"},
             # The agent trace (app.trace); calls logged before it stay NULL ("not recorded").
             "modelcall": {
                 "report_id": "INTEGER REFERENCES report(id)",
@@ -117,6 +117,7 @@ DRAFT_GENERATED_COLUMNS = (
     "event_type",
     "event_at",
     "content",
+    "entries",
     "evidence_fingerprint",
     "summary_model",
     "summary_fallback",

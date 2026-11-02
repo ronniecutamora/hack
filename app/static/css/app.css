@@ -874,6 +874,83 @@ table.stack.accuracy__table td:first-child { white-space: normal; }
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
 
+/* ---------- Fillable forms (app.fillable): one block per field, phone first ---------- */
+
+/* A field: its number and label, the control, then what it came from. An officer's entry is
+   marked by a green edge (the colour of officer actions in the incident history); a personal
+   field by a dashed control, kept in this tab only. */
+.fill { margin: 0; }
+.fill-card {
+  margin: 0 0 var(--space-5); padding: var(--space-4); border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-surface-container-low); border: 1px solid var(--md-sys-color-outline-variant);
+}
+.fill-card > h2 { margin-top: 0; }
+.fill-progress { display: flex; align-items: center; gap: var(--space-3); margin: 0 0 var(--space-3); font: var(--md-sys-typescale-body-medium); }
+.fill-progress .meter { flex: 1; max-width: 12rem; margin: 0; }
+.fill-subhead { margin: var(--space-5) 0 var(--space-2); font: var(--md-sys-typescale-title-small); color: var(--md-sys-color-on-surface-variant); }
+.fill-note { margin: 0 0 var(--space-3); max-width: 70ch; font: var(--md-sys-typescale-body-medium); color: var(--md-sys-color-on-surface-variant); }
+.fill-section > h2 { margin-bottom: var(--space-2); }
+.fill-field {
+  padding: var(--space-3) 0 var(--space-3) var(--space-3); margin-left: calc(-1 * var(--space-3));
+  border-left: 3px solid transparent; border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  scroll-margin-bottom: 6rem;
+}
+.fill-field--edited { border-left-color: var(--md-ext-color-success); }
+.fill-field--error { border-left-color: var(--md-sys-color-error); }
+.fill-group { margin: 0; padding: 0; border: 0; background: none; border-radius: 0; }
+.fill-label { display: block; margin: 0 0 var(--space-1); padding: 0; font: var(--md-sys-typescale-title-small); color: var(--md-sys-color-on-surface); }
+.fill-label__num { font-variant-numeric: tabular-nums; color: var(--md-sys-color-on-surface-variant); margin-right: var(--space-1); }
+.fill-hint, .fill-from { margin: 0 0 var(--space-1); max-width: 70ch; font: var(--md-sys-typescale-body-small); color: var(--md-sys-color-on-surface-variant); }
+.fill-from strong { color: var(--md-sys-color-on-surface); font-weight: 500; }
+.fill-fixed { margin: 0; font: var(--md-sys-typescale-body-large); }
+.fill-field input[type=text], .fill-field input[type=email], .fill-field input[type=date], .fill-field textarea { min-height: var(--target); padding: .625rem .875rem; }
+.fill-field textarea { min-height: 5rem; max-width: 48rem; }
+.fill-field input[type=date], .fill-field input[type=datetime-local] { max-width: 16rem; }
+.fill-field--personal input { border-style: dashed; }
+.fill-number { display: flex; align-items: center; gap: var(--space-2); max-width: 12rem; }
+.fill-number input { max-width: 9rem; text-align: right; font-variant-numeric: tabular-nums; }
+.fill-number__unit { color: var(--md-sys-color-on-surface-variant); }
+input[type=email], input[type=date] {
+  display: block; width: 100%; max-width: 32rem; margin-top: var(--space-1);
+  font: var(--md-sys-typescale-body-large); color: var(--md-sys-color-on-surface);
+  background: transparent; border: 1px solid var(--md-sys-color-outline); border-radius: var(--md-sys-shape-corner-extra-small);
+}
+input[type=email]:focus, input[type=date]:focus { outline: none; border-color: var(--md-sys-color-primary); box-shadow: inset 0 0 0 1px var(--md-sys-color-primary); }
+.fill-choices { display: flex; flex-wrap: wrap; gap: 0 var(--space-4); }
+.fill-choices--grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); gap: 0 var(--space-4); }
+.fill-choices .choice { margin: 0; font: var(--md-sys-typescale-body-medium); color: var(--md-sys-color-on-surface); }
+.fill-choices .choice--none { color: var(--md-sys-color-on-surface-variant); }
+.fill-error { display: flex; align-items: center; gap: var(--space-1); margin: var(--space-1) 0 0; }
+.fill-error .icon { width: 1.125rem; height: 1.125rem; }
+.fill-meta:empty { display: none; }
+.fill-meta > .chip { margin: var(--space-1) var(--space-1) 0 0; }
+.fill-meta .muted { margin: var(--space-1) 0 0; }
+.fill-was { margin-top: var(--space-1); }
+.fill-was > summary { min-height: 2.5rem; color: var(--md-ext-color-success); font: var(--md-sys-typescale-label-large); }
+.fill-was p { margin: 0 0 var(--space-1); font: var(--md-sys-typescale-body-medium); }
+.fill-moved { display: block; width: fit-content; max-width: 100%; height: auto; padding: var(--space-1) var(--space-3); white-space: normal; }
+.fill-rest { margin: var(--space-5) 0; border-top: 1px solid var(--md-sys-color-outline-variant); }
+.fill-rest > summary { font: var(--md-sys-typescale-title-medium); color: var(--md-sys-color-on-surface); }
+
+/* The save bar stays in reach while the officer scrolls the form: above the phone's navigation
+   bar, at the bottom of the window on wider screens. */
+.fill-bar {
+  position: sticky; z-index: 400; bottom: calc(var(--nav-bar) + var(--safe-bottom));
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3);
+  margin: var(--space-4) calc(-1 * var(--space-4)) 0; padding: var(--space-2) var(--space-4);
+  background: var(--md-sys-color-surface-container); border-top: 1px solid var(--md-sys-color-outline-variant);
+  box-shadow: 0 -1px 3px rgb(0 0 0 / .12);
+}
+@media (min-width: 37.5rem) { .fill-bar { bottom: 0; margin-inline: 0; border-radius: var(--md-sys-shape-corner-medium) var(--md-sys-shape-corner-medium) 0 0; } }
+.fill-bar__who { display: flex; align-items: center; gap: var(--space-2); margin: 0; color: var(--md-sys-color-on-surface); }
+.fill-bar__who input { width: 5.5rem; min-height: 2.5rem; margin: 0; padding: .375rem .625rem; }
+.fill-bar__status { flex: 1 1 10rem; margin: 0; font: var(--md-sys-typescale-body-small); color: var(--md-sys-color-on-surface-variant); }
+.fill-bar__status.has-changes { color: var(--md-sys-color-on-surface); font-weight: 500; }
+.fill-bar button { margin: 0 0 0 auto; }
+
+/* The printout (_paper.html) exists only on paper. */
+.print-only { display: none; }
+
 /* ---------- Print: A4 forms without the dashboard chrome ---------- */
 
 @page { size: A4; margin: 12mm; }
@@ -896,6 +973,51 @@ table.stack.accuracy__table td:first-child { white-space: normal; }
   .gap, .muted { color: #000; }
 }
 @media print { .live, .live-notice { display: none !important; } }
+
+/* The paper form: black on white, compact ruled tables in the form's order (NDRRMC Memo 107
+   Annex I; PCIC FIP CAS Form No. 1). Everything else on a form's page is .screen-only. */
+@page { @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 8pt Arial, sans-serif; } }
+@media print {
+  .screen-only, .fill-bar { display: none !important; }
+  .print-only { display: block !important; }
+  .paper { font: 8.5pt/1.25 Arial, "Liberation Sans", Helvetica, sans-serif; color: #000; }
+  .paper p { margin: 0 0 2mm; }
+  .paper__stamp { margin: 0 0 3mm; padding: 1mm 2mm; border: 1.5px solid #000; font-weight: 700; font-size: 8.5pt; letter-spacing: .02em; }
+  .paper__head { text-align: center; margin-bottom: 2mm; border: 1px solid #000; border-bottom: 0; padding: 2mm; position: relative; }
+  .paper__annex { position: absolute; right: 2mm; top: 1.5mm; margin: 0 !important; font-weight: 700; font-size: 11pt; }
+  .paper__title { margin: 0; font: 700 13pt/1.2 Arial, sans-serif; color: #000; }
+  .paper__subtitle { margin: 0 !important; font-style: italic; font-size: 8.5pt; }
+  .paper__table { width: 100%; border-collapse: collapse; border: 1px solid #000; border-radius: 0; margin: 0 0 -1px; background: none; font: inherit; }
+  .paper__table th, .paper__table td { padding: .55mm 1.5mm; border: 1px solid #000; vertical-align: top; color: #000; background: none; }
+  .paper__section { text-align: left; font-weight: 700; font-size: 9.5pt; }
+  .paper__table thead { display: table-header-group; }
+  .paper__table tr { break-inside: avoid; }
+  .paper__sub td { font-weight: 700; font-size: 8.5pt; }
+  .paper__num { width: 9mm; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .paper__label { width: 62mm; }
+  .paper__req { font-size: 7.5pt; }
+  .paper__note td { font-style: italic; font-size: 7.5pt; }
+  .paper__value { white-space: pre-line; font-weight: 600; }
+  .paper__line { display: inline-block; min-width: 40mm; min-height: 1.1em; border-bottom: .75px solid #000; vertical-align: bottom; }
+  .paper__line:not(:empty) { border-bottom: 0; min-width: 0; font-weight: 600; }
+  .paper__row--long .paper__line:empty { display: block; width: 100%; height: 3.6em; border: 0; background: repeating-linear-gradient(to bottom, transparent 0, transparent calc(1.2em - .75px), #000 calc(1.2em - .75px), #000 1.2em); }
+  .paper__boxes { display: flex; flex-wrap: wrap; gap: .2mm 3.5mm; font-size: 8pt; }
+  .paper__value + .paper__boxes { margin-top: .5mm; }
+  .paper__foot { margin-top: 3mm !important; font-size: 7.5pt; }
+  /* The Notice of Loss: a one-page letter. */
+  .paper--letter { font-size: 10.5pt; line-height: 1.45; }
+  .paper--letter p { margin-bottom: 3.5mm; }
+  .paper__formid { text-align: right; font-size: 8.5pt; }
+  .paper__center { text-align: center; }
+  .paper--letter .paper__title { text-align: center; margin: 5mm 0; font-size: 12pt; }
+  .paper__list { list-style: none; padding: 0 0 0 6mm; margin: 0 0 6mm; }
+  .paper__list li { margin: 0 0 2.6mm; break-inside: avoid; }
+  .paper__list .paper__line { min-width: 70mm; }
+  .paper--letter .paper__num { display: inline-block; width: 7mm; }
+  .paper__closing { margin-top: 8mm; }
+  .paper__sign { margin-top: 12mm !important; }
+  .paper__line--sign { min-width: 75mm; }
+}
 
 /* Accuracy charts (app/charts.py, drawn on the server as inline SVG; see app/accuracy.py).
    chart__fill--<role> paints an SVG mark (fill) and its HTML legend swatch (background) alike.

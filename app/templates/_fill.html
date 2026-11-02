@@ -1,0 +1,138 @@
+{# The fillable form (app.fillable views from app.drafts.form_view): one control per field, read
+   from the field's definition. A personal field's input has no name: the browser never posts it;
+   app.js keeps it in this tab (sessionStorage) for the printout. #}
+{% from "_evidence.html" import evidence_refs %}
+{% from "_icons.html" import icon %}
+
+{% macro control(v, locked=false) %}{% set c = v.control %}{% set id = "i-" ~ v.key %}{% set described = ("h-" ~ v.key if v.hint else "") ~ (" e-" ~ v.key if v.error else "") %}
+  {%- set common %} id="{{ id }}"{% if v.storable %} name="{{ v.name }}"{% else %} data-personal="{{ v.key }}" autocomplete="off"{% endif %}{% if described %} aria-describedby="{{ described|trim }}"{% endif %}{% if v.error %} aria-invalid="true"{% endif %}{% if locked %} disabled{% endif %}{% endset -%}
+  {% if c.kind == "long" %}
+    <textarea{{ common }} rows="{{ 4 if (v.current|length) > 160 else 2 }}" maxlength="{{ c.max_length }}">{{ v.current }}</textarea>
+  {% elif c.kind == "number" %}
+    <span class="fill-number"><input type="text"{{ common }} inputmode="{{ c.inputmode }}" value="{{ v.current }}" maxlength="12"{% if c.unit %} aria-label="{{ v.label }}, in {{ c.unit }}"{% endif %}>{% if c.unit %}<span class="fill-number__unit" aria-hidden="true">{{ c.unit }}</span>{% endif %}</span>
+  {% elif c.kind == "date" %}
+    <input type="date"{{ common }} value="{{ v.current }}"{% if c.past_only %} max="{{ today }}"{% endif %} min="2000-01-01">
+  {% elif c.kind == "datetime" %}
+    <input type="datetime-local"{{ common }} value="{{ v.current|replace(' ', 'T') }}"{% if c.past_only %} max="{{ today }}T23:59"{% endif %} min="2000-01-01T00:00">
+  {% elif c.kind in ("choice", "multi") %}
+    {% if v.storable %}<input type="hidden" name="{{ v.name }}" value=""{% if locked %} disabled{% endif %}>{% endif %}
+    <div class="fill-choices{% if v.options|length > 3 %} fill-choices--grid{% endif %}">
+    {% for o in v.options %}
+      <label class="choice"><input type="{{ 'radio' if c.kind == 'choice' else 'checkbox' }}" name="{{ v.name }}" value="{{ o }}"{% if o in v.selected %} checked{% endif %}{% if v.error %} aria-invalid="true"{% endif %}{% if locked %} disabled{% endif %}> {{ o }}</label>
+    {% endfor %}
+    {% if c.kind == "choice" %}<label class="choice choice--none"><input type="radio" name="{{ v.name }}" value=""{% if not v.selected %} checked{% endif %}{% if locked %} disabled{% endif %}> No answer</label>{% endif %}
+    </div>
+  {% else %}
+    <input type="{{ 'email' if c.inputmode == 'email' else 'text' }}"{{ common }} value="{{ v.current }}" maxlength="{{ c.max_length }}"{% if c.inputmode %} inputmode="{{ c.inputmode }}"{% endif %}>
+  {% endif %}
+{% endmacro %}
+
+{# The value a field had before the officer's entry, and the generated chips (Technical mode). #}
+{% macro provenance(v) %}{% set g = v.generated %}
+  {% if technical() and g.value is not none and not v.entry %}
+    {% if g.source == 'officer' %}<span class="chip">entered when generated</span>{% elif g.source == 'agent' %}<span class="chip">written by the agent</span>{% elif g.source == 'fixed' %}<span class="chip">fixed for Biñan</span>{% else %}<span class="chip">from the reports</span>{% endif %}
+  {% endif %}
+  {% if g.count is defined and g.count.pending is not none %}<span class="chip warn">{{ "pending grouping review" if technical() else "may repeat another report" }}: {{ "%g"|format(g.count.pending) }}, not added</span>{% endif %}
+{% endmacro %}
+
+{% macro field(v, locked=false) %}{% set c = v.control %}{% set choices = c.kind in ("choice", "multi") %}
+  <div class="fill-field{% if v.error %} fill-field--error{% endif %}{% if v.entry %} fill-field--edited{% endif %}{% if v.personal %} fill-field--personal{% endif %}" id="f-{{ v.key }}" data-key="{{ v.key }}">
+    {% if choices %}<fieldset class="fill-group"{% if v.hint %} aria-describedby="h-{{ v.key }}"{% endif %}><legend class="fill-label">{% else %}<label class="fill-label" for="i-{{ v.key }}">{% endif %}
+      <span class="fill-label__num">{{ v.number }}</span>{% if v.sic %} <span class="muted">(sic)</span>{% endif %} <span class="fill-label__text">{{ v.label }}</span>{% if v.required %} <span class="muted">(required)</span>{% endif %}
+    {% if choices %}</legend>{% else %}</label>{% endif %}
+    {% if not v.editable %}
+      <p class="fill-fixed">{{ v.value if v.value is not none else "" }}</p>
+    {% else %}
+      {% if v.hint and not technical() %}<p class="fill-hint" id="h-{{ v.key }}">{{ v.hint }}</p>{% elif v.hint %}<p class="visually-hidden" id="h-{{ v.key }}">{{ v.hint }}</p>{% endif %}
+      {% if v.unmatched is not none %}<p class="fill-from">{{ "From the reports" }}: <strong>{{ v.unmatched|plain }}</strong></p>{% endif %}
+      {{ control(v, locked) }}
+    {% endif %}
+    {% if choices %}</fieldset>{% endif %}
+    {% if v.error %}<p class="error fill-error" id="e-{{ v.key }}" role="alert">{{ icon("error") }}{{ v.error }}</p>{% endif %}
+    <div class="fill-meta">
+      {{ provenance(v) }}
+      {% if v.entry %}
+        <details class="fill-was">
+          <summary>{{ "Emptied" if v.entry.value is none else "Edited" }} by {{ v.entry.by }} · {{ v.entry_at[11:] if v.entry_at and v.entry_at[:10] == today else v.entry_at }}</summary>
+          <p>{% if v.from_reports %}Before: <strong>{{ v.entry.base|plain if v.entry.base is not none else "empty" }}</strong> ({{ "from the reports" if v.generated.source in ("reports", "rule") else "as generated" }}).{% else %}Empty before: the reports did not give it.{% endif %}</p>
+          {% if not locked %}<button type="submit" name="restore" value="{{ v.key }}" class="button--text">{{ icon("refresh") }}{{ "Use the reports' value again" if v.from_reports else "Clear my entry" }}</button>{% endif %}
+        </details>
+      {% endif %}
+      {% if v.moved %}<p class="chip warn fill-moved">The reports now say: {{ v.moved.now|plain if v.moved.now is not none else "nothing" }} (was {{ v.moved.was|plain if v.moved.was is not none else "nothing" }} when edited). Your entry is kept.</p>{% endif %}
+      {% if v.generated.warning and not v.entry %}<span class="chip warn">{{ v.generated.warning }}</span>{% endif %}
+      {% if technical() and v.generated.note %}<p class="muted">{{ v.generated.note|plain }}</p>{% endif %}
+      {{ evidence_refs(v.generated.evidence) }}
+    </div>
+  </div>
+{% endmacro %}
+
+{# The sticky save bar: initials and Save, with what saving does. #}
+{% macro save_bar(draft, locked) %}
+  {% if not locked %}
+  <div class="fill-bar" data-fill-bar>
+    <label class="fill-bar__who">Your initials <input type="text" name="officer" value="{{ fill_officer }}" maxlength="40" required autocomplete="off" size="6"></label>
+    <p class="fill-bar__status" data-fill-status aria-live="polite">{% if draft.status == 'approved' %}Saving makes version {{ draft.version + 1 }}, which needs approval again.{% else %}Saving makes version {{ draft.version + 1 }}.{% endif %}</p>
+    <button type="submit">{{ icon("check") }}Save changes</button>
+  </div>
+  {% endif %}
+{% endmacro %}
+
+{# Simple mode: what only the office can answer first, then what Ulat filled in to check, then
+   the rest folded away (on the RDANA form: what the team on site asks). #}
+{% macro simple(form, locked, rest_title) %}
+  {% set ask = form.fields|selectattr("ask")|list %}
+  {% set mine = ask|selectattr("storable")|list %}
+  {% set personal = ask|selectattr("personal")|list %}
+  {% set checked = form.fields|rejectattr("ask")|selectattr("from_reports")|list %}
+  {% set rest = form.fields|rejectattr("ask")|rejectattr("from_reports")|selectattr("editable")|list %}
+  <section class="fill-card" aria-labelledby="ask-title">
+    <h2 id="ask-title">What you need to fill in</h2>
+    {% if form.asked %}<p class="fill-progress"><strong>{{ form.done }} of {{ form.asked }} done</strong><span class="meter" aria-hidden="true"><span style="width: {{ (100 * form.done / form.asked)|round|int }}%"></span></span></p>{% endif %}
+    {% for v in mine %}{{ field(v, locked) }}{% endfor %}
+    {% if personal %}
+      <h3 class="fill-subhead">For the printout only</h3>
+      <p class="fill-note">Names and contact details are never saved by Ulat. Type them here to print them (they stay in this browser tab until it closes), or write them on the paper.</p>
+      {% for v in personal %}{{ field(v, locked) }}{% endfor %}
+    {% endif %}
+  </section>
+  {% if checked %}
+  <section aria-labelledby="check-title">
+    <h2 id="check-title">Check what Ulat filled in</h2>
+    <p class="fill-note">From the reports, each with the reports behind it. Change anything that is wrong; the original stays one tap away.</p>
+    {% for v in checked %}{{ field(v, locked) }}{% endfor %}
+  </section>
+  {% endif %}
+  {% if rest %}
+  <details class="fill-rest"{% if rest|selectattr("error")|list %} open{% endif %} data-details-key="fill-rest">
+    <summary>{{ rest_title }} · {{ rest|length }} question{{ 's' if rest|length != 1 }}</summary>
+    {% set rest_keys = rest|map(attribute="key")|list %}
+    {% for section in form.sections %}{% set mine_here = section.fields|selectattr("key", "defined")|selectattr("key", "in", rest_keys)|list %}
+      {% if mine_here %}<h3 class="fill-subhead">{% if section.number %}{{ section.number }}. {% endif %}{{ section.title }}</h3>{% for v in mine_here %}{{ field(v, locked) }}{% endfor %}{% endif %}
+    {% endfor %}
+  </details>
+  {% endif %}
+{% endmacro %}
+
+{# Technical mode: the whole form in its own order and numbering, with provenance chips. #}
+{% macro numbered(form, locked) %}
+  {% for section in form.sections %}
+    <section class="fill-section" {% if section.number %}id="s-{{ section.number }}"{% endif %}>
+      {% if section.title %}<h2>{% if section.number %}{{ section.number }}. {% endif %}{{ section.title }}</h2>{% endif %}
+      {% for f in section.fields %}
+        {% if f.heading is defined %}<h3 class="fill-subhead" id="f-{{ f.heading.key }}">{{ f.heading.number }} {{ f.heading.label }}</h3>{% else %}{{ field(f, locked) }}{% endif %}
+      {% endfor %}
+      {% if section.note %}<p class="fill-note">Note: {{ section.note }}</p>{% endif %}
+    </section>
+  {% endfor %}
+{% endmacro %}
+
+{# The form element around either view, with the save bar. #}
+{% macro form_for(draft, form, rest_title) %}{% set locked = draft.status == 'superseded' %}
+  {% if refused %}<p class="banner alert" role="alert"><strong>NOT SAVED.</strong> {{ refused }} Everything you typed is still here.</p>{% endif %}
+  {% if saved == "1" %}<p class="banner ok" data-flash>Saved as version {{ draft.version }}{% if form.officer_count %}; {{ form.officer_count }} field{{ 's' if form.officer_count != 1 }} now the office's{% endif %}.</p>{% elif saved == "0" %}<p class="banner" data-flash>Nothing to save: no field changed.</p>{% endif %}
+  {% if locked %}<p class="banner warn">A newer version exists, so this one cannot be changed.{% if newest %} <a href="/drafts/{{ newest.id }}">Open version {{ newest.version }}</a> to make changes.{% endif %}</p>{% endif %}
+  <form id="fill" class="fill" method="post" action="/drafts/{{ draft.id }}/fill" data-done="Saved" data-scope="{{ draft.kind }}:{{ draft.incident_id or draft.barangay or '' }}" data-return-anchor="fill">
+    {% if technical() %}{{ numbered(form, locked) }}{% else %}{{ simple(form, locked, rest_title) }}{% endif %}
+    {{ save_bar(draft, locked) }}
+  </form>
+{% endmacro %}

@@ -1,10 +1,12 @@
 """Officer drafts: generate versioned RDANA forms, damaged-houses tables and PCIC Notices of Loss,
 then approve or reject them.
 
-A draft is generated once and never edited. Generating again makes version n+1 and marks the
-previous undecided draft of the same output `superseded`; approved and rejected drafts stay as
-they were decided. Every generate, supersede, approve and reject writes an append-only
-DraftEvent. No database transaction is held across the summary model call.
+A version is never changed after it is written. Generating again, or saving the officer's
+entries (app.fillable), makes version n+1 and marks the previous undecided draft of the same
+output `superseded`; approved and rejected drafts stay as they were decided. A regenerated
+version carries the previous version's entries. Every generate, edit, supersede, approve and
+reject writes an append-only DraftEvent. No database transaction is held across the summary
+model call.
 
 Versioning, staleness, approval and the audit are the same for every output; an output is
 identified by its kind, barangay and incident. Notice of Loss kinds come from the commodity
@@ -19,15 +21,18 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import Engine, func, update
+from sqlalchemy import Engine, update
 from sqlmodel import Session, col, select
 
+from app import fillable
 from app.config import Settings
 from app.counting import COUNTING_RULE, BarangayEvidence, CityEvidence, IncidentEvidence, collect
 from app.deadlines import Countdown
 from app.meta.llm import AgentLLM
 from app.models import (
     DRAFT_APPROVED,
+    DRAFT_EDITED,
+    DRAFT_GENERATED,
     DRAFT_OPEN,
     DRAFT_REJECTED,
     DRAFT_SUPERSEDED,
@@ -48,8 +53,10 @@ from app.nol import (
 )
 from app.nol import fingerprint as nol_fingerprint
 from app.nol_form import COMMODITIES, Commodity, commodity_for_kind
+from app.nol_form import all_fields as nol_fields
 from app.rdana import EventInput, count_field, fill_rdana, summary_counts
-from app.rdana_form import CITY, PROVINCE, REGION
+from app.rdana_form import CITY, PROVINCE, REGION, SECTIONS
+from app.rdana_form import all_fields as rdana_fields
 from app.rdana_summary import summarize
 from app.trace import Step, traced
 from app.trust import model_spend
@@ -94,6 +101,17 @@ class DraftNotFound(DraftError):
 
 class DraftConflict(DraftError):
     status_code = 409
+
+
+class FillRefused(DraftError):
+    """A save with values the controls refuse: the page is shown again with what was typed."""
+
+    def __init__(self, draft_id: int, result: fillable.FillResult) -> None:
+        count = len(result.errors)
+        super().__init__(
+            f"{count} field{'s' if count != 1 else ''} need{'s' * (count == 1)} fixing."
+        )
+        self.draft_id, self.result = draft_id, result
 
 
 def clean_text(
@@ -180,6 +198,100 @@ def regenerate_form(draft: Draft) -> tuple[str, dict[str, str]]:
     if draft.event_at:
         fields["event_at"] = manila_time(draft.event_at).replace(" ", "T")
     return "/drafts", fields
+
+
+def form_fields(draft: Draft) -> list[Any]:
+    """The fillable form's field definitions in the paper form's order; none for the table."""
+    if (commodity := commodity_for_kind(draft.kind)) is not None:
+        return nol_fields(commodity)
+    if draft.kind == KIND_RDANA:
+        return [f for f in rdana_fields() if not f.heading]
+    return []
+
+
+def generated_fields(content: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """A version's generated values by field key (RDANA sections or Notice of Loss fields)."""
+    if "sections" in content:
+        return {f["key"]: f for s in content["sections"] for f in s["fields"]}
+    return {f["number"]: f for f in content.get("fields", [])}
+
+
+def generated_values(content: dict[str, Any]) -> dict[str, str | None]:
+    return {k: f.get("value") for k, f in generated_fields(content).items()}
+
+
+@dataclass
+class FormView:
+    """A draft's fields as the page and the printout show them (app.fillable.view)."""
+
+    fields: list[dict[str, Any]]
+    sections: list[dict[str, Any]]  # RDANA: number, title, note, its field views; NOL: one
+    done: int  # of the fields only the office answers and Ulat keeps
+    asked: int
+    officer_count: int  # fields with an officer entry on this version
+
+    @property
+    def by_key(self) -> dict[str, dict[str, Any]]:
+        return {v["key"]: v for v in self.fields}
+
+
+def form_view(
+    draft: Draft,
+    now: datetime,
+    *,
+    refused: fillable.FillResult | None = None,
+    present: fillable.Present = fillable.as_is,
+) -> FormView | None:
+    """The fillable view of an RDANA or Notice of Loss version; None for the table."""
+    definitions = form_fields(draft)
+    if not definitions:
+        return None
+    generated, entries = generated_fields(draft.content), draft.entries or {}
+    views = [
+        fillable.view(
+            f,
+            generated.get(f.key),
+            entries.get(f.key),
+            now,
+            error=refused.errors.get(f.key) if refused else None,
+            posted=refused.posted.get(f.key) if refused else None,
+            present=present,
+        )
+        for f in definitions
+    ]
+    by_key = {v["key"]: v for v in views}
+    if draft.kind == KIND_RDANA:
+        sections = [
+            {
+                "number": section.number,
+                "title": section.title,
+                "note": section.note,
+                "fields": [
+                    by_key[f.key] if not f.heading else {"heading": f} for f in section.fields
+                ],
+            }
+            for section in SECTIONS
+        ]
+    else:
+        sections = [{"number": "", "title": "", "note": None, "fields": views}]
+    done, asked = fillable.progress(views)
+    return FormView(views, sections, done, asked, sum(v["entry"] is not None for v in views))
+
+
+def print_stamp(draft: Draft, events: list[DraftEvent]) -> str:
+    """The printout's status line: what this paper is, which version, when and by whom."""
+    made = next((e for e in events if e.action in (DRAFT_GENERATED, DRAFT_EDITED)), None)
+    if draft.status == DRAFT_APPROVED:
+        parts = ["APPROVED", draft.decided_at and manila_time(draft.decided_at), draft.decided_by]
+    elif draft.status == DRAFT_REJECTED:
+        parts = ["REJECTED, NOT FOR SUBMISSION", draft.decided_at and manila_time(draft.decided_at)]
+    elif draft.status == DRAFT_SUPERSEDED:
+        parts = ["SUPERSEDED, NOT FOR SUBMISSION", manila_time(draft.created_at)]
+    else:
+        by = made.actor if made is not None and made.action == DRAFT_EDITED else None
+        parts = ["DRAFT, NOT APPROVED", manila_time(draft.created_at), by and f"edited by {by}"]
+    head, *rest = [p for p in parts if p]
+    return " · ".join([head, f"version {draft.version}", *rest])
 
 
 HOUSE_COLUMNS = {"totally": "houses_totally_damaged", "partially": "houses_partially_damaged"}
@@ -421,15 +533,37 @@ class DraftService:
         return self._insert(draft, detail)
 
     def _insert(
-        self, draft: Draft, detail: dict[str, Any], *, model_calls: list[int] | None = None
+        self,
+        draft: Draft,
+        detail: dict[str, Any],
+        *,
+        model_calls: list[int] | None = None,
+        action: str = DRAFT_GENERATED,
+        actor: str | None = None,
+        expect_newest: int | None = None,
     ) -> Draft:
         """Number the version and supersede open drafts in one write transaction, and link the
-        model calls that wrote the draft (`model_calls`, ModelCall ids) to it."""
+        model calls that wrote the draft (`model_calls`, ModelCall ids) to it.
+
+        A generated version carries the newest version's officer entries (app.fillable.carry);
+        an edited one brings its own and must follow `expect_newest` (a draft id), or another
+        save got there first and this one is refused, nothing written.
+        """
         with Session(self.engine, expire_on_commit=False) as session:
             session.connection().exec_driver_sql("BEGIN IMMEDIATE")
             same = same_output(draft)
-            latest = session.exec(select(func.max(Draft.version)).where(same)).one()
-            draft.version = (latest or 0) + 1
+            newest = session.exec(select(Draft).where(same).order_by(Draft.version.desc())).first()
+            if expect_newest is not None and (newest is None or newest.id != expect_newest):
+                raise DraftConflict(
+                    f"Version {newest.version if newest else '?'} was saved while you were "
+                    "typing, so these changes were not saved. Open the newest version and enter "
+                    "them there."
+                )
+            if action == DRAFT_GENERATED and newest is not None:
+                draft.entries = (
+                    fillable.carry(newest.entries, generated_fields(draft.content)) or None
+                )
+            draft.version = (newest.version if newest else 0) + 1
             session.add(draft)
             session.flush()
             if model_calls:
@@ -438,6 +572,7 @@ class DraftService:
                     .where(col(ModelCall.id).in_(model_calls))
                     .values(draft_id=draft.id)
                 )
+            made = "saved with the officer's changes" if action == DRAFT_EDITED else "generated"
             for old in session.exec(select(Draft).where(same, Draft.status == DRAFT_OPEN)).all():
                 if old.id == draft.id:
                     continue
@@ -447,20 +582,82 @@ class DraftService:
                     DraftEvent(
                         draft_id=old.id,
                         action=DRAFT_SUPERSEDED,
-                        reason=f"Version {draft.version} was generated.",
+                        reason=f"Version {draft.version} was {made}.",
                         detail={"superseded_by": draft.id},
                     )
                 )
+            if draft.entries and action == DRAFT_GENERATED:
+                detail = {**detail, "carried_fields": sorted(draft.entries)}
             session.add(
                 DraftEvent(
                     draft_id=draft.id,
-                    action="generated",
+                    action=action,
+                    actor=actor,
                     detail={"version": draft.version, **detail},
                     created_at=draft.created_at,
                 )
             )
             session.commit()
             return draft
+
+    def save_entries(
+        self,
+        draft_id: int,
+        pairs: list[tuple[str, str]],
+        *,
+        officer: str | None,
+        present: fillable.Present = fillable.as_is,
+    ) -> Draft | None:
+        """Save the officer's entries on a version as the next version; None if nothing changed.
+
+        Only the newest version of an output takes entries (a superseded one is history). An
+        approved or rejected version stays as decided: the new version is undecided and needs
+        approval again. The audit lists the changed field keys, never their values.
+        """
+        officer = clean_text(officer, label="Your initials", max_length=DECIDED_BY_MAX)
+        if not officer:
+            raise DraftError("Write your initials so the form shows who changed it.")
+        draft, _events, newest = self.get(draft_id)
+        if newest is not None and newest.id != draft.id:
+            raise DraftConflict(
+                f"Version {newest.version} is newer than this one: open it to make changes."
+            )
+        definitions = form_fields(draft)
+        if not definitions:
+            raise DraftError("This output has no fields to fill in.")
+        now = self.clock()
+        generated = generated_values(draft.content)
+        entries = draft.entries or {}
+        result = fillable.read_post(definitions, pairs, generated, entries, now, present)
+        if result.errors:
+            raise FillRefused(draft_id, result)
+        if not result.changes and not result.restored:
+            return None
+        edited = Draft(
+            kind=draft.kind,
+            barangay=draft.barangay,
+            incident_id=draft.incident_id,
+            version=0,
+            event_name=draft.event_name,
+            event_type=draft.event_type,
+            event_at=draft.event_at,
+            content=draft.content,
+            entries=fillable.apply(entries, result, generated, officer, now) or None,
+            evidence_fingerprint=draft.evidence_fingerprint,
+            summary_model=draft.summary_model,
+            summary_fallback=draft.summary_fallback,
+            summary_validation=draft.summary_validation,
+            created_at=now,
+        )
+        detail = {
+            "from_version": draft.version,
+            "from_draft": draft.id,
+            "fields": sorted(result.changes),
+            **({"restored": sorted(result.restored)} if result.restored else {}),
+        }
+        return self._insert(
+            edited, detail, action=DRAFT_EDITED, actor=officer, expect_newest=draft.id
+        )
 
     def decide(
         self,
@@ -470,8 +667,10 @@ class DraftService:
         reason: str | None,
         decided_by: str | None,
         confirm_stale: bool = False,
+        version: int | None = None,
     ) -> Draft:
-        """Approve or reject an open draft once.
+        """Approve or reject an open draft once: the exact version the officer read (`version`,
+        when the page sends it).
 
         Staleness is checked again here, inside the write transaction: approving a draft whose
         evidence changed since it was generated needs `confirm_stale`, and the audit records it.
@@ -491,6 +690,10 @@ class DraftService:
             draft = session.get(Draft, draft_id)
             if draft is None:
                 raise DraftNotFound("Draft not found.")
+            if version is not None and draft.version != version:
+                raise DraftConflict(
+                    f"This is version {draft.version}, not version {version}: nothing decided."
+                )
             if draft.status != DRAFT_OPEN:
                 raise DraftConflict(
                     f"Draft {draft_id} is {draft.status}; only a draft can be decided."

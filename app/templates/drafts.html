@@ -12,7 +12,7 @@
     {% if not technical() %}{{ hint("Ulat fills in each form from the reports. Make a draft, check it, then approve it. Nothing is sent or filed by itself.") }}{% endif %}
     <p class="muted">RDANA form (NDRRMC Memo 107 s. 2021, Annex I) per barangay · {{ rdana_deadline.label }} within {{ rdana_deadline.window_text }} of {{ rdana_deadline.start }} (<a href="{{ rdana_deadline.url }}">{{ rdana_deadline.source }}</a>) · Philippine time (GMT+8)</p>
   </header>
-  <p>Each draft fills only what the reports show, links every value to its evidence and leaves the rest for the RDANA team. Nothing is submitted until you approve it.</p>
+  <p>Each draft fills in what the reports show and links every value to its evidence. You fill in the rest on the draft itself (what only your office knows first); each save is a new version. Nothing is submitted until you approve it.</p>
   {% if not technical() %}{{ whats_this("rdana") }}{{ whats_this("dromic") }}{% endif %}
   <p class="toolbar"><a class="button button--tonal" href="/damaged-houses">{{ icon("house") }}Damaged-houses table (DROMIC columns)</a> <a class="button button--text" href="/damaged-houses.csv" download hx-boost="false">{{ icon("download") }}Download CSV</a></p>
   {% if not statuses %}
@@ -74,7 +74,7 @@
   <section id="nol-{{ commodity.key }}">
     <h2>PCIC Notice of Loss ({{ commodity.name }})</h2>
     {% if not technical() %}{{ whats_this("nol") }}{% endif %}
-    <p>One draft of the {{ commodity.form_id }} ({{ commodity.revision }}) per incident whose reports state damage to {{ commodity.eligible_livelihood|map("replace", "_", " ")|join(", or ") }}. The agent fills {{ commodity.fields|selectattr("mode", "equalto", "evidence")|map(attribute="label")|join(", ") }} from the reports and packages the evidence for the PCIC adjuster; {{ commodity.fields|selectattr("mode", "equalto", "assured")|map(attribute="label")|join(", ") }} are left for the assured{% if commodity.preamble_blanks %}, as are the {{ commodity.preamble_blanks|join(" and ") }} in the opening line{% endif %}. Nothing is filed: the assured files with PCIC.</p>
+    <p>One draft of the {{ commodity.form_id }} ({{ commodity.revision }}) per incident whose reports state damage to {{ commodity.eligible_livelihood|map("replace", "_", " ")|join(", or ") }}. The agent fills {{ commodity.fields|selectattr("mode", "equalto", "evidence")|map(attribute="label")|join(", ") }} from the reports and packages the evidence for the PCIC adjuster; you fill in {{ commodity.fields|selectattr("mode", "equalto", "assured")|rejectattr("personal")|map(attribute="label")|join(", ") }} with the assured on the draft. {% set personal = commodity.fields|selectattr("personal")|map(attribute="label")|list %}{% if personal %}{{ personal|join(", ") }} are typed only for the printout and never saved.{% endif %} Nothing is filed: the assured files with PCIC.</p>
     {% if not rows %}
       <p class="empty">No assessed report states {{ commodity.name }} damage yet.</p>
     {% else %}

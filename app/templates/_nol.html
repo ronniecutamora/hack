@@ -3,10 +3,11 @@
 {% from "_links.html" import report_href %}
 {% from "_trust.html" import signal_chips %}
 {% from "_deadline.html" import clock, deadline_notes %}
+{% from "_fill.html" import form_for with context %}
 <header class="keep">
   <div>
     <h1>{{ c.title }} <span class="muted">{% if technical() %}· incident #{{ c.incident_id }}{% endif %}{% if c.barangay %} · {{ c.barangay }}{% endif %} · version {{ draft.version }}</span></h1>
-    <p class="muted">Form: <a href="{{ c.form_url }}">{{ c.form_source }}</a>. Fields in the form's order and numbering. Drafted {{ c.drafted_at }} from {{ c.report_ids|length }} report{{ 's' if c.report_ids|length != 1 }}{% if technical() %} without a model call{% endif %}; {{ c.filled_count }} field{{ 's' if c.filled_count != 1 }} filled from the reports, {{ c.assured_count }} left for the assured.</p>
+    <p class="muted">Form: <a href="{{ c.form_url }}">{{ c.form_source }}</a>. Fields in the form's order and numbering. Drafted {{ c.drafted_at }} from {{ c.report_ids|length }} report{{ 's' if c.report_ids|length != 1 }}{% if technical() %} without a model call{% endif %}; {{ c.filled_count }} field{{ 's' if c.filled_count != 1 }} filled from the reports{% if form.officer_count %}, {{ form.officer_count }} by the office{% endif %}. Fill in the rest here with the assured, then print it for them to sign.</p>
   </div>
 </header>
 {% if c.reused_photos %}
@@ -24,33 +25,10 @@
   {{ deadline_notes(c.deadlines) }}
 </section>
 
-<section class="keep">
-  <p><strong>PHILIPPINE CROP INSURANCE CORPORATION</strong><br>{{ c.office.name }}</p>
-  <p><strong>{{ c.title }}</strong> <span class="muted">({{ c.form_id }}, {{ c.revision }})</span></p>
-  <p>Date: <span class="gap">{{ c.assured_marker }}</span></p>
-  <p>TO: {{ c.office.addressee }}<br>{{ c.office.name }}<br>{{ c.office.address }}<br>{{ c.office.email }} · {{ c.office.phone }} <span class="muted">(address from {{ c.office.source }})</span></p>
-  <p>Dear Sir/Madam:</p>
-  <p>{{ c.preamble }}</p>
-  <p class="muted">Left for the assured: {{ c.preamble_blanks|join(", ") }}.</p>
-  <div class="table-wrap">
-  <table class="form-table nol-fields">
-    <tbody>
-    {% for f in c.fields %}
-      <tr class="keep" id="f-{{ f.number }}">
-        <td class="field-label"><strong>{{ f.number }}.</strong> {{ f.label }}</td>
-        <td>
-          {% if f.mode == "assured" %}<div class="gap">{{ c.assured_marker }}</div>
-          {% elif f.value is not none %}<div class="value"><strong>{{ f.value|plain }}</strong></div>
-          {% else %}<div class="gap">{{ c.not_in_reports }}</div>{% endif %}
-          {% if f.note %}<div class="muted">{{ f.note|plain }}</div>{% endif %}
-          {{ evidence_refs(f.evidence) }}
-        </td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-  </div>
-  <p>{% for line in c.closing.split(" / ") %}{{ line }}{% if not loop.last %}<br>{% endif %}{% endfor %}</p>
+<section aria-labelledby="letter-title">
+  <h2 id="letter-title">The notice</h2>
+  {% if technical() %}<p class="muted">Addressed to {{ c.office.addressee }}, {{ c.office.name }}, {{ c.office.address }} ({{ c.office.email }} · {{ c.office.phone }}; address from {{ c.office.source }}).</p>{% endif %}
+  {{ form_for(draft, form, "More details") }}
 </section>
 
 <section>

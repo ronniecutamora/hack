@@ -6,23 +6,38 @@ deadlines-table rows set its filing clock, which typed report facts make an
 incident eligible, the evidence the adjuster needs, and how each field is filled:
 
 - assured: only the assured fisherfolk or farmer can give it (name, address, policy, lot,
-  harvest date, underwriter, contact); Ulat stores no names, addresses or phone numbers, so
-  these stay "to be filled by the assured";
+  harvest date, underwriter, contact);
 - evidence: a deterministic rule over the incident's report facts (`rule`, in app.nol).
+
+Every field is also an input for the officer (app.fillable): its control, a plain hint, whether
+it is asked first in Simple mode (`ask`) and whether it is personal. Personal fields (the
+assured's name, address, lot and policy numbers, contact number) are typed for the printout
+only and never stored; the others are saved as the officer's entries on a new version.
 
 The drafting, deadline and approval code reads these entries and never names a commodity, so
 adding one (crops later, once their PCIC deadlines are verified for this project) is one more
 entry here plus its tests. Only fisheries is in scope for the hackathon.
 """
 
+import re
 from dataclasses import dataclass
 
 from app.deadlines import DEADLINES
+from app.fillable import DATE as DATE_CONTROL
+from app.fillable import (
+    HECTARES,
+    LONG,
+    PAST_DATE,
+    PAST_DATETIME,
+    PHONE,
+    TEXT,
+    Control,
+    check_field,
+)
 
 MODES = ("assured", "evidence")
 RULES = ("location", "cause", "first_reported", "stated_area", "extent")
 KIND_PREFIX = "pcic_nl_"
-ASSURED = "— to be filled by the assured"
 # The SAM 3.1 concepts the pipeline prompts for, and the measurement keys each one yields.
 SAM_CONCEPTS = {
     "roof": ("roof_count",),
@@ -30,12 +45,32 @@ SAM_CONCEPTS = {
 }
 
 
+PRINTED_ONLY = "Printed only, never saved. Type it to print, or the assured writes it on the paper."
+
+
 @dataclass(frozen=True)
 class NolField:
-    number: str
+    number: str  # as printed; the letter's own blanks (date, type of policy) use a word
     label: str
     mode: str = "assured"
     rule: str | None = None
+    control: Control = TEXT
+    ask: bool = False
+    personal: bool = False
+    hint: str | None = None
+    options: tuple[str, ...] = ()
+
+    @property
+    def key(self) -> str:
+        return self.number
+
+    @property
+    def editable(self) -> bool:
+        return True
+
+
+def _personal(number: str, label: str, control: Control = TEXT) -> NolField:
+    return NolField(number, label, ask=True, personal=True, hint=PRINTED_ONLY, control=control)
 
 
 @dataclass(frozen=True)
@@ -62,6 +97,9 @@ class Commodity:
     office: Office
     preamble: str  # as printed; the blanks are the assured's
     preamble_blanks: tuple[str, ...]
+    # The preamble with each blank as {field key}, for the printout.
+    preamble_form: str
+    letter_fields: tuple[NolField, ...]  # the letter's own blanks: its date, the type of policy
     fields: tuple[NolField, ...]
     deadline: str  # the Notice of Loss row of app/data/deadlines.json
     later_deadlines: tuple[str, ...]  # rows that run from the same occurrence (the claim)
@@ -82,6 +120,12 @@ class Commodity:
     loss_bands: str
     loss_bands_source: str
     closing: str
+
+    @property
+    def preamble_parts(self) -> list[tuple[str, bool]]:
+        """The printed preamble as (text, False) and (field key, True) pieces."""
+        pieces = re.split(r"\{([^}]+)\}", self.preamble_form)
+        return [(piece, i % 2 == 1) for i, piece in enumerate(pieces) if piece]
 
     @property
     def kind(self) -> str:
@@ -113,19 +157,71 @@ FISHERIES = Commodity(
         "the following particulars:"
     ),
     preamble_blanks=("type of policy", "insurance policy number"),
+    preamble_form=(
+        "This is to file a NOTICE OF LOSS with respect to the {policy_type} with Insurance "
+        "Policy No. {10} issued by PCIC, with the following particulars:"
+    ),
+    letter_fields=(
+        NolField(
+            "date",
+            "Date",
+            control=PAST_DATE,
+            ask=True,
+            hint="The day the notice is signed and filed.",
+        ),
+        NolField(
+            "policy_type",
+            "Type of Policy",
+            ask=True,
+            hint="As on the policy, e.g. Fish Cage Insurance or Milkfish Insurance.",
+        ),
+    ),
     fields=(
-        NolField("1", "Name of Assured Fisherfolk/Fish Grower"),
-        NolField("2", "Address of Assured"),
-        NolField("3", "Location of Fisheries Farm/Property", "evidence", "location"),
+        _personal("1", "Name of Assured Fisherfolk/Fish Grower"),
+        _personal("2", "Address of Assured"),
+        NolField(
+            "3",
+            "Location of Fisheries Farm/Property",
+            "evidence",
+            "location",
+            control=LONG,
+        ),
         NolField("4", "Nature/cause of loss", "evidence", "cause"),
-        NolField("5", "Date/time of loss", "evidence", "first_reported"),
-        NolField("6", "Total Area Affected", "evidence", "stated_area"),
-        NolField("7", "Lot Number/s"),
-        NolField("8", "Expected date of harvest (if applicable)"),
-        NolField("9", "Extent of Damage", "evidence", "extent"),
-        NolField("10", "Insurance Policy Number"),
-        NolField("11", "Underwriter"),
-        NolField("12", "Contact number"),
+        NolField(
+            "5",
+            "Date/time of loss",
+            "evidence",
+            "first_reported",
+            control=PAST_DATETIME,
+            ask=True,
+            hint="When the loss happened. The reports only show when it was first reported.",
+        ),
+        NolField(
+            "6",
+            "Total Area Affected",
+            "evidence",
+            "stated_area",
+            control=HECTARES,
+            ask=True,
+            hint="In hectares, from the assured or the farm plan; never measured from photos.",
+        ),
+        _personal("7", "Lot Number/s"),
+        NolField(
+            "8",
+            "Expected date of harvest (if applicable)",
+            control=DATE_CONTROL,
+            ask=True,
+            hint="Leave empty if there was no stock to harvest.",
+        ),
+        NolField("9", "Extent of Damage", "evidence", "extent", control=LONG),
+        _personal("10", "Insurance Policy Number"),
+        NolField(
+            "11",
+            "Underwriter",
+            ask=True,
+            hint="The PCIC underwriter or agent named on the policy, or the office.",
+        ),
+        _personal("12", "Contact number", PHONE),
     ),
     deadline="pcic_fisheries_nl",
     later_deadlines=("pcic_fisheries_ci",),
@@ -155,20 +251,30 @@ FISHERIES = Commodity(
 COMMODITIES: dict[str, Commodity] = {FISHERIES.key: FISHERIES}
 
 
+def all_fields(commodity: Commodity) -> list[NolField]:
+    """The letter's blanks, then the numbered fields: the order of the paper form."""
+    return [*commodity.letter_fields, *commodity.fields]
+
+
 def commodity_for_kind(kind: str) -> Commodity | None:
     """The commodity a Draft.kind belongs to, or None for the other outputs."""
     return next((c for c in COMMODITIES.values() if c.kind == kind), None)
 
 
 def check(commodity: Commodity) -> None:
-    numbers = [f.number for f in commodity.fields]
+    numbers = [f.number for f in (*commodity.letter_fields, *commodity.fields)]
     if len(set(numbers)) != len(numbers):
         raise ValueError(f"{commodity.key}: duplicate field numbers")
-    for f in commodity.fields:
+    for f in (*commodity.letter_fields, *commodity.fields):
+        check_field(f, f"{commodity.key} field {f.number}")
         if f.mode not in MODES:
             raise ValueError(f"{commodity.key} field {f.number}: unknown mode {f.mode!r}")
         if (f.mode == "evidence") != (f.rule is not None) or (f.rule and f.rule not in RULES):
             raise ValueError(f"{commodity.key} field {f.number}: evidence needs a known rule")
+    keys = {f.key for f in all_fields(commodity)}
+    for piece, is_key in commodity.preamble_parts:
+        if is_key and piece not in keys:
+            raise ValueError(f"{commodity.key}: preamble blank {piece!r} is not a field")
     for key in (commodity.deadline, *commodity.later_deadlines):
         if key not in DEADLINES:
             raise ValueError(f"{commodity.key}: deadline {key!r} is not in the deadlines table")

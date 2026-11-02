@@ -42,6 +42,74 @@
   fillInitials();
   document.addEventListener("htmx:afterSwap", () => fillInitials());
 
+  // ---------- Fillable forms (app/fillable.py) ----------
+  // A personal field (names, contact details) has no name attribute, so the browser never posts
+  // it. Its value is kept in this tab only (sessionStorage: gone when the tab closes), per form
+  // (the output, so a saved new version keeps it), and copied into the printout. The save bar
+  // counts unsaved changes, and printing with unsaved changes says the paper shows the saved
+  // version.
+  const PERSONAL_PREFIX = "ulat.personal.";
+  const fillForm = () => document.getElementById("fill");
+  function personalKey(form) { return PERSONAL_PREFIX + (form.dataset.scope || ""); }
+  function readPersonal(form) {
+    try { return JSON.parse(sessionStorage.getItem(personalKey(form)) || "{}"); } catch (e) { return {}; }
+  }
+  function writePersonal(form, values) {
+    try {
+      if (Object.keys(values).length) sessionStorage.setItem(personalKey(form), JSON.stringify(values));
+      else sessionStorage.removeItem(personalKey(form));
+    } catch (e) { /* storage off: the value is still on screen and on paper */ }
+  }
+  function printPersonal(values) {
+    document.querySelectorAll("[data-personal-print]").forEach((span) => {
+      span.textContent = values[span.dataset.personalPrint] || "";
+    });
+  }
+  function hydrateFill() {
+    const form = fillForm();
+    if (!form) return;
+    const values = readPersonal(form);
+    form.querySelectorAll("[data-personal]").forEach((input) => {
+      const value = values[input.dataset.personal];
+      // As the default too, so a restored value does not count as an unsaved change.
+      if (value !== undefined && !input.value) { input.value = value; input.defaultValue = value; }
+    });
+    printPersonal(values);
+    countChanges();
+  }
+  function countChanges() {
+    const form = fillForm();
+    const status = form && form.querySelector("[data-fill-status]");
+    if (!status) return 0;
+    if (!status.dataset.idle) status.dataset.idle = status.textContent;
+    const names = new Set();
+    form.querySelectorAll("[name^='f.']").forEach((field) => { if (fieldChanged(field)) names.add(field.name); });
+    status.textContent = names.size ? names.size + " unsaved change" + (names.size !== 1 ? "s" : "") + ". " + status.dataset.idle : status.dataset.idle;
+    status.classList.toggle("has-changes", names.size > 0);
+    return names.size;
+  }
+  document.addEventListener("input", (event) => {
+    const input = event.target;
+    const form = input.closest && input.closest("#fill");
+    if (!form) return;
+    if (input.dataset.personal) {
+      const values = readPersonal(form);
+      const value = input.value.trim();
+      if (value) values[input.dataset.personal] = value; else delete values[input.dataset.personal];
+      writePersonal(form, values);
+      printPersonal(values);
+    }
+    countChanges();
+  });
+  document.addEventListener("change", (event) => { if (event.target.closest && event.target.closest("#fill")) countChanges(); });
+  window.addEventListener("beforeprint", () => {
+    const form = fillForm();
+    if (!form) return;
+    printPersonal(readPersonal(form));
+    if (countChanges()) snackbar("Unsaved changes are not on the printout: it shows the saved version. Save first to print them.", "error");
+  });
+  document.addEventListener("htmx:afterSettle", hydrateFill);
+
   // ---------- Live updates ----------
   // The server sends which topics changed (reports, incidents, drafts, spend) over SSE
   // (GET /events, app/live.py). Each region marked data-live="<topics>" re-fetches this page
@@ -571,6 +639,7 @@
   if (window.htmx) markEntry();
   mountMaps();
   ensureLive();
+  hydrateFill();
 
   window.Ulat = { tickCountdowns, inUse, refresh, snackbar };
 })();

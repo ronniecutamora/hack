@@ -206,6 +206,8 @@ DRAFT_OPEN = "draft"
 DRAFT_APPROVED = "approved"
 DRAFT_REJECTED = "rejected"
 DRAFT_SUPERSEDED = "superseded"  # a newer version of the same output was generated undecided
+DRAFT_GENERATED = "generated"  # DraftEvent actions that make a version
+DRAFT_EDITED = "edited"  # the officer saved entries: a new version with the field keys changed
 
 
 class Draft(SQLModel, table=True):
@@ -227,6 +229,10 @@ class Draft(SQLModel, table=True):
     event_type: str | None = None  # officer override of 1.1.2
     event_at: NaiveDatetime | None = None  # officer override of 1.1.3, naive UTC
     content: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    # The officer's entries on this version (app.fillable), beside the generated content: field
+    # key -> {"value", "by" (initials), "at" (naive UTC ISO), "base" (the generated value it was
+    # typed over)}. Saving entries makes the next version; personal fields are never here.
+    entries: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON))
     evidence_fingerprint: str | None = None  # changes when the counted evidence changes
     summary_model: str | None = None  # model that wrote the accepted summary; None = rule
     summary_fallback: bool = False
@@ -238,7 +244,7 @@ class Draft(SQLModel, table=True):
 
 
 class DraftEvent(SQLModel, table=True):
-    """Append-only draft audit (generated, superseded, approved, rejected); database triggers
+    """Append-only draft audit (generated, edited, superseded, approved, rejected); triggers
     reject updates and deletes. Separate from AgentDecision, which is per report and incident."""
 
     id: int | None = Field(default=None, primary_key=True)
