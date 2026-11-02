@@ -11,7 +11,20 @@
 
 {# One line per incident: link, the value it contributed, its reports and trust chips. #}
 {% macro evidence_refs(refs) %}
-  {% if refs %}
+  {% if refs and not technical() %}
+  {# Simple mode: how many reports back the value, linked to them, and what to double-check. #}
+  <ul class="evidence-refs">
+  {% for ref in refs %}{% set n = ref.report_ids|length %}
+    <li>
+      {% if ref.incident_id %}<a href="/incidents/{{ ref.incident_id }}">{{ n }} report{{ 's' if n != 1 }}</a>{% else %}<a href="{{ report_href(ref.report_ids[0]) }}">1 report, not grouped yet</a>{% endif %}{% if ref.value is defined %}: <strong>{{ "%g"|format(ref.value) }}</strong> ({{ ref.rule }}){% endif %}
+      {{ incident_trust(ref.trust) }}
+      {% if ref.single_source and ref.trust.reporter_count != 1 %}<span class="chip warn">said by one person only</span>{% endif %}
+      {% if ref.status == "needs_officer" or ref.pending %}<span class="chip warn">may repeat another report: not added yet</span>{% endif %}
+      {% if ref.flagged_report_ids %}<span class="chip alert">{{ ref.flagged_report_ids|length }} to double-check</span>{% endif %}
+    </li>
+  {% endfor %}
+  </ul>
+  {% elif refs %}
   <ul class="evidence-refs">
   {% for ref in refs %}
     <li>
@@ -43,7 +56,7 @@
         <td class="num" data-label="Damaged houses, total">{% if row.total is not none %}{{ "%g"|format(row.total) }}{% else %}<span class="gap" title="no confirmed figure">—</span>{% endif %}</td>
         <td class="num" data-label="Totally damaged">{% if row.totally is not none %}{{ "%g"|format(row.totally) }}{% else %}<span class="gap" title="not in reports">—</span>{% endif %}</td>
         <td class="num" data-label="Partially damaged">{% if row.partially is not none %}{{ "%g"|format(row.partially) }}{% else %}<span class="gap" title="not in reports">—</span>{% endif %}</td>
-        <td class="num" data-label="Pending grouping review (not added)">{% if row.pending is defined and row.pending is not none %}<span class="chip warn">{{ "%g"|format(row.pending) }}</span><div class="muted">report{{ 's' if row.pending_report_ids|length != 1 }} {{ row.pending_report_ids|join(", ") }}</div>{% endif %}</td>
+        <td class="num" data-label="Pending grouping review (not added)">{% if row.pending is defined and row.pending is not none %}<span class="chip warn">{{ "%g"|format(row.pending) }}</span>{% if technical() %}<div class="muted">report{{ 's' if row.pending_report_ids|length != 1 }} {{ row.pending_report_ids|join(", ") }}</div>{% endif %}{% endif %}</td>
         <td data-label="Evidence">
           {{ evidence_refs(row.evidence) }}
           {% if row.total is not none %}<div class="muted">{{ "%g"|format(row.single_source) }} of {{ "%g"|format(row.total) }} stated by only one reporter · {{ "%g"|format(row.flagged) }} from flagged reports</div>{% endif %}

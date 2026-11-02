@@ -3,12 +3,60 @@
 {% from "_status.html" import incident_status %}
 {% from "_links.html" import report_href %}
 {% import "_map.html" as m %}
-{% block title %}Overview{% endblock %}
+{% from "_todo.html" import todo_list %}
+{% from "_help.html" import hint, guide_steps, whats_this %}
+{% from "_icons.html" import icon %}
+{% block title %}{{ "Overview" if technical() else "Home" }}{% endblock %}
 {% block content %}
+{% if not technical() %}
+  <header>
+    <h1>{{ "What needs you" if todo else "All caught up" }}</h1>
+    {{ hint("Most urgent first. Tap the button on a card to do it." if todo else "Nothing waits for you. New reports from the Telegram bot show up here.") }}
+  </header>
+  {% if guide %}
+  <section class="card guide" aria-labelledby="guide-title">
+    <div class="guide__head">
+      <h2 id="guide-title">How Ulat works</h2>
+      <form method="post" action="/help/guide" data-done="Guide hidden. Find it again under More, then Help.">
+        <input type="hidden" name="guide" value="hide"><input type="hidden" name="next" value="/">
+        <button type="submit" class="button--text">Got it, hide this</button>
+      </form>
+    </div>
+    {{ guide_steps() }}
+  </section>
+  {% endif %}
+  <div id="live-todo" data-live="reports incidents drafts">
+    {% if todo %}
+      {{ todo_list(todo) }}
+    {% else %}
+      <div class="empty empty--done">{{ icon("task_alt") }}<p><strong>All caught up.</strong> No report waits for your check and no form waits for your approval.</p></div>
+      {% if recent_incidents %}
+      <section aria-labelledby="recent-title">
+        <h2 id="recent-title">Latest incidents</h2>
+        {{ whats_this("incident") }}
+        <ul class="feed">
+        {% for i in recent_incidents %}
+          <li><div class="feed__head"><a href="/incidents/{{ i.id }}"><strong>{{ i.title }}</strong></a><span class="muted">{{ i.status|plain_status }}</span></div>
+            <div class="feed__meta">{{ i.latest_facts.get("report_count", 0) }} report{{ 's' if i.latest_facts.get("report_count", 0) != 1 }} · last one {{ i.last_seen|manila_time }}</div></li>
+        {% endfor %}
+        </ul>
+      </section>
+      {% endif %}
+    {% endif %}
+    {% if not_reports %}<p class="muted quiet-line">{{ not_reports }} message{{ "s" if not_reports != 1 }} set aside as not reports (greetings, jokes, unrelated chat). <a href="/reports/set-aside">See them</a></p>{% endif %}
+  </div>
+{% else %}
   <header>
     <h1>Overview</h1>
     <p class="muted">Biñan City · Philippine time (GMT+8) · reported figures for the officer to verify · <a href="/accuracy">How accurate is the agent?</a></p>
   </header>
+
+  {% if todo %}
+  <section id="live-todo" data-live="reports incidents drafts" aria-labelledby="todo-title">
+    <h2 id="todo-title">What needs you <span class="muted">({{ todo|length }})</span></h2>
+    {{ todo_list(todo) }}
+  </section>
+  {% endif %}
 
   <div id="live-kpis" data-live="reports incidents drafts spend">
   <ul class="kpis" aria-label="Key figures">
@@ -148,4 +196,5 @@
       {% endif %}
     </section>
   </div>
+{% endif %}
 {% endblock %}

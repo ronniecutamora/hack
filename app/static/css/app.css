@@ -486,6 +486,98 @@ button:disabled, button[aria-busy="true"] { cursor: progress; opacity: .62; }
 .toolbar .button, .toolbar button { margin: 0; }
 .toolbar .button--text:first-child { margin-left: -.75rem; }
 
+/* ---------- Simple mode: to-do list, first-run guide, hints, glossary (app.modes) ---------- */
+
+/* Home's to-do list: one card per thing to do, the button says what happens. A larger corner
+   than section cards marks a card you act on; the words carry the urgency, colour repeats it. */
+.todo { list-style: none; margin: 0 0 var(--space-4); padding: 0; display: grid; gap: var(--space-3); }
+.todo__item {
+  display: grid; grid-template-columns: 2.5rem minmax(0, 1fr) auto; align-items: center; gap: var(--space-1) var(--space-4);
+  padding: var(--space-4); border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-surface-container-lowest); border: 1px solid var(--md-sys-color-outline-variant);
+}
+@media (prefers-color-scheme: dark) { .todo__item { background: var(--md-sys-color-surface-container-low); } }
+.todo__icon {
+  display: grid; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); align-self: start;
+}
+.todo__item--warn .todo__icon { background: var(--md-ext-color-warning-container); color: var(--md-ext-color-on-warning-container); }
+.todo__item--alert { border-color: var(--md-sys-color-error); }
+.todo__item--alert .todo__icon { background: var(--md-sys-color-error-container); color: var(--md-sys-color-on-error-container); }
+.todo__text { min-width: 0; }
+.todo__title { margin: 0; font: var(--md-sys-typescale-title-medium); }
+.todo__due { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); margin: var(--space-1) 0 0; font: var(--md-sys-typescale-label-large); color: var(--md-ext-color-warning); }
+.todo__item--alert .todo__due { color: var(--md-sys-color-error); }
+.todo__due .icon { width: 1.125rem; height: 1.125rem; }
+.todo__due span { color: var(--md-sys-color-on-surface-variant); font-weight: 400; }
+.todo__detail { margin: var(--space-1) 0 0; font: var(--md-sys-typescale-body-medium); color: var(--md-sys-color-on-surface-variant); }
+.todo__action { margin: 0; white-space: nowrap; }
+@media (max-width: 37.49rem) {
+  .todo__item { grid-template-columns: 2.5rem minmax(0, 1fr); padding: var(--space-3) var(--space-4) var(--space-4); }
+  .todo__action { grid-column: 1 / -1; width: 100%; margin-top: var(--space-2); }
+}
+.empty--done { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); }
+.empty--done .icon { width: 2.5rem; height: 2.5rem; color: var(--md-ext-color-success); }
+.empty--done p { margin: 0; max-width: 32rem; }
+.quiet-line { margin: var(--space-4) 0 0; }
+
+/* The first-run guide: a real sequence, so its steps are numbered. */
+.guide { margin-bottom: var(--space-4); background: var(--md-sys-color-surface-container-low); border-color: transparent; }
+.guide__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.guide__head h2 { margin: 0; }
+.guide__head form { margin: 0; }
+.guide__steps { list-style: none; margin: var(--space-3) 0 0; padding: 0; display: grid; gap: var(--space-4); }
+@media (min-width: 48rem) { .guide__steps { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.guide__step { display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: var(--space-3); align-items: start; }
+.guide__number {
+  display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: 50%;
+  background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); font: var(--md-sys-typescale-title-small);
+}
+.guide__step h3 { margin: .25rem 0 var(--space-1); font: var(--md-sys-typescale-title-medium); }
+.guide__step p { margin: 0; font: var(--md-sys-typescale-body-medium); color: var(--md-sys-color-on-surface-variant); }
+.guide form:last-child { margin-top: var(--space-4); }
+
+/* A page's one-line hint, under its heading. */
+.hint { display: flex; align-items: flex-start; gap: var(--space-2); margin: 0; font: var(--md-sys-typescale-body-medium); color: var(--md-sys-color-on-surface-variant); max-width: 70ch; }
+.hint .icon { flex: none; width: 1.125rem; height: 1.125rem; margin-top: .0625rem; }
+.hint-plain { margin: 0; max-width: 70ch; color: var(--md-sys-color-on-surface-variant); }
+
+/* "What's this?": an official term explained in place, one tap away. */
+.whats-this { margin: 0 0 var(--space-3); max-width: 70ch; }
+.whats-this > summary { display: inline-flex; min-height: var(--target); align-items: center; font: var(--md-sys-typescale-label-large); color: var(--md-sys-color-primary); }
+.whats-this > p { margin: 0 0 var(--space-2); padding: var(--space-3) var(--space-4); border-radius: var(--md-sys-shape-corner-medium); background: var(--md-sys-color-surface-container-low); font: var(--md-sys-typescale-body-medium); }
+.help-list { margin: 0; max-width: 70ch; }
+.help-list dt { font: var(--md-sys-typescale-title-small); margin-top: var(--space-3); }
+.help-list dd { margin: var(--space-1) 0 0; color: var(--md-sys-color-on-surface-variant); }
+
+/* Plain report and set-aside lists (Simple mode's Reports; the set-aside list in both modes). */
+.report-list, .set-aside { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+.report-list > li > p, .set-aside > li > p { margin: var(--space-1) 0; }
+.report-list__head, .set-aside__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-2); }
+.report-list__photos { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: flex-start; }
+.report-list__photos img { width: 10rem; height: 7.5rem; object-fit: cover; border-radius: var(--md-sys-shape-corner-small); }
+
+/* The mode switch in the account menu: two-line items, the current one checked. */
+.menu__group { padding-bottom: var(--space-2); margin-bottom: var(--space-2); border-bottom: 1px solid var(--md-sys-color-outline-variant); }
+.menu__item--two-line { min-height: 3.5rem; }
+.menu__hint { display: block; font: var(--md-sys-typescale-body-small); color: var(--md-sys-color-on-surface-variant); }
+.menu__item[aria-current="true"] { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
+
+/* The count on a destination (M3 large badge): on the icon in the bar and the rail, at the
+   end of the row in the drawer and the More sheet. */
+.nav__item { position: relative; }
+.badge {
+  display: inline-grid; place-items: center; min-width: 1rem; height: 1rem; padding: 0 .25rem; border-radius: .5rem;
+  background: var(--md-sys-color-error); color: var(--md-sys-color-on-error); font: 500 .6875rem/1 var(--md-ref-typeface);
+}
+.nav > .nav__list .badge { position: absolute; top: .125rem; left: calc(50% + .375rem); }
+.nav__list--more .badge { margin-left: auto; }
+@media (min-width: 37.5rem) { .nav > .nav__list .badge { top: .375rem; } }
+@media (min-width: 77.5rem) { .nav > .nav__list .badge { position: static; margin-left: auto; } }
+
+/* An RDANA sub-table's heading is its caption (a real <caption>, not a spanning row). */
+table.form-table caption { caption-side: top; text-align: left; padding: 0 0 var(--space-2); font: var(--md-sys-typescale-title-small); color: var(--md-sys-color-on-surface); }
+
 /* ---------- Text fields, selection controls (M3 outlined) ---------- */
 
 form.inline { display: inline; }

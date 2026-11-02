@@ -1,12 +1,14 @@
 {% extends "base.html" %}
 {% from "_trust.html" import incident_trust %}
 {% from "_status.html" import incident_status %}
+{% from "_help.html" import hint, whats_this %}
 {% block title %}Incidents{% endblock %}
 {% block content %}
 <div id="live-incidents" data-live="incidents reports">
-  <header><h1>Incidents</h1><p class="muted">Newest activity first · Philippine time (GMT+8)</p></header>
+  <header><h1>Incidents</h1>{% if technical() %}<p class="muted">Newest activity first · Philippine time (GMT+8)</p>{% else %}{{ hint("Reports about the same flood, put together per barangay. Newest first; tap one to see its reports and photos.") }}{% endif %}</header>
+  {% if not technical() %}{{ whats_this("incident") }}{% endif %}
   {% if not items %}
-    <p class="empty">No incidents yet. Successfully assessed reports are grouped here.</p>
+    <p class="empty">{{ "No incidents yet. Successfully assessed reports are grouped here." if technical() else "No incidents yet. When reports come in, Ulat puts the ones about the same flood together here." }}</p>
   {% else %}
     <div class="table-wrap">
     <table class="stack">

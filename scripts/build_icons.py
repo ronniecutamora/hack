@@ -28,11 +28,13 @@ NAV_ICONS = (
     "map",
     "house",
     "query_stats",
+    "help",
 )
 # Everything else: outlined only.
 ICONS = (
     "account_circle",
     "arrow_back",
+    "check",
     "check_circle",
     "close",
     "download",
@@ -43,6 +45,7 @@ ICONS = (
     "print",
     "refresh",
     "schedule",
+    "task_alt",
     "warning",
 )
 OUT = Path(__file__).resolve().parent.parent / "app/static/vendor/material-symbols/icons.svg"

@@ -2,13 +2,49 @@
 {% from "_trust.html" import signal_chips %}
 {% from "_trace.html" import agent_trace %}
 {% from "_icons.html" import icon %}
+{% from "_help.html" import hint %}
 {% block content %}
 <div id="live-reports" data-live="reports spend">
+  {% if not technical() %}
+  <header>
+    <h1>Reports</h1>
+    {{ hint("Every message people sent to the bot, newest first, with what Ulat read from it. Photos are deleted after " ~ ttl_hours ~ " hours for privacy.") }}
+  </header>
+  {% if around %}<p class="banner">Showing the reports around the one you opened, newest first. <a href="/reports">Back to the most recent reports</a></p>{% endif %}
+  {% if not items %}
+    <p class="empty">No reports yet. When someone sends a photo, voice note or text to the Telegram bot, it shows up here.</p>
+  {% else %}
+    <ul class="report-list">
+    {% for item in items %}{% set r = item.report %}{% set a = item.assessment %}
+      <li class="card" id="report-{{ r.id }}">
+        <p class="report-list__head"><strong>{{ r.barangay or "Place not found yet" }}</strong> <time class="muted">{{ r.received_at|manila_time }}</time> <span class="muted">· {{ r.status|plain_status }}</span>{% if r.channel == "demo" %} <span class="chip warn">Synthetic demo</span>{% endif %}</p>
+        {% if a and a.facts and a.facts.summary_en %}<p>{{ a.facts.summary_en }}</p>{% endif %}
+        {% if r.text %}<p class="muted">“{{ r.text }}”</p>{% elif a and a.transcript_clean %}<p class="muted">Voice: “{{ a.transcript_clean }}”</p>{% elif r.transcript %}<p class="muted">Voice: “{{ r.transcript }}”</p>{% endif %}
+        {% if a and a.facts %}<ul class="chips">{% for line in fact_lines(a.facts) %}<li class="chip{% if line.startswith('CORRECTION') %} warn{% endif %}">{{ line }}</li>{% endfor %}</ul>{% endif %}
+        {{ signal_chips(a, related_incidents) }}
+        {% if item.photos %}
+        <div class="report-list__photos">
+          {% for p in item.photos %}{% set pa = p.assessment %}
+            {% if p.overlay and p.overlay.purged_at is none %}<a href="/media/{{ p.overlay.id }}" hx-boost="false"><img src="/media/{{ p.overlay.id }}" alt="Reported photo with roofs marked orange and floodwater blue" loading="lazy" width="160" height="120"></a>
+            {% elif p.photo and p.photo.purged_at is none %}<a href="/media/{{ p.photo.id }}" hx-boost="false"><img src="/media/{{ p.photo.id }}" alt="Reported photo" loading="lazy" width="160" height="120"></a>
+            {% else %}<span class="muted">Photo deleted after {{ ttl_hours }} hours (privacy); what Ulat read from it is kept.</span>{% endif %}
+            {% if pa and pa.judgment %}{% set j = pa.judgment %}<p class="muted">Roof damage: {{ j.roof_damage }}{% if j.floodwater %} · floodwater{% endif %}{% if j.fallen_tree %} · maybe a fallen tree (confirm it on Review){% endif %}</p>{% endif %}
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if r.status == 'held' %}<p class="chip warn">On hold{% if r.hold_reason %}: {{ r.hold_reason }}{% endif %}</p>{% endif %}
+        <p>{% if r.incident_id %}<a href="/incidents/{{ r.incident_id }}">Open its incident</a>{% else %}<span class="muted">Not grouped yet</span>{% endif %}</p>
+      </li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+  {% else %}
   <header>
     <h1>Reports</h1>
     <p class="muted">Agent LLM: <code>{{ agent_llm }}</code> · photo judgment by the agent LLM, measurements by SAM 3.1</p>
     <p class="{% if model_spend >= spend_cap %}chip warn{% else %}muted{% endif %}">Model spend, last 24 h: ${{ "%.2f"|format(model_spend) }} of ${{ "%.2f"|format(spend_cap) }} cap</p>
   </header>
+  {% if set_aside %}<p class="banner">{{ set_aside }} message{{ "s" if set_aside != 1 }} set aside by the not-a-report screen: <a href="/reports/set-aside">their own list, with Restore</a>.</p>{% endif %}
   {% if not items %}
     <p class="empty">No reports yet. Send a photo, voice note or text to the Telegram bot and it will show up here.</p>
   {% else %}
@@ -89,22 +125,7 @@
             {% endfor %}
           </td>
           <td data-label="Status">
-            {% if r.status == "not_a_report" %}
-              {# Screened out (app.screening): kept for the officer, never counted; restoring it re-runs the pipeline. #}
-              <span class="chip status-chip">{{ icon("filter_alt_off") }}not a report</span>
-              {% if r.screening and r.screening.reason %}<div class="muted">{{ r.screening.reason }}</div>{% endif %}
-              <details class="review-group">
-                <summary>Restore as a report</summary>
-                <form method="post" action="/reports/{{ r.id }}/review/restore" data-done="Report #{{ r.id }} restored: the agent assesses it again">
-                  <input type="hidden" name="next" value="/review">
-                  <label>Your initials <input type="text" name="officer" required maxlength="{{ REVIEW_LIMITS.officer }}" autocomplete="off" value="{{ current_officer() }}" placeholder="e.g. JDC, CDRRMO"></label>
-                  <label>Note (optional) <textarea name="note" rows="2" maxlength="{{ REVIEW_LIMITS.note }}"></textarea></label>
-                  <button type="submit">Restore report #{{ r.id }}</button>
-                </form>
-              </details>
-            {% else %}
             <span class="status-{{ r.status }}">{{ r.status|replace("_", " ") }}</span>
-            {% endif %}
             {% if r.status == 'held' and r.hold_reason %}<div class="chip warn">{{ r.hold_reason }}</div>{% endif %}
             {% if r.incident_id %}<div><a href="/incidents/{{ r.incident_id }}">Incident #{{ r.incident_id }}</a></div>{% else %}<div class="muted">Not grouped yet</div>{% endif %}
             {% if r.grouping_error %}<div class="error">Grouping needs officer review: {{ r.grouping_error }}</div>{% endif %}
@@ -117,5 +138,7 @@
     </table>
     </div>
   {% endif %}
+  {% endif %}
+  {% if set_aside and not technical() %}<p class="muted quiet-line">{{ set_aside }} message{{ "s" if set_aside != 1 }} set aside as not reports. <a href="/reports/set-aside">See them</a></p>{% endif %}
 </div>
 {% endblock %}

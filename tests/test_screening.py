@@ -524,9 +524,7 @@ async def test_the_overview_does_not_count_screened_out_messages(settings, engin
     intake = IntakeService(settings, engine)
     await intake.ingest_text(7, "hahaha")
     kept = await intake.ingest_text(8, "baha dito")
-    drafts = SimpleNamespace(
-        overview=lambda: (None, None, []), nol_statuses=lambda city, history: []
-    )
+    drafts = SimpleNamespace(overview=lambda: (None, [], []), nol_statuses=lambda city, history: [])
     with Session(engine) as session:
         data = overview(session, drafts, utcnow())
     assert (data["reports_total"], data["reports_recent"], data["not_reports"]) == (1, 1, 1)

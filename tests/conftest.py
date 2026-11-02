@@ -16,6 +16,9 @@ def settings(tmp_path):
         data_dir=tmp_path / "var",
         model_cache=True,
         raw_media_ttl_hours=24,
+        # The page tests check everything the agent recorded, which Technical mode shows; Simple
+        # mode, the production default, has its own tests (tests/test_modes.py).
+        dashboard_mode="technical",
     )
 
 

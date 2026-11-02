@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "_evidence.html" import houses_table %}
 {% from "_icons.html" import icon %}
+{% from "_help.html" import whats_this %}
 {% block title %}Damaged houses{% endblock %}
 {% block content %}
 <div id="live-damaged-houses" data-live="reports incidents">
@@ -9,8 +10,9 @@
     <p class="no-print toolbar"><a class="button button--text" href="/damaged-houses.csv" download hx-boost="false">{{ icon("download") }}Download CSV</a> <button type="button" onclick="window.print()">{{ icon("print") }}Print</button></p>
   </header>
   <p class="muted">Live from the current reports, in the DSWD DROMIC damaged-houses columns. Reported figures for verification, not verified damage. To freeze a version for approval, use <a href="/drafts">Drafts</a>.</p>
+  {% if not technical() %}{{ whats_this("dromic") }}{% endif %}
   {% if not t.rows %}
-    <p class="empty">No report states a number of damaged houses yet.</p>
+    <p class="empty">No report states a number of damaged houses yet. When people report damaged houses, the table fills in here.</p>
   {% else %}
     {{ houses_table(t) }}
   {% endif %}

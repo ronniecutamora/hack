@@ -1,17 +1,19 @@
 {% extends "base.html" %}
 {% from "_review.html" import review_card %}
+{% from "_help.html" import hint %}
 {% block title %}Needs review{% endblock %}
 {% block content %}
   <header>
     <h1>Needs review</h1>
-    <p class="muted">What the agent could not settle: uncertain or failed duplicate checks, unknown places, trust signals and fallen trees. Every action is recorded with your initials, and an automatic re-check never undoes it.</p>
+    {% if technical() %}<p class="muted">What the agent could not settle: uncertain or failed duplicate checks, unknown places, trust signals and fallen trees. Every action is recorded with your initials, and an automatic re-check never undoes it.</p>
+    {% else %}{{ hint("Ulat could not settle these alone. Open a card, choose an answer and save it. Your initials are recorded, and Ulat never undoes your choice.") }}{% endif %}
   </header>
   {% if done %}<p class="banner ok" role="status" data-flash>{{ done }}</p>{% endif %}
   <div id="live-review" data-live="reports incidents">
     {% if not cards %}
-      <p class="empty">Nothing waits for review. New uncertain groupings, trust signals and fallen trees appear here as they arrive.</p>
+      <p class="empty">{{ "Nothing waits for review. New uncertain groupings, trust signals and fallen trees appear here as they arrive." if technical() else "Nothing waits for your check. When Ulat is unsure about a report, it shows up here." }}</p>
     {% else %}
-      <p><strong data-kpi="review_total">{{ cards|length }}</strong> report{{ "s" if cards|length != 1 }} waiting{% set grouping = cards|selectattr("grouping")|list|length %}{% if grouping %}, {{ grouping }} for grouping (their figures are pending, not in the totals){% endif %}.</p>
+      <p><strong data-kpi="review_total">{{ cards|length }}</strong> report{{ "s" if cards|length != 1 }} waiting{% set grouping = cards|selectattr("grouping")|list|length %}{% if grouping %}, {{ grouping }} {{ "for grouping (their figures are pending, not in the totals)" if technical() else "may repeat another report (they are not counted until you decide)" }}{% endif %}.</p>
       {% for card in cards %}{{ review_card(card, "/review", review_form) }}{% endfor %}
     {% endif %}
   </div>

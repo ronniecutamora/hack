@@ -29,11 +29,21 @@
       <span class="live__updated">· updated <time data-live-updated>{{ render_time() }}</time></span>
     </p>
     {% set session = request.state.officer_session %}
-    {% if session or self.app_bar_menu()|trim %}
+    {% if session or self.app_bar_menu()|trim %}{# always: the mode switch is in it #}
     <button type="button" class="icon-button app-bar__account" popovertarget="account-menu" aria-label="Account{% if session and session.officer %}: {{ session.officer }}{% endif %}">{{ icon("account_circle") }}</button>
     <div id="account-menu" class="menu" popover>
       {% if session %}<p class="menu__header">{% if session.officer %}Signed in as {{ session.officer }}{% else %}Signed in{% endif %}</p>{% endif %}
-      {% block app_bar_menu %}{% endblock %}
+      {% block app_bar_menu %}
+      {# Simple or Technical mode (app.modes): a full page load, so the whole page, this menu
+         included, is drawn again in the chosen mode. "?mode=" keeps the page and drops the rest
+         of its query, then the server stores the choice and lands on the page without it. #}
+      <div class="menu__group" role="group" aria-labelledby="mode-title">
+        <p class="menu__header" id="mode-title">View</p>
+        {% for value, name, hint in (("simple", "Simple", "What needs you, in plain words"), ("technical", "Technical", "Agent steps, models, costs, accuracy")) %}{% set on = technical() == (value == "technical") %}
+        <a class="menu__item menu__item--two-line" href="?mode={{ value }}" hx-boost="false"{% if on %} aria-current="true"{% endif %}>{% if on %}{{ icon("check") }}{% else %}<span class="icon" aria-hidden="true"></span>{% endif %}<span>{{ name }}<span class="menu__hint">{{ hint }}</span></span></a>
+        {% endfor %}
+      </div>
+      {% endblock %}
       {% if session %}
       {# A full page load: signing out leaves nothing of the dashboard on screen. #}
       <form method="post" action="/logout" hx-boost="false">
@@ -47,25 +57,34 @@
      the snackbar outside it stay. #}
   <div id="shell" class="shell{% block shell_class %}{% endblock %}" hx-history-elt>
     {% block nav %}
+    {% set tech = technical() %}{% set primary, secondary = destinations(tech) %}{% set badges = nav_badges(request) %}
+    {% macro destination(item) %}{% set current = nav_current(request.url.path, item.href) %}{% set count = badges.get(item.badge, 0) if item.badge else 0 %}
+      <li><a href="{{ item.href }}"{% if current %} aria-current="page"{% endif %} class="nav__item">{{ icon(item.icon, filled=current, cls="nav__icon") }}<span class="nav__label">{{ item.label_for(tech) }}</span>{% if count %}<span class="badge" data-badge="{{ item.badge }}"><span class="visually-hidden">: </span>{{ count if count < 100 else "99+" }}<span class="visually-hidden"> waiting</span></span>{% endif %}</a></li>
+    {%- endmacro %}
     <nav class="nav" aria-label="Officer dashboard">
       <ul class="nav__list">
-      {% for item in NAV_PRIMARY %}{% set current = nav_current(request.url.path, item.href) %}
-        <li><a href="{{ item.href }}"{% if current %} aria-current="page"{% endif %} class="nav__item">{{ icon(item.icon, filled=current, cls="nav__icon") }}<span class="nav__label">{{ item.label }}</span></a></li>
-      {% endfor %}
+      {% for item in primary %}{{ destination(item) }}{% endfor %}
         <li class="nav__more-slot"><button type="button" class="nav__item nav__more{% if more_current(request.url.path) %} is-current{% endif %}" popovertarget="nav-more">{{ icon("more_horiz", cls="nav__icon") }}<span class="nav__label">More</span></button></li>
       </ul>
       <div id="nav-more" class="nav__sheet" popover>
         <h2 class="nav__sheet-title">More</h2>
         <ul class="nav__list nav__list--more">
-        {% for item in NAV_SECONDARY %}{% set current = nav_current(request.url.path, item.href) %}
-          <li><a href="{{ item.href }}"{% if current %} aria-current="page"{% endif %} class="nav__item">{{ icon(item.icon, filled=current, cls="nav__icon") }}<span class="nav__label">{{ item.label }}</span></a></li>
-        {% endfor %}
+        {% for item in secondary %}{{ destination(item) }}{% endfor %}
         </ul>
       </div>
     </nav>
     {% endblock %}
     <main id="main" class="page" tabindex="-1" data-live-tokens="{{ live_tokens(request) }}">
+      {% if technical_only(request.url.path) and not technical() %}
+        {# A Technical-mode page opened in Simple mode (a shared link): offer the switch, show nothing of it. #}
+        <header><h1>{{ self.title() }}</h1></header>
+        <div class="empty">
+          <p>This page shows how the agent works inside: models, scores and costs. It is part of Technical mode.</p>
+          <p><a class="button" href="?mode=technical" hx-boost="false">Switch to Technical mode</a> <a class="button button--text" href="/">Back to Home</a></p>
+        </div>
+      {% else %}
       {% block content %}{% endblock %}
+      {% endif %}
     </main>
   </div>
   <div class="snackbar" data-snackbar>

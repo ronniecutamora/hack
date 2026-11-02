@@ -22,7 +22,7 @@ from datetime import datetime
 from functools import cache
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qsl, urlsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import (
@@ -36,7 +36,7 @@ from fastapi.responses import (
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import Engine
-from sqlmodel import Session, col, select
+from sqlmodel import Session, col, func, select
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -53,7 +53,14 @@ from app.auth import (
 )
 from app.bot import build_application, start_upkeep, stop_upkeep
 from app.config import Settings, get_settings
-from app.dashboard import active_incidents, incident_trust, overview
+from app.dashboard import (
+    active_incidents,
+    incident_trust,
+    nav_counts,
+    overview,
+    plain_output_label,
+    report_href,
+)
 from app.db import init_db, make_engine, make_recorder
 from app.deadlines import deadline
 from app.drafts import (
@@ -87,6 +94,7 @@ from app.meta.factory import make_agent_llm, make_pair_judge
 from app.meta.llm import AgentLLM
 from app.models import (
     MANILA,
+    STATUS_NOT_A_REPORT,
     Assessment,
     Draft,
     Incident,
@@ -97,7 +105,25 @@ from app.models import (
     manila_time,
     utcnow,
 )
-from app.nav import NAV, PRIMARY, SECONDARY, more_current, nav_current
+from app.modes import (
+    GLOSSARY,
+    GUIDE_COOKIE,
+    GUIDE_STEPS,
+    MODE_COOKIE,
+    MODE_MAX_AGE_S,
+    MODE_PARAM,
+    MODES,
+    PLAIN_DONE,
+    PLAIN_VERDICTS,
+    current_mode,
+    plain,
+    plain_reason,
+    plain_signal,
+    plain_status,
+    resolve,
+    technical,
+)
+from app.nav import NAV, destinations, more_current, nav_current, technical_only
 from app.nol import deadline_table
 from app.nol_form import COMMODITIES, commodity_for_kind
 from app.rdana import RDANA_DEADLINE, EventInput
@@ -141,6 +167,18 @@ def live_tokens(request: Request) -> str:
     return json.dumps(hub.snapshot()["tokens"] if hub else {}, separators=(",", ":"))
 
 
+def nav_badges(request: Request) -> dict[str, int]:
+    """The counts on the navigation (app.dashboard.nav_counts), as of this render."""
+    with Session(request.app.state.engine) as session:
+        return nav_counts(session)
+
+
+def without_mode(request: Request) -> str:
+    """The request's path and query without `?mode=`: where a mode link lands."""
+    query = urlencode([(k, v) for k, v in request.query_params.multi_items() if k != MODE_PARAM])
+    return request.url.path + (f"?{query}" if query else "")
+
+
 def duration(ms: float | None) -> str:
     """Model time for the officer: "850 ms", "4.2 s", "1 min 5 s"."""
     if ms is None:
@@ -164,13 +202,24 @@ templates.env.filters["manila_time"] = manila_time
 templates.env.filters["duration"] = duration
 templates.env.filters["usd"] = usd
 templates.env.globals["live_tokens"] = live_tokens
+templates.env.globals["nav_badges"] = nav_badges
 templates.env.globals["render_time"] = lambda: datetime.now(MANILA).strftime("%H:%M:%S")
 templates.env.globals["NAV"] = NAV
 templates.env.globals["nav_current"] = nav_current
-templates.env.globals["NAV_PRIMARY"] = PRIMARY
-templates.env.globals["NAV_SECONDARY"] = SECONDARY
 templates.env.globals["more_current"] = more_current
 templates.env.globals["static_url"] = static_url
+templates.env.globals["technical"] = technical
+templates.env.globals["destinations"] = destinations
+templates.env.globals["technical_only"] = technical_only
+templates.env.globals["GLOSSARY"] = GLOSSARY
+templates.env.globals["GUIDE_STEPS"] = GUIDE_STEPS
+templates.env.globals["PLAIN_VERDICTS"] = PLAIN_VERDICTS
+templates.env.globals["report_link"] = report_href
+templates.env.globals["plain_output_label"] = plain_output_label
+templates.env.filters["plain_status"] = plain_status
+templates.env.filters["plain_reason"] = plain_reason
+templates.env.filters["plain_signal"] = plain_signal
+templates.env.filters["plain"] = plain
 templates.env.globals["current_officer"] = current_officer.get
 
 templates.env.globals["fact_lines"] = fact_lines
@@ -189,6 +238,7 @@ templates.env.globals["REVIEW_LIMITS"] = {
 # Officer review actions (POST /reports/{id}/review/{action}) and the pages they return to.
 REVIEW_ACTIONS = ("merge", "keep", "place", "signal", "tree", "block", "unblock", "restore")
 REVIEW_RETURN = re.compile(r"/review|/incidents/\d+")
+GUIDE_RETURN = ("/", "/help")  # where hiding the first-run guide may return to
 DONE_MESSAGES = {
     "merge": "merged into incident #{incident}",
     "keep": "kept as its own incident #{incident}",
@@ -278,12 +328,18 @@ def foreign_origin(request: Request) -> str | None:
     return None
 
 
-def report_page(session: Session, around: int | None) -> list[tuple[Report, str]]:
+def report_page(
+    session: Session, around: int | None, *, set_aside: bool = False
+) -> list[tuple[Report, str]]:
     """Up to REPORT_LIMIT reports with pseudonyms, newest first: the most recent ones, or a
-    window centred on report `around`, so an evidence link reaches any report however old."""
+    window centred on report `around`, so an evidence link reaches any report however old.
+    Messages the screen set aside as not reports (app.screening) have their own list."""
     newest_first = (col(Report.received_at).desc(), col(Report.id).desc())
-    query = select(Report, Reporter.pseudonym).join(
-        Reporter, col(Reporter.id) == Report.reporter_id
+    screened = col(Report.status) == STATUS_NOT_A_REPORT
+    query = (
+        select(Report, Reporter.pseudonym)
+        .join(Reporter, col(Reporter.id) == Report.reporter_id)
+        .where(screened if set_aside else ~screened)
     )
     if around is None:
         return list(session.exec(query.order_by(*newest_first).limit(REPORT_LIMIT)).all())
@@ -426,8 +482,33 @@ def create_app(
     app = FastAPI(title="Typhoon damage reports", lifespan=lifespan)
     app.state.auth = auth
     app.state.results_path = RESULTS_PATH  # the recorded accuracy results; tests point elsewhere
-    # Middleware runs last-added first: host check, then same-origin, then the login gate.
+    # Middleware runs last-added first: host check, then same-origin, then the mode, then the
+    # login gate.
     install_login_gate(app, auth)
+
+    @app.middleware("http")
+    async def presentation_mode(request: Request, call_next):
+        """Simple or Technical mode for this request (app.modes). A `?mode=` link stores the
+        choice for this browser and lands on the same page without the parameter."""
+        asked = request.query_params.get(MODE_PARAM)
+        if request.method == "GET" and asked in MODES:
+            response = RedirectResponse(without_mode(request), status_code=303)
+            response.set_cookie(
+                MODE_COOKIE,
+                asked,
+                max_age=MODE_MAX_AGE_S,
+                path="/",
+                httponly=True,
+                secure=auth.https(request),
+                samesite="lax",
+            )
+            return response
+        mode = resolve(None, request.cookies.get(MODE_COOKIE), settings.dashboard_mode)
+        token = current_mode.set(mode)
+        try:
+            return await call_next(request)
+        finally:
+            current_mode.reset(token)
 
     @app.middleware("http")
     async def same_origin_only(request: Request, call_next):
@@ -547,6 +628,8 @@ def create_app(
         with Session(request.app.state.engine) as session:
             context = overview(session, drafts, drafts.clock())
         context["spend_cap"] = settings.daily_spend_cap_usd
+        context["guide"] = request.cookies.get(GUIDE_COOKIE) != "hidden"
+        context["now"] = drafts.clock()
         return templates.TemplateResponse(request, "overview.html", context)
 
     @app.get("/accuracy", response_class=HTMLResponse)
@@ -580,10 +663,51 @@ def create_app(
             return Response(status_code=304, headers=headers)
         return Response(body, media_type="application/geo+json", headers=headers)
 
+    @app.get("/help", response_class=HTMLResponse)
+    def help_page(request: Request) -> HTMLResponse:
+        """How Ulat works and what its official terms mean; the first-run guide's steps."""
+        hidden = request.cookies.get(GUIDE_COOKIE) == "hidden"
+        return templates.TemplateResponse(request, "help.html", {"guide_hidden": hidden})
+
+    @app.post("/help/guide")
+    async def guide(request: Request) -> RedirectResponse:
+        """Hide the first-run guide on Home for this browser, or show it again (Help)."""
+        form = await form_fields(request)
+        show = form.get("guide") == "show"
+        back = form.get("next") if form.get("next") in GUIDE_RETURN else "/"
+        response = RedirectResponse("/" if show else back, status_code=303)
+        if show:
+            response.delete_cookie(GUIDE_COOKIE, path="/")
+        else:
+            response.set_cookie(
+                GUIDE_COOKIE,
+                "hidden",
+                max_age=MODE_MAX_AGE_S,
+                path="/",
+                httponly=True,
+                secure=auth.https(request),
+                samesite="lax",
+            )
+        return response
+
+    @app.get("/reports/set-aside", response_class=HTMLResponse)
+    def set_aside(request: Request) -> HTMLResponse:
+        """Messages the screen kept out as not reports, each with its reason and Restore."""
+        with Session(request.app.state.engine) as session:
+            rows = report_page(session, None, set_aside=True)
+        return templates.TemplateResponse(
+            request, "set_aside.html", {"items": [report for report, _ in rows]}
+        )
+
     @app.get("/reports", response_class=HTMLResponse)
     def reports(request: Request, around: int | None = None) -> HTMLResponse:
         with Session(request.app.state.engine) as session:
             rows = report_page(session, around)
+            set_aside_count = session.exec(
+                select(func.count())
+                .select_from(Report)
+                .where(col(Report.status) == STATUS_NOT_A_REPORT)
+            ).one()
             ids = [report.id for report, _ in rows]
             media = session.exec(select(Media).where(col(Media.report_id).in_(ids))).all()
             assessments = session.exec(
@@ -634,6 +758,7 @@ def create_app(
             "spend_cap": settings.daily_spend_cap_usd,
             "related_incidents": related,
             "around": around,
+            "set_aside": set_aside_count,
         }
         return templates.TemplateResponse(request, "reports.html", context)
 
@@ -666,14 +791,22 @@ def create_app(
                 session, [c.assessment for c in cards if c.assessment is not None]
             )
         params = request.query_params
-        done = DONE_MESSAGES.get(params.get("done", ""))
+        action = params.get("done", "")
+        done = DONE_MESSAGES.get(action)
+        if done and not technical():  # Simple mode names no report or incident numbers
+            done = PLAIN_DONE.get(action)
         context = {
             "cards": cards,
             "related_incidents": related,
             "review_form": form,
             # After a redirect: what the last action did (ids are digits or the line is dropped).
             "done": (
-                f"Report #{params['report']}: " + done.format(incident=params.get("incident", "?"))
+                (
+                    f"Report #{params['report']}: "
+                    + done.format(incident=params.get("incident", "?"))
+                    if technical()
+                    else done
+                )
                 if done
                 and params.get("report", "").isdigit()
                 and params.get("incident", "0").isdigit()

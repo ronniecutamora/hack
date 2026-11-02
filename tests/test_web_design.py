@@ -134,9 +134,7 @@ def test_pages_and_assets_are_compressed_fonts_are_not(client):
     assert "content-encoding" not in font.headers  # already compressed
 
 
-async def test_a_screened_out_message_shows_a_chip_and_can_be_restored_from_reports(
-    settings, client
-):
+async def test_a_screened_out_message_has_its_own_list_with_a_chip_and_restore(settings, client):
     intake = IntakeService(settings, client.app.state.engine)
     report = await intake.ingest_text(333, "hello po")
     with Session(client.app.state.engine) as session:
@@ -150,8 +148,13 @@ async def test_a_screened_out_message_shows_a_chip_and_can_be_restored_from_repo
         }
         session.add(row)
         session.commit()
-    html = client.get("/reports").text
-    assert 'filter_alt_off"></use></svg>not a report</span>' in html and "a greeting" in html
+    reports = client.get("/reports").text
+    assert f'id="report-{report.id}"' not in reports  # set aside, so not among the reports
+    assert (
+        '1 message set aside by the not-a-report screen: <a href="/reports/set-aside">' in reports
+    )
+    html = client.get("/reports/set-aside").text
+    assert 'filter_alt_off"></use></svg>Set aside</span>' in html and "a greeting" in html
     assert f'action="/reports/{report.id}/review/restore"' in html
     done = client.post(
         f"/reports/{report.id}/review/restore", data={"officer": "JDC", "next": "/review"}

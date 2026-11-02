@@ -5,13 +5,13 @@
 {% from "_deadline.html" import clock, deadline_notes %}
 <header class="keep">
   <div>
-    <h1>{{ c.title }} <span class="muted">· incident #{{ c.incident_id }}{% if c.barangay %} · {{ c.barangay }}{% endif %} · version {{ draft.version }}</span></h1>
-    <p class="muted">Form: <a href="{{ c.form_url }}">{{ c.form_source }}</a>. Fields in the form's order and numbering. Drafted {{ c.drafted_at }} from {{ c.report_ids|length }} report{{ 's' if c.report_ids|length != 1 }} without a model call; {{ c.filled_count }} field{{ 's' if c.filled_count != 1 }} filled from the reports, {{ c.assured_count }} left for the assured.</p>
+    <h1>{{ c.title }} <span class="muted">{% if technical() %}· incident #{{ c.incident_id }}{% endif %}{% if c.barangay %} · {{ c.barangay }}{% endif %} · version {{ draft.version }}</span></h1>
+    <p class="muted">Form: <a href="{{ c.form_url }}">{{ c.form_source }}</a>. Fields in the form's order and numbering. Drafted {{ c.drafted_at }} from {{ c.report_ids|length }} report{{ 's' if c.report_ids|length != 1 }}{% if technical() %} without a model call{% endif %}; {{ c.filled_count }} field{{ 's' if c.filled_count != 1 }} filled from the reports, {{ c.assured_count }} left for the assured.</p>
   </div>
 </header>
 {% if c.reused_photos %}
   <div class="banner alert keep"><strong>PHOTO REUSED.</strong>
-    {% for r in c.reused_photos %}The photo in report <a href="{{ report_href(r.report_id, c.incident_id) }}">#{{ r.report_id }}</a> matches report <a href="{{ report_href(r.related_report_id) }}">#{{ r.related_report_id }}</a> from another reporter{{ "; " if not loop.last else "." }}{% endfor %}
+    {% for r in c.reused_photos %}{% if technical() %}The photo in report <a href="{{ report_href(r.report_id, c.incident_id) }}">#{{ r.report_id }}</a> matches report <a href="{{ report_href(r.related_report_id) }}">#{{ r.related_report_id }}</a> from another reporter{% else %}The photo in <a href="{{ report_href(r.report_id, c.incident_id) }}">one report</a> matches <a href="{{ report_href(r.related_report_id) }}">a photo another person sent</a>{% endif %}{{ "; " if not loop.last else "." }}{% endfor %}
     One photo cannot prove two losses: verify with the assured and the PCIC adjuster before this is filed.</div>
 {% endif %}
 {% for m in c.missing_evidence %}<p class="banner warn keep"><strong>MISSING EVIDENCE.</strong> {{ m }} The PCIC adjuster will need it.</p>{% endfor %}
@@ -40,9 +40,9 @@
         <td class="field-label"><strong>{{ f.number }}.</strong> {{ f.label }}</td>
         <td>
           {% if f.mode == "assured" %}<div class="gap">{{ c.assured_marker }}</div>
-          {% elif f.value is not none %}<div class="value"><strong>{{ f.value }}</strong></div>
+          {% elif f.value is not none %}<div class="value"><strong>{{ f.value|plain }}</strong></div>
           {% else %}<div class="gap">{{ c.not_in_reports }}</div>{% endif %}
-          {% if f.note %}<div class="muted">{{ f.note }}</div>{% endif %}
+          {% if f.note %}<div class="muted">{{ f.note|plain }}</div>{% endif %}
           {{ evidence_refs(f.evidence) }}
         </td>
       </tr>
@@ -55,19 +55,19 @@
 
 <section>
   <h2>Evidence annex for the PCIC adjuster</h2>
-  <p class="muted">Every report in incident #{{ c.incident_id }}, oldest first. Photo judgments are by the agent LLM; SAM 3.1 measurements are {{ c.sam_label }}.{% if c.sam_caveat %} {{ c.sam_caveat }}{% endif %} Names and contact details (phone numbers, emails, handles, account names) are removed from the excerpts and the agent's photo notes. Photo links work until raw media are deleted after the retention period; the judgments and measurements stay.</p>
+  <p class="muted">{% if technical() %}Every report in incident #{{ c.incident_id }}, oldest first. Photo judgments are by the agent LLM; SAM 3.1 measurements are {{ c.sam_label }}.{% else %}Every report about this loss, oldest first. Ulat judged each photo and measured it; the measurements are {{ c.sam_label }}.{% endif %}{% if c.sam_caveat %} {{ c.sam_caveat|plain }}{% endif %} Names and contact details (phone numbers, emails, handles, account names) are removed from the excerpts and the agent's photo notes. Photo links work until raw media are deleted after the retention period; the judgments and measurements stay.</p>
   <div class="table-wrap">
   <table class="stack">
     <thead><tr><th>Report</th><th>Photo evidence</th><th>What the reporter said</th><th>Trust</th></tr></thead>
     <tbody>
     {% for e in c.annex %}
       <tr class="keep" id="annex-{{ e.report_id }}">
-        <td data-label="Report"><a href="{{ report_href(e.report_id, c.incident_id) }}">#{{ e.report_id }}</a><div class="muted">{{ e.at }}</div></td>
+        <td data-label="Report"><a href="{{ report_href(e.report_id, c.incident_id) }}">{{ "#" ~ e.report_id if technical() else "Open the report" }}</a><div class="muted">{{ e.at }}</div></td>
         <td data-label="Photo evidence">
           {% for p in e.photos %}
             <div>
               {% if p.media_id in available_media %}<a href="/media/{{ p.media_id }}" hx-boost="false">photo</a>{% else %}<span class="muted">photo deleted (retention)</span>{% endif %}
-              {% if p.overlay_media_id %} · {% if p.overlay_media_id in available_media %}<a href="/media/{{ p.overlay_media_id }}" hx-boost="false">SAM overlay</a>{% else %}<span class="muted">overlay deleted</span>{% endif %}{% endif %}
+              {% if p.overlay_media_id %} · {% if p.overlay_media_id in available_media %}<a href="/media/{{ p.overlay_media_id }}" hx-boost="false">{{ "SAM overlay" if technical() else "measured photo" }}</a>{% else %}<span class="muted">overlay deleted</span>{% endif %}{% endif %}
               {% set j = p.judgment %}
               {% if j %}
                 <ul class="chips">
@@ -77,13 +77,13 @@
                   {% if j.tarpaulin %}<li class="chip">tarpaulin</li>{% endif %}
                   {% if j.fallen_tree %}<li class="chip warn">fallen tree (needs confirmation)</li>{% endif %}
                 </ul>
-                {% if j.notes %}<div class="muted">Agent: {{ j.notes }}</div>{% endif %}
+                {% if j.notes %}<div class="muted">{{ "Agent" if technical() else "Ulat" }}: {{ j.notes }}</div>{% endif %}
               {% else %}<div class="muted">Not judged.</div>{% endif %}
               {% set m = p.measurement %}
               {% set parts = [] %}
               {% if m and "roof_count" in m %}{% set _ = parts.append(m.roof_count ~ " roof" ~ ("s" if m.roof_count != 1 else "")) %}{% endif %}
               {% if m and "floodwater_present" in m %}{% set _ = parts.append(("floodwater over " ~ "%.0f"|format(m.floodwater_fraction * 100) ~ "% of the photo") if m.floodwater_present else "no floodwater") %}{% endif %}
-              {% if parts %}<div class="muted">SAM 3.1 measured ({{ c.sam_label }}): {{ parts|join(", ") }}</div>{% endif %}
+              {% if parts %}<div class="muted">{{ "SAM 3.1 measured" if technical() else "Measured" }} ({{ c.sam_label }}): {{ parts|join(", ") }}</div>{% endif %}
             </div>
           {% else %}<span class="muted">No photo.</span>{% endfor %}
         </td>

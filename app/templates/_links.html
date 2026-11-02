@@ -1,5 +1,3 @@
-{# A stable link to one report: its place on the incident timeline, else the reports page around it. #}
-{% macro report_href(report_id, incident_id=none) -%}
-  {%- if incident_id -%}/incidents/{{ incident_id }}#report-{{ report_id }}
-  {%- else -%}/reports?around={{ report_id }}#report-{{ report_id }}{%- endif -%}
-{%- endmacro %}
+{# A stable link to one report: its place on the incident timeline, else the reports page around it
+   (app.dashboard.report_href, which Home's to-do list uses too). #}
+{% macro report_href(report_id, incident_id=none) -%}{{ report_link(report_id, incident_id) }}{%- endmacro %}

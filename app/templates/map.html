@@ -5,7 +5,7 @@
 {% block content %}
   <header>
     <h1>Map</h1>
-    <p class="muted">Active incidents in Biñan · placed at their reports' GPS, else the barangay centre</p>
+    <p class="muted">Active incidents in Biñan · placed at their reports' GPS, else the barangay centre{% if not technical() %}. Tap a pin to open its incident.{% endif %}</p>
   </header>
   <div class="map-layout">
     <div class="map-panel">
@@ -36,7 +36,7 @@
           <td data-label="Incident"><strong>{{ p.barangay or "Location unknown" }}</strong><div><a href="{{ p.url }}">{{ p.title }}</a></div></td>
           <td data-label="Status">{{ incident_status(p.status) }}</td>
           <td data-label="Placed at">{% if p.approximate %}<span class="chip warn">approximate</span> <span class="muted">barangay centre, no GPS in its reports</span>{% else %}GPS of {{ p.points }} report{{ 's' if p.points != 1 }}{% if p.points > 1 %} (mean){% endif %}{% endif %}
-            <div class="muted">{{ "%.5f"|format(f.geometry.coordinates[1]) }}, {{ "%.5f"|format(f.geometry.coordinates[0]) }}</div></td>
+            {% if technical() %}<div class="muted">{{ "%.5f"|format(f.geometry.coordinates[1]) }}, {{ "%.5f"|format(f.geometry.coordinates[0]) }}</div>{% endif %}</td>
           <td data-label="Reports" class="num">{{ p.report_count }}</td>
           <td data-label="Flood depth">Latest: {{ p.latest_depth }}<br>Max: {{ p.max_depth }}</td>
         </tr>
@@ -49,7 +49,7 @@
       <p class="banner warn">Not on the map (no GPS and no barangay): {% for i in unplaced %}<a href="/incidents/{{ i.id }}">{{ i.title }}</a>{{ ", " if not loop.last }}{% endfor %}.</p>
     {% endif %}
     {% if outside %}
-      <p class="banner alert">Flagged reports pinned outside Biñan: {% for f in outside %}<a href="{{ f.properties.url }}">report #{{ f.properties.report_id }}</a>{{ ", " if not loop.last }}{% endfor %}.</p>
+      <p class="banner alert">Flagged reports pinned outside Biñan: {% for f in outside %}<a href="{{ f.properties.url }}">{{ "report #" ~ f.properties.report_id if technical() else "report " ~ loop.index }}</a>{{ ", " if not loop.last }}{% endfor %}.</p>
     {% endif %}
   </div>
 {% endblock %}

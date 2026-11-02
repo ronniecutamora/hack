@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     # Telegram echoes this in X-Telegram-Bot-Api-Secret-Token; it also derives the URL path.
     telegram_webhook_secret: SecretStr = SecretStr("")
 
+    # The dashboard's presentation for a browser that has not chosen one (app.modes): "simple"
+    # for officers; a staging deploy for judges may default to "technical".
+    dashboard_mode: Literal["simple", "technical"] = "simple"
+
     # Agent and pair judge share a backend vocabulary; None inherits AGENT_LLM.
     agent_llm: AgentLLMName = "muse-spark-1.3"
 

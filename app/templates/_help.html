@@ -1,0 +1,17 @@
+{# Plain-language helpers: an official term explained in place, a page's one-line hint, and the
+   "How Ulat works" steps (app.modes.GLOSSARY and GUIDE_STEPS). #}
+{% from "_icons.html" import icon %}
+
+{% macro whats_this(key) %}{% set term, text = GLOSSARY[key] %}
+  <details class="whats-this"><summary>What's {{ term if term != "Incident" else "an incident" }}?</summary><p><strong>{{ term }}</strong>: {{ text }}</p></details>
+{%- endmacro %}
+
+{% macro hint(text) %}<p class="hint">{{ icon("info") }}<span>{{ text }}</span></p>{% endmacro %}
+
+{% macro guide_steps() %}
+  <ol class="guide__steps">
+  {% for title, text in GUIDE_STEPS %}
+    <li class="guide__step"><span class="guide__number" aria-hidden="true">{{ loop.index }}</span><div><h3>{{ title }}</h3><p>{{ text }}</p></div></li>
+  {% endfor %}
+  </ol>
+{% endmacro %}

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% from "_help.html" import hint %}
+{% block title %}Set aside{% endblock %}
+{% block content %}
+<div id="live-set-aside" data-live="reports">
+  <header>
+    <h1>Messages set aside</h1>
+    {{ hint("Ulat kept these out of the counts because they did not look like damage reports. If one is a real report, restore it and Ulat reads it again.") }}
+  </header>
+  <p class="toolbar"><a class="button button--text" href="/reports">{{ icon("arrow_back") }}Reports</a></p>
+  {% if not items %}
+    <p class="empty">No message is set aside. Greetings, jokes and other chat sent to the bot would show up here instead of in the counts.</p>
+  {% else %}
+    <ul class="set-aside">
+    {% for r in items %}
+      {# Screened out (app.screening): kept for the officer, never counted; restoring it re-runs the pipeline. #}
+      <li class="card" id="report-{{ r.id }}">
+        <p class="set-aside__head"><span class="chip status-chip">{{ icon("filter_alt_off") }}Set aside</span> <time class="muted">{{ r.received_at|manila_time }}</time>{% if technical() %} <span class="muted">· report #{{ r.id }} · {{ r.channel }}</span>{% endif %}</p>
+        {% if r.text %}<p>{{ r.text }}</p>{% elif r.transcript %}<p><span class="muted">Voice:</span> {{ r.transcript }}</p>{% else %}<p class="muted">No text: a photo, voice note or location only.</p>{% endif %}
+        {% set s = r.screening or {} %}
+        {% if s.reason %}<p class="muted">Why: {{ s.reason }}{% if technical() %} ({{ s.code|replace("_", " ") }}{% if s.model %}, <code>{{ s.model }}</code>{% else %}, rule{% endif %}){% endif %}</p>{% endif %}
+        <details class="review-group">
+          <summary>This is a real report: restore it</summary>
+          <form method="post" action="/reports/{{ r.id }}/review/restore" data-done="Restored as a report: Ulat reads it again">
+            <input type="hidden" name="next" value="/review">
+            <label>Your initials <input type="text" name="officer" required maxlength="{{ REVIEW_LIMITS.officer }}" autocomplete="off" value="{{ current_officer() }}" placeholder="e.g. JDC, CDRRMO"></label>
+            <label>Note (optional) <textarea name="note" rows="2" maxlength="{{ REVIEW_LIMITS.note }}"></textarea></label>
+            <button type="submit">Restore as a report{% if technical() %} (#{{ r.id }}){% endif %}</button>
+          </form>
+        </details>
+      </li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+</div>
+{% endblock %}

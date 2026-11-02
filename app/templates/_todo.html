@@ -1,0 +1,18 @@
+{# Home's to-do list (app.dashboard.todo): one card per thing to do, most urgent first, each with
+   one button that says what it does. Inside a live region, so it refreshes as reports arrive. #}
+{% from "_icons.html" import icon %}
+{% macro todo_list(items) %}
+  <ol class="todo" aria-label="To do, most urgent first">
+  {% for item in items %}
+    <li class="todo__item{% if item.tone %} todo__item--{{ item.tone }}{% endif %}">
+      <span class="todo__icon">{{ icon(item.icon) }}</span>
+      <div class="todo__text">
+        <h2 class="todo__title">{{ item.title }}</h2>
+        {% if item.due %}<p class="todo__due">{{ icon("schedule") }}<strong data-due="{{ item.due.due_iso }}">{{ item.due.text }}</strong> <span>· {{ item.due.due_local }}</span></p>{% endif %}
+        <p class="todo__detail">{{ item.detail }}</p>
+      </div>
+      <a class="button{% if item.news %} button--tonal{% endif %} todo__action" href="{{ item.href }}">{{ item.action }}</a>
+    </li>
+  {% endfor %}
+  </ol>
+{% endmacro %}

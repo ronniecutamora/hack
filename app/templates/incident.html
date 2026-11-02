@@ -4,19 +4,22 @@
 {% from "_status.html" import incident_status %}
 {% from "_review.html" import review_card, review_actions, history_entry %}
 {% from "_trace.html" import agent_trace %}
-{% block title %}Incident #{{ incident.id }}{% endblock %}
+{% from "_help.html" import hint, whats_this %}
+{% block title %}{{ "Incident #" ~ incident.id if technical() else incident.title }}{% endblock %}
 {% block content %}
 <div id="live-incident" data-live="incidents reports drafts">
   <header>
     <h1>{{ incident.title }}</h1>
     {{ incident_status(incident.status) }}
+    {% if not technical() %}{{ hint("Every report about this flood, oldest first, with what Ulat read from it. If one does not belong here, settle it under “Needs your check”.") }}{% endif %}
   </header>
+  {% if not technical() %}{{ whats_this("incident") }}{% endif %}
   {% if not incident.active %}<p class="muted">Retired grouping. Reports were re-linked; its decision history is preserved.</p>{% endif %}
   <p>{{ incident.barangay or "Location unknown" }} · First seen {{ incident.first_seen|manila_time }} · Last seen {{ incident.last_seen|manila_time }}</p>
   <div>{{ incident_trust(trust) }}</div>
   {% for n in nol_statuses %}
     {% set row, cd = n.clocks[0] %}
-    <p>{{ clock(row, cd) }} <a href="/drafts#{{ n.anchor }}">{% if n.latest %}Notice of Loss draft v{{ n.latest.version }} ({{ "approved for filing, not filed" if n.latest.status == "approved" else n.latest.status }}){% else %}Draft the Notice of Loss{% endif %}</a></p>
+    <p>{{ clock(row, cd) }} <a href="/drafts#{{ n.anchor }}">{% if n.latest %}Notice of Loss draft v{{ n.latest.version }} ({{ "approved for filing, not filed" if n.latest.status == "approved" else (n.latest.status if technical() else n.latest.status|plain_status|lower) }}){% else %}Draft the Notice of Loss{% endif %}</a></p>
   {% endfor %}
   <p>Latest flood depth: <strong>{{ incident.latest_facts.get("latest_depth", "unknown")|replace("_", " ") }}</strong> · Maximum seen: <strong>{{ incident.latest_facts.get("max_depth", "unknown")|replace("_", " ") }}</strong></p>
   <ul class="chips">
@@ -31,8 +34,8 @@
   {% set back = "/incidents/" ~ incident.id %}
   {% if review %}
     <section class="review-panel" id="review" aria-labelledby="review-title">
-      <h2 id="review-title">Officer review <span class="muted">({{ review|length }} report{{ "s" if review|length != 1 }})</span></h2>
-      <p class="muted">The agent could not settle these. Every action is recorded with your initials, and a later automatic re-check never undoes it.</p>
+      <h2 id="review-title">{{ "Officer review" if technical() else "Needs your check" }} <span class="muted">({{ review|length }} report{{ "s" if review|length != 1 }})</span></h2>
+      <p class="muted">{{ "The agent could not settle these." if technical() else "Ulat could not settle these alone." }} Every action is recorded with your initials, and a later automatic re-check never undoes it.</p>
       {% for card in review %}{{ review_card(card, back, review_form) }}{% endfor %}
     </section>
   {% endif %}
@@ -42,7 +45,7 @@
   {% for item in items %}
     {% set r = item.report %}{% set a = item.assessment %}
     <li id="report-{{ r.id }}">
-      <p><time>{{ r.received_at|manila_time }}</time> · Report #{{ r.id }}
+      <p><time>{{ r.received_at|manila_time }}</time>{% if technical() %} · Report #{{ r.id }}{% endif %}
         {% if r.channel == "demo" %}<span class="chip warn">Synthetic demo</span>{% endif %}
       </p>
       {% if a and a.facts %}
@@ -55,20 +58,22 @@
         {% for m in item.media %}<a href="/media/{{ m.id }}" hx-boost="false"><img src="/media/{{ m.id }}" alt="Report photo evidence{% if m.kind == 'overlay' %} with measurement overlay{% endif %}" loading="lazy"></a>{% endfor %}
       </div>
       {% if item.had_photos and not item.media %}<p class="muted">Photo evidence deleted after retention; assessment kept.</p>{% endif %}
-      {{ agent_trace(item.trace, r.id) }}
-      {% if r.grouping_error %}<p class="error">{{ r.grouping_error }}</p>{% endif %}
+      {% if technical() %}{{ agent_trace(item.trace, r.id) }}{% endif %}
+      {% if r.grouping_error %}<p class="error">{{ r.grouping_error if technical() else "Ulat could not check whether this report repeats another one." }}</p>{% endif %}
       {% if item.card %}
-        {% if item.card.needs_review %}<p><a href="#review-{{ r.id }}">Waiting for officer review: {{ item.card.reasons|join(", ") }}</a></p>
-        {% else %}<details class="officer-actions"{% if review_form and review_form.report_id == r.id %} open{% endif %}><summary>Officer actions for report #{{ r.id }}</summary>{{ review_actions(item.card, back, review_form) }}</details>{% endif %}
+        {% if item.card.needs_review %}<p><a href="#review-{{ r.id }}">{% if technical() %}Waiting for officer review: {{ item.card.reasons|join(", ") }}{% else %}Needs your check: {{ item.card.reasons|map("plain_reason")|join(", ")|lower }}{% endif %}</a></p>
+        {% else %}<details class="officer-actions"{% if review_form and review_form.report_id == r.id %} open{% endif %}><summary>{{ "Officer actions for report #" ~ r.id if technical() else "Change the grouping, the place or the sender" }}</summary>{{ review_actions(item.card, back, review_form) }}</details>{% endif %}
       {% endif %}
     </li>
   {% endfor %}
   </ol>
+  {% if technical() %}
   <h2>Why the agent grouped these, and what officers changed</h2>
   <p class="muted">The agent's decisions (a model or a deterministic rule) and every officer override, oldest first.</p>
   {% if not history %}<p class="empty">No grouping decisions recorded yet.</p>{% endif %}
   <div class="decisions">
   {% for entry in history %}{{ history_entry(entry) }}{% endfor %}
   </div>
+{% endif %}
 </div>
 {% endblock %}
