@@ -1,5 +1,43 @@
 {% extends "base.html" %}
 {% block title %}Accuracy{% endblock %}
+{% macro chart_figure(ch) %}
+  <figure class="chart" id="{{ ch.id }}" aria-labelledby="{{ ch.id }}-caption">
+    <figcaption id="{{ ch.id }}-caption"><strong class="chart__title">{{ ch.title }}</strong> <span class="muted">{{ ch.description }}</span></figcaption>
+    {% if ch.legend %}
+      <ul class="chart-legend" aria-label="Legend">
+        {% for s in ch.legend %}<li><span class="chart-swatch chart__fill--{{ s.fill }}" aria-hidden="true"></span>{{ s.label }}</li>{% endfor %}
+      </ul>
+    {% endif %}
+    <div class="chart__panels">
+      {% for p in ch.panels %}
+        <div class="chart__panel">
+          <h3 class="chart__panel-title">{{ p.heading }}{% if p.detail %} <span class="muted">· {{ p.detail }}</span>{% endif %}{% if p.weak %} <span class="chip warn">weak</span>{% endif %}</h3>
+          {{ p.svg }}
+        </div>
+      {% endfor %}
+    </div>
+    {% if ch.tables %}
+      <details class="chart__numbers">
+        <summary>Show the numbers</summary>
+        {% for nt in ch.tables %}
+          <div class="table-wrap">
+          <table class="chart__table">
+            <caption class="muted">{{ nt.caption }}</caption>
+            <thead><tr>{% for h in nt.head %}<th scope="col"{% if not loop.first %} class="num"{% endif %}>{{ h }}</th>{% endfor %}</tr></thead>
+            <tbody>
+            {% for r in nt.rows %}
+              <tr><th scope="row">{{ r[0] }}</th>{% for v in r[1:] %}<td class="num">{{ v }}</td>{% endfor %}</tr>
+            {% endfor %}
+            </tbody>
+          </table>
+          </div>
+        {% endfor %}
+      </details>
+    {% else %}
+      <p class="muted chart__note">{{ ch.note }}</p>
+    {% endif %}
+  </figure>
+{% endmacro %}
 {% block content %}
   <header>
     <h1>How accurate is the agent?</h1>
@@ -23,6 +61,7 @@
         </h2>
         <p>{{ t.intro }}</p>
         <p class="muted"><strong>{{ t.provenance_note }}</strong> {{ t.dataset.source }}. Labels: {{ t.dataset.label_source }}. Data set size: {{ t.dataset.n }}.</p>
+        {% if t.charts %}<div class="charts">{% for ch in t.charts %}{{ chart_figure(ch) }}{% endfor %}</div>{% endif %}
         <div class="table-wrap">
         <table class="stack accuracy__table">
           <caption class="muted">{{ t.title }}: {{ t.dataset.title }}, per model</caption>
@@ -54,6 +93,20 @@
         </table>
         </div>
         <p class="muted"><strong>What this does not mean:</strong> {{ t.not_meaning }}</p>
+      </section>
+    {% endfor %}
+
+    {% for v in page.voice %}
+      {% set e = v.entry %}
+      <section class="card accuracy" id="voice-{{ e.dataset.id }}" aria-labelledby="voice-{{ e.dataset.id }}-title">
+        <h2 id="voice-{{ e.dataset.id }}-title">{{ v.title }}
+          <span class="chip {{ 'info' if e.dataset.provenance == 'real' else 'warn' }}">{{ "Real data" if e.dataset.provenance == "real" else "Synthetic data" }}</span>
+        </h2>
+        <p>{{ v.intro }}</p>
+        <p class="muted"><strong>{{ v.provenance_note }}</strong> {{ e.dataset.source }}. Labels: {{ e.dataset.label_source }}. Data set size: {{ e.dataset.n }}.</p>
+        <div class="charts">{% for ch in v.charts %}{{ chart_figure(ch) }}{% endfor %}</div>
+        <p class="muted">Model <code>{{ e.model_id }}</code> ({{ e.backend }}) · {{ e.n }} notes scored{% if e.errors %}, {{ e.errors }} failed{% endif %} · run {{ e.date }}, commit {{ e.commit[:12] }} · {{ e.spend_usd|usd }} at list prices.</p>
+        <p class="muted"><strong>What this does not mean:</strong> {{ v.not_meaning }}</p>
       </section>
     {% endfor %}
   {% endif %}

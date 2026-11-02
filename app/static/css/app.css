@@ -888,3 +888,56 @@ table.stack.accuracy__table td:first-child { white-space: normal; }
   .gap, .muted { color: #000; }
 }
 @media print { .live, .live-notice { display: none !important; } }
+
+/* Accuracy charts (app/charts.py, drawn on the server as inline SVG; see app/accuracy.py).
+   chart__fill--<role> paints an SVG mark (fill) and its HTML legend swatch (background) alike.
+   Fills are M3 roles; text inside a strong fill uses the lowest surface colour (white in light,
+   near-black in dark), which clears 4.5:1 on every strong role here in both themes. */
+.charts { display: grid; gap: var(--space-5); margin: var(--space-4) 0; }
+.chart { margin: 0; min-width: 0; }
+.chart figcaption { margin-bottom: var(--space-2); font: var(--md-sys-typescale-body-medium); }
+.chart__title { display: block; font: var(--md-sys-typescale-title-medium); color: var(--md-sys-color-on-surface); }
+.chart__panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: var(--space-4) var(--space-5); }
+.chart__panel { min-width: 0; }
+.chart__panel-title { margin: 0 0 var(--space-2); font: var(--md-sys-typescale-title-small); }
+.chart__svg { display: block; width: 100%; max-width: 30rem; height: auto; overflow: visible; }
+.chart__svg text { font-family: var(--md-ref-typeface); font-size: 12px; fill: var(--md-sys-color-on-surface); }
+.chart__svg .chart__strong { font-weight: 600; }
+.chart__svg .chart__muted { fill: var(--md-sys-color-on-surface-variant); }
+.chart__svg .chart__value { font-weight: 600; font-variant-numeric: tabular-nums; }
+.chart__svg .chart__tick { font-size: 11px; fill: var(--md-sys-color-on-surface-variant); font-variant-numeric: tabular-nums; }
+.chart__svg .chart__count { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.chart__svg .chart__weak { font-size: 10px; font-weight: 500; fill: var(--md-ext-color-on-warning-container); }
+/* A ring of the card's own surface round label text, so a gridline or the weak line never runs
+   through a word. */
+.chart__svg .chart__halo { paint-order: stroke; stroke: var(--md-sys-color-surface-container-lowest); stroke-width: 4px; stroke-linejoin: round; }
+@media (prefers-color-scheme: dark) { .chart__svg .chart__halo { stroke: var(--md-sys-color-surface-container-low); } }
+.chart__weak-chip { fill: var(--md-ext-color-warning-container); }
+.chart__grid { stroke: var(--md-sys-color-outline-variant); stroke-width: 1; }
+.chart__axis { stroke: var(--md-sys-color-outline); stroke-width: 1; }
+.chart__threshold { stroke: var(--md-ext-color-warning); stroke-width: 2; }
+.chart__hit { fill: transparent; pointer-events: all; }
+.chart__hit:hover { fill: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent); }
+.chart__fill--primary { fill: var(--md-sys-color-primary); background: var(--md-sys-color-primary); }
+.chart__fill--primary-soft { fill: var(--md-sys-color-inverse-primary); background: var(--md-sys-color-inverse-primary); }
+.chart__fill--success { fill: var(--md-ext-color-success); background: var(--md-ext-color-success); }
+.chart__fill--error { fill: var(--md-sys-color-error); background: var(--md-sys-color-error); }
+.chart__fill--warning { fill: var(--md-ext-color-warning); background: var(--md-ext-color-warning); }
+.chart__fill--empty { fill: var(--md-sys-color-surface-container-high); }
+/* Confusion-matrix steps: one hue each, light to strong (agree: primary, disagree: error). */
+.chart__fill--agree-1, .chart__fill--agree-2, .chart__fill--agree-3, .chart__fill--agree-4 { fill: var(--md-sys-color-primary); }
+.chart__fill--disagree-1, .chart__fill--disagree-2, .chart__fill--disagree-3, .chart__fill--disagree-4 { fill: var(--md-sys-color-error); }
+.chart__fill--agree-1, .chart__fill--disagree-1 { fill-opacity: .18; }
+.chart__fill--agree-2, .chart__fill--disagree-2 { fill-opacity: .35; }
+.chart__fill--agree-3, .chart__fill--disagree-3 { fill-opacity: .85; }
+.chart-swatch.chart__fill--agree-4 { background: var(--md-sys-color-primary); }
+.chart-swatch.chart__fill--disagree-4 { background: var(--md-sys-color-error); }
+.chart__svg .chart__ink--strong, .chart__svg .chart__ink--primary, .chart__svg .chart__ink--success,
+.chart__svg .chart__ink--error, .chart__svg .chart__ink--warning { fill: var(--md-sys-color-surface-container-lowest); }
+.chart__svg .chart__ink--primary-soft { fill: var(--md-sys-color-on-primary-container); }
+.chart-legend { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin: 0 0 var(--space-3); padding: 0; list-style: none; font: var(--md-sys-typescale-body-small); color: var(--md-sys-color-on-surface-variant); }
+.chart-legend li { display: flex; align-items: center; gap: var(--space-2); }
+.chart-swatch { display: inline-block; flex: none; width: .75rem; height: .75rem; border-radius: 2px; }
+.chart__numbers { margin-top: var(--space-2); }
+.chart__table caption { text-align: left; padding: var(--space-2) var(--space-3) 0; }
+.chart__note { margin: var(--space-2) 0 0; font: var(--md-sys-typescale-body-small); }
