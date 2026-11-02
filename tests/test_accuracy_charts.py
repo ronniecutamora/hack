@@ -133,7 +133,9 @@ def test_the_screen_and_voice_charts_follow_the_file(client, tmp_path):
     assert '<span class="chip warn">weak</span>' in chart  # a real report was dropped
     wer = figure(html, "chart-wer-voice-notes-8")
     assert "Hint + Biñan&#39;s barangay names: 31% of words wrong" in wer
-    assert "Hint + Biñan&#39;s barangay names (the bot uses this)" in wer
+    bot = voice["settings"][voice["production"]]["label"].replace("'", "&#39;")
+    assert f"{bot} (the bot uses this)" in wer  # the bot's own setting is marked, once
+    assert wer.count("(the bot uses this)") == 1
     assert ">40%</text>" in wer  # the axis grows to fit the larger error rate
     places = figure(html, "chart-places-voice-notes-8")
     assert "7 of 10 place names heard right" in places

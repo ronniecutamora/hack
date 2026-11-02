@@ -694,12 +694,12 @@
       "backend": "Meta Model API",
       "sam": null,
       "date": "2026-11-02",
-      "commit": "d6d121092781",
+      "commit": "6448e01dacbf",
       "n": 8,
       "errors": 0,
       "metrics": {
         "reference_words": 399,
-        "production": "barangays",
+        "production": "barangays_and_osm",
         "settings": {
           "no_hint": {
             "label": "No language hint",
@@ -709,7 +709,8 @@
             "wer": 0.193,
             "wer_clean": 0.1654,
             "place_names_heard": 3,
-            "place_names": 10
+            "place_names": 10,
+            "insertions": 0
           },
           "language_hint": {
             "label": "Language hint (Tagalog, English)",
@@ -722,7 +723,8 @@
             "wer": 0.198,
             "wer_clean": 0.1654,
             "place_names_heard": 3,
-            "place_names": 10
+            "place_names": 10,
+            "insertions": 0
           },
           "barangays": {
             "label": "Hint + Biñan's barangay names",
@@ -732,10 +734,11 @@
             ],
             "keywords": "barangays",
             "keyword_count": 29,
-            "wer": 0.2155,
-            "wer_clean": 0.183,
+            "wer": 0.203,
+            "wer_clean": 0.1805,
             "place_names_heard": 3,
-            "place_names": 10
+            "place_names": 10,
+            "insertions": 0
           },
           "barangays_and_places": {
             "label": "Hint + barangay names + the notes' own place names",
@@ -745,14 +748,43 @@
             ],
             "keywords": "barangays+places",
             "keyword_count": 39,
-            "wer": 0.1629,
-            "wer_clean": 0.1504,
+            "wer": 0.188,
+            "wer_clean": 0.1404,
             "place_names_heard": 10,
-            "place_names": 10
+            "place_names": 10,
+            "insertions": 1
+          },
+          "barangays_and_osm_100": {
+            "label": "Hint + barangay names + 100 Biñan street and place names",
+            "language_bias": [
+              "Tagalog",
+              "English"
+            ],
+            "keywords": "barangays+osm:100",
+            "keyword_count": 129,
+            "wer": 0.2055,
+            "wer_clean": 0.1679,
+            "place_names_heard": 3,
+            "place_names": 10,
+            "insertions": 0
+          },
+          "barangays_and_osm": {
+            "label": "Hint + barangay names + Biñan street and place names, up to the 500-keyword limit",
+            "language_bias": [
+              "Tagalog",
+              "English"
+            ],
+            "keywords": "barangays+osm",
+            "keyword_count": 500,
+            "wer": 0.1905,
+            "wer_clean": 0.1629,
+            "place_names_heard": 4,
+            "place_names": 10,
+            "insertions": 0
           }
         }
       },
-      "spend_usd": 0.0201
+      "spend_usd": 0.0804
     }
   ]
 }
