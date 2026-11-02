@@ -347,6 +347,9 @@ button:active::after, .button:active::after, .menu__item:active::after, .kpi:act
 
 /* Compact: bottom navigation bar. */
 @media (max-width: 37.49rem) {
+  /* `view-transition-name` makes .nav a stacking context: raise it as a whole, or positioned
+     content (buttons, summaries) scrolling under the bar is painted over it. */
+  .nav { position: relative; z-index: 500; }
   .nav > .nav__list {
     position: fixed; inset: auto 0 0 0; z-index: 500; justify-content: space-around;
     height: calc(var(--nav-bar) + var(--safe-bottom)); padding: var(--space-3) var(--space-1) calc(var(--space-4) + var(--safe-bottom));
