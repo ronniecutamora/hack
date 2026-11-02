@@ -50,7 +50,12 @@ COLUMN_ADDITIONS: dict[str, dict[str, str]] = {
         "officer_restored": "BOOLEAN NOT NULL DEFAULT 0",
     },
     "reporter": {"blocked": "BOOLEAN NOT NULL DEFAULT 0"},
-    "media": {"phash": "VARCHAR"},
+    "media": {
+        "phash": "VARCHAR",
+        "video_duration_s": "FLOAT",
+        "video_frame_s": "FLOAT",
+        "audio_done": "BOOLEAN NOT NULL DEFAULT 0",
+    },
     "photoassessment": {"taken_at": "DATETIME"},
     "assessment": {"signals": "JSON"},
     "draft": {"incident_id": "INTEGER REFERENCES incident(id)", "entries": "JSON"},

@@ -21,6 +21,7 @@ from app.meta.sam import MODEL as SAM_MODEL
 from app.models import (
     AgentDecision,
     Assessment,
+    Media,
     ModelCall,
     OfficerAction,
     PhotoAssessment,
@@ -232,6 +233,7 @@ def build_trace(
     calls: list[ModelCall],
     decisions: list[AgentDecision],
     actions: list[OfficerAction],
+    media: list[Media] | None = None,
 ) -> Trace:
     trace = Trace(
         calls=len(calls),
@@ -246,6 +248,12 @@ def build_trace(
     ruled_out = screening is not None and screening.source == "rule" and screening.filtered
     if ruled_out:
         steps.append(_step(Step.SCREEN_RULE, _screen_output(screening)))
+    frames = [m for m in media or [] if m.kind == "photo" and m.video_frame_s is not None]
+    video_audio = [m for m in media or [] if m.kind == "audio" and m.video_duration_s is not None]
+    if frames:
+        steps.append(
+            _step(Step.VIDEO_AUDIO, "audio extracted" if video_audio else "no audible audio")
+        )
     words = len(report.transcript.split()) if report.transcript else 0
     transcribed = sorted(
         (subject for step, subject in pending.groups if step == Step.TRANSCRIBE),
@@ -253,9 +261,16 @@ def build_trace(
     )
     for subject in transcribed:
         part = _subject_id(subject, "part")
-        label = STEPS[Step.TRANSCRIBE].label + (f" (part {part})" if part else "")
+        label = (
+            "Transcribe the audio"
+            if any(m.kind == "audio" for m in media or [])
+            else STEPS[Step.TRANSCRIBE].label
+        )
+        label += f" (part {part})" if part else ""
         output = f"{_plural(words, 'word')} transcribed" if words else "no speech transcribed"
         steps.append(TraceStep(label, "model", output, pending.take(Step.TRANSCRIBE, subject)))
+    if frames:
+        steps.append(_step(Step.VIDEO_FRAMES, f"{_plural(len(frames), 'frame')} extracted"))
     if report.transcript and assessment and assessment.transcript_clean is not None:
         cleaned = assessment.transcript_clean != report.transcript
         steps.append(
@@ -369,12 +384,19 @@ def report_traces(session: Session, reports: list[Report]) -> dict[int, Trace]:
         for a in session.exec(select(Assessment).where(col(Assessment.report_id).in_(ids))).all()
     }
     photos = rows(PhotoAssessment, (col(PhotoAssessment.media_id),))
+    media = rows(Media, (col(Media.id),))
     calls = rows(ModelCall, (col(ModelCall.id),))
     decisions = rows(AgentDecision, (col(AgentDecision.created_at), col(AgentDecision.id)))
     actions = rows(OfficerAction, (col(OfficerAction.created_at), col(OfficerAction.id)))
     return {
         r.id: build_trace(
-            r, assessments.get(r.id), photos[r.id], calls[r.id], decisions[r.id], actions[r.id]
+            r,
+            assessments.get(r.id),
+            photos[r.id],
+            calls[r.id],
+            decisions[r.id],
+            actions[r.id],
+            media[r.id],
         )
         for r in reports
     }

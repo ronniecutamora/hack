@@ -18,9 +18,9 @@
     <ul class="report-list">
     {% for item in items %}{% set r = item.report %}{% set a = item.assessment %}
       <li class="card" id="report-{{ r.id }}">
-        <p class="report-list__head"><strong>{{ r.barangay or "Place not found yet" }}</strong> <time class="muted">{{ r.received_at|manila_time }}</time> <span class="muted">· {{ r.status|plain_status }}</span>{% if r.channel == "demo" %} <span class="chip warn">Synthetic demo</span>{% endif %}</p>
+        <p class="report-list__head"><strong>{{ r.barangay or "Place not found yet" }}</strong> <time class="muted">{{ r.received_at|manila_time }}</time> <span class="muted">· {{ r.status|plain_status }}</span>{% if item.media|selectattr("video_frame_s", "ne", none)|list %} <span class="chip info">Video</span>{% endif %}{% if r.channel == "demo" %} <span class="chip warn">Synthetic demo</span>{% endif %}</p>
         {% if a and a.facts and a.facts.summary_en %}<p>{{ a.facts.summary_en }}</p>{% endif %}
-        {% if r.text %}<p class="muted">“{{ r.text }}”</p>{% elif a and a.transcript_clean %}<p class="muted">Voice: “{{ a.transcript_clean }}”</p>{% elif r.transcript %}<p class="muted">Voice: “{{ r.transcript }}”</p>{% endif %}
+        {% if r.text %}<p class="muted">“{{ r.text }}”</p>{% endif %}{% if a and a.transcript_clean %}<p class="muted">Transcript: “{{ a.transcript_clean }}”</p>{% elif r.transcript %}<p class="muted">Transcript: “{{ r.transcript }}”</p>{% endif %}
         {% if a and a.facts %}<ul class="chips">{% for line in fact_lines(a.facts) %}<li class="chip{% if line.startswith('CORRECTION') %} warn{% endif %}">{{ line }}</li>{% endfor %}</ul>{% endif %}
         {{ signal_chips(a, related_incidents) }}
         {% if item.photos %}
@@ -29,6 +29,7 @@
             {% if p.overlay and p.overlay.purged_at is none %}<a href="/media/{{ p.overlay.id }}" hx-boost="false"><img src="/media/{{ p.overlay.id }}" alt="Reported photo with roofs marked orange and floodwater blue" loading="lazy" width="160" height="120"></a>
             {% elif p.photo and p.photo.purged_at is none %}<a href="/media/{{ p.photo.id }}" hx-boost="false"><img src="/media/{{ p.photo.id }}" alt="Reported photo" loading="lazy" width="160" height="120"></a>
             {% else %}<span class="muted">Photo deleted after {{ ttl_hours }} hours (privacy); what Ulat read from it is kept.</span>{% endif %}
+            {% if p.photo and p.photo.frame_label %}<p class="muted">{{ p.photo.frame_label }}</p>{% endif %}
             {% if pa and pa.judgment %}{% set j = pa.judgment %}<p class="muted">Roof damage: {{ j.roof_damage }}{% if j.floodwater %} · floodwater{% endif %}{% if j.fallen_tree %} · maybe a fallen tree (confirm it on Review){% endif %}</p>{% endif %}
           {% endfor %}
         </div>
@@ -71,6 +72,7 @@
           </td>
           <td data-label="Report">
             {% if r.text %}<div>{{ r.text }}</div>{% endif %}
+            {% if item.media|selectattr("video_frame_s", "ne", none)|list %}<span class="chip info">Video</span>{% endif %}
             {% if a and a.transcript_clean %}
               <div><span class="muted">Voice:</span> {{ a.transcript_clean }}</div>
               {% if r.transcript != a.transcript_clean %}
@@ -103,6 +105,7 @@
                   <span class="muted">Photo deleted after {{ ttl_hours }} h (privacy); results kept.</span>
                 {% endif %}
                 <div>
+                  {% if p.photo and p.photo.frame_label %}<div class="muted">{{ p.photo.frame_label }}</div>{% endif %}
                   {% if pa.judgment %}
                     {% set j = pa.judgment %}
                     <ul class="chips">

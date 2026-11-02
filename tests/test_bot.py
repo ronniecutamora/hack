@@ -118,7 +118,7 @@ def test_main_explains_missing_token(monkeypatch, capsys):
 def test_application_registers_all_handlers(settings):
     configured = settings.model_copy(update={"telegram_bot_token": SecretStr("123456:ABC-test")})
     application = bot.build_application(configured)
-    assert len(application.handlers[0]) == 7  # text, photo, image file, voice, pin, sticker
+    assert len(application.handlers[0]) == 9  # existing handlers plus video and audio files
     assert isinstance(application.bot_data["nudges"], bot.NudgeLimiter)
     assert application.bot_data["assessor"].llm.model == "muse-spark-1.3"
 

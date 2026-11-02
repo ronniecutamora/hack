@@ -78,13 +78,28 @@ class Report(SQLModel, table=True):
 class Media(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     report_id: int = Field(foreign_key="report.id", index=True)
-    kind: str  # "photo" | "voice" | "overlay" (SAM masks drawn on a photo; purged like raw media)
+    kind: str  # photo | voice | audio | overlay
     path: str  # relative to DATA_DIR
     sha256: str = Field(index=True)
     phash: str | None = None  # retained 64-bit dHash; NULL = untried, "" = unavailable
+    # Only extracted video frames/audio carry a video duration; no raw video is stored.
+    video_duration_s: float | None = None
+    video_frame_s: float | None = None
+    audio_done: bool = False  # an extracted/uploaded audio file has been transcribed
     created_at: NaiveDatetime = Field(default_factory=utcnow)
     # Set when the raw file is deleted; derived text and assessments are kept.
     purged_at: NaiveDatetime | None = None
+
+    @property
+    def frame_label(self) -> str | None:
+        if self.video_frame_s is None or self.video_duration_s is None:
+            return None
+
+        def clock(seconds: float) -> str:
+            minutes, remaining = divmod(int(seconds), 60)
+            return f"{minutes}:{remaining:02d}"
+
+        return f"Frame at {clock(self.video_frame_s)} from a {clock(self.video_duration_s)} video"
 
 
 class ModelCall(SQLModel, table=True):

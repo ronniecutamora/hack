@@ -29,7 +29,9 @@ class Step(StrEnum):
     """Pipeline steps in the order the agent runs them for one report (drafts last)."""
 
     SCREEN_RULE = "screen_rule"
+    VIDEO_AUDIO = "video_audio"
     TRANSCRIBE = "transcribe"
+    VIDEO_FRAMES = "video_frames"
     CLEANUP = "cleanup"
     FACTS = "facts"
     PHOTO_JUDGE = "photo_judge"
@@ -56,7 +58,9 @@ STEPS: dict[Step, StepInfo] = {
     # Screening (app.screening): the free rule, and the model verdict asked only when the facts
     # state nothing a report states. Same label, so a report shows one "Screen the message".
     Step.SCREEN_RULE: StepInfo("Screen the message", "rule"),
+    Step.VIDEO_AUDIO: StepInfo("Extract video audio", "rule"),
     Step.TRANSCRIBE: StepInfo("Transcribe the voice note", "model"),
+    Step.VIDEO_FRAMES: StepInfo("Extract video keyframes", "rule"),
     Step.CLEANUP: StepInfo("Clean the transcript", "rule"),
     Step.FACTS: StepInfo("Read the facts", "model"),
     Step.PHOTO_JUDGE: StepInfo("Judge photo damage", "model"),

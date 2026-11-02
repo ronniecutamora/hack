@@ -129,7 +129,7 @@
 {% endmacro %}
 
 {# A full review card: what waits, the agent's comparisons, and the actions. #}
-{% macro review_card(card, back, form=none) %}
+{% macro review_card(card, back, form=none, photos=none) %}
   {% set r = card.report %}{% set a = card.assessment %}
   <article class="card review-card" id="review-{{ r.id }}" data-key="review-{{ r.id }}">
     <div class="review-card__head">
@@ -142,6 +142,10 @@
       {% if r.officer_incident_id %}<span class="chip ok">grouping set by an officer</span>{% endif %}
       {% if r.channel == "demo" %}<span class="chip warn">Synthetic demo</span>{% endif %}
     </p>
+    {% if r.transcript %}<p><span class="muted">Transcript:</span> {{ a.transcript_clean if a and a.transcript_clean else r.transcript }}</p>{% endif %}
+    {% if photos %}{% for p in photos.get(r.id, []) %}{% if p.video_frame_s is not none %}
+      <figure><a href="/media/{{ p.id }}" hx-boost="false"><img src="/media/{{ p.id }}" alt="Frame from the reported video" loading="lazy" width="160" height="120"></a><figcaption>{{ p.frame_label }}</figcaption></figure>
+    {% endif %}{% endfor %}{% endif %}
     {% if a and a.facts %}
       {% if a.facts.get("summary_en") %}<p>{{ a.facts.summary_en }}</p>{% endif %}
       <ul class="chips">{% for line in fact_lines(a.facts) %}<li class="chip">{{ line }}</li>{% endfor %}</ul>

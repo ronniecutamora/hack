@@ -826,10 +826,12 @@ def create_app(
             )
             # Simple mode asks one question at a time (app.questions); Technical lists the cards.
             asked = [] if technical() else questions(session, cards)
-            shown = {q.card.report.id for q in asked} | {
-                q.compare.id for q in asked if q.compare is not None
-            }
-            photos = question_photos(session, shown) if asked else {}
+            shown = (
+                {q.card.report.id for q in asked}
+                | {q.compare.id for q in asked if q.compare is not None}
+                | {card.report.id for card in cards}
+            )
+            photos = question_photos(session, shown)
         at = params.get("at")
         if form and asked:  # a refused answer: show its question, with the error
             at = next((q.key for q in asked if q.card.report.id == form["report_id"]), at)

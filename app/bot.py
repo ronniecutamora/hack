@@ -38,6 +38,7 @@ from app.models import STATUS_HELD, STATUS_NOT_A_REPORT, Assessment, Incident, R
 from app.reporter_summary import Acknowledgments, summary_text
 from app.retention import purge_loop
 from app.screening import NudgeLimiter
+from app.video import MediaError, MediaTooLong
 
 logger = logging.getLogger(__name__)
 
@@ -95,8 +96,9 @@ NOT_A_HOTLINE = (
 def start_text(ttl_hours: int, held_max_hours: int) -> str:
     return (
         "Kumusta! Ito ang bot para sa pag-report ng pinsala ng bagyo. Magpadala ng larawan, "
-        "voice note, text, o location ng pinsala.\n"
-        "Hello! Send photos, voice notes, text or your location to report typhoon damage.\n\n"
+        "maikling video, voice note, text, o location ng pinsala.\n"
+        "Hello! Send a photo, a short video, a voice note or text to report typhoon damage. "
+        "You can also send an audio file or your location.\n\n"
         f"{PROTOTYPE_NOTICE}\n{NOT_A_HOTLINE}\n\n"
         "Privacy:\n"
         f"- {NO_NAMES_STORED}\n"
@@ -106,6 +108,9 @@ def start_text(ttl_hours: int, held_max_hours: int) -> str:
         f"Original photos and audio are deleted after {ttl_hours} hours, "
         f"or up to {held_max_hours} hours if processing is paused; only text and "
         "assessments are kept.\n"
+        "- Ang orihinal na video ay binubura pagkatapos kunin ang mga frame at audio; "
+        "ang audio file ay binubura pagkatapos ma-transcribe. / Original videos are deleted "
+        "after frames and audio are extracted; audio files are deleted after transcription.\n"
         "- Ipoproseso ng AI models ng Meta ang mga ito para sa damage-assessment prototype. / "
         "Meta AI models process them for the damage-assessment prototype.\n"
         "- Huwag magpadala ng mukha ng tao o ID. / Please do not send faces or ID documents."
@@ -134,6 +139,14 @@ UNSUPPORTED_IMAGE = (
 TOO_LARGE = (
     "Masyadong malaki ang file (max 20 MB). Paki-send bilang karaniwang photo. / "
     "The file is too large (max 20 MB). Please send it as a normal photo."
+)
+AV_TOO_LARGE = (
+    "Masyadong malaki o mahaba ang file. Paki-send ng mas maikling video o ilang larawan. / "
+    "This file is too large or long. Please send a shorter clip or a few photos."
+)
+AV_UNREADABLE = (
+    "Hindi mabasa ang file. Paki-send muli o magpadala ng ilang larawan o text. / "
+    "We could not read this file. Please send it again, or send a few photos or text."
 )
 # Images sent as files keep their EXIF GPS (normal photos are stripped by Telegram).
 IMAGE_DOCUMENT_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
@@ -413,6 +426,55 @@ async def on_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await _stored(context, report, message, RECEIVED if heard else VOICE_NOT_TRANSCRIBED)
 
 
+async def _on_av(update: Update, context: ContextTypes.DEFAULT_TYPE, *, video: bool) -> None:
+    message = update.effective_message
+    media = (
+        getattr(message, "video", None)
+        or getattr(message, "video_note", None)
+        or getattr(message, "audio", None)
+        or getattr(message, "document", None)
+    )
+    settings = context.application.bot_data["settings"]
+    limit = settings.video_max_seconds if video else settings.audio_file_max_seconds
+    if (getattr(media, "file_size", None) or 0) > MAX_DOWNLOAD_BYTES or (
+        (getattr(media, "duration", None) or 0) > limit
+    ):
+        await _reply(message, AV_TOO_LARGE)
+        return
+    data = await _download(media)
+    if len(data) > MAX_DOWNLOAD_BYTES:
+        await _reply(message, AV_TOO_LARGE)
+        return
+    intake = _intake(context)
+    joins = _joins_album(intake, update.effective_user.id, message)
+    try:
+        report = await intake.ingest_av(
+            update.effective_user.id,
+            data,
+            video=video,
+            caption=getattr(message, "caption", None),
+            album=_album(message),
+        )
+    except MediaTooLong:
+        await _reply(message, AV_TOO_LARGE)
+        return
+    except MediaError:
+        logger.warning("reporter media could not be read")
+        await _reply(message, AV_UNREADABLE)
+        return
+    await _stored(context, report, message, None if joins else RECEIVED)
+
+
+@_admitted(attaches=_joins_album)
+async def on_video(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await _on_av(update, context, video=True)
+
+
+@_admitted(attaches=_joins_album)
+async def on_audio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await _on_av(update, context, video=False)
+
+
 @_admitted(attaches=lambda intake, user_ref, _message: intake.can_attach_location(user_ref))
 async def on_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
@@ -455,6 +517,14 @@ def add_handlers(application: Application) -> None:
     application.add_handler(MessageHandler(private & filters.PHOTO, on_photo))
     application.add_handler(MessageHandler(private & filters.Document.IMAGE, on_image_document))
     application.add_handler(MessageHandler(private & filters.VOICE, on_voice))
+    application.add_handler(
+        MessageHandler(
+            private & (filters.VIDEO | filters.VIDEO_NOTE | filters.Document.VIDEO), on_video
+        )
+    )
+    application.add_handler(
+        MessageHandler(private & (filters.AUDIO | filters.Document.AUDIO), on_audio)
+    )
     application.add_handler(MessageHandler(private & filters.LOCATION, on_location))
     application.add_handler(
         MessageHandler(private & (filters.Sticker.ALL | filters.ANIMATION), on_sticker)

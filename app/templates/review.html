@@ -16,7 +16,7 @@
       <p class="empty">Nothing waits for review. New uncertain groupings, trust signals and fallen trees appear here as they arrive.</p>
     {% else %}
       <p><strong data-kpi="review_total">{{ cards|length }}</strong> report{{ "s" if cards|length != 1 }} waiting{% set grouping = cards|selectattr("grouping")|list|length %}{% if grouping %}, {{ grouping }} for grouping (their figures are pending, not in the totals){% endif %}.</p>
-      {% for card in cards %}{{ review_card(card, "/review", review_form) }}{% endfor %}
+      {% for card in cards %}{{ review_card(card, "/review", review_form, photos) }}{% endfor %}
     {% endif %}
   </div>
 {% else %}

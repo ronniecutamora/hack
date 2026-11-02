@@ -62,6 +62,8 @@ def test_every_step_is_listed_once_with_a_label_and_an_actor():
     rules = {step for step, info in STEPS.items() if info.actor == "rule"}
     assert rules == {
         Step.SCREEN_RULE,
+        Step.VIDEO_AUDIO,
+        Step.VIDEO_FRAMES,
         Step.CLEANUP,
         Step.GEOLOCATE,
         Step.TRUST,

@@ -68,13 +68,36 @@ Ulat is a hackathon prototype that Biñan's disaster office has not adopted, and
 - **Name:** Ulat · Bagyo at Baha (prototype)
 - **Short description:** Prototype: mag-report ng pinsala ng bagyo at baha. / Prototype damage reports, not official.
   Emergency? Call 911.
-- **Description:** Prototype para sa Biñan, hindi pa opisyal o binabantayan ng LGU: magpadala ng larawan, voice note,
-  text o location ng pinsala. / A prototype for Biñan's disaster office, not yet official or monitored by the city:
-  send photos, voice notes, text or location of the damage. — Hindi ito emergency hotline. Para sa rescue, tumawag sa
+- **Description:** Prototype para sa Biñan, hindi pa opisyal o binabantayan ng LGU: magpadala ng larawan, maikling
+  video, voice note, text o location ng pinsala. / A Biñan prototype, not yet official or monitored by the city: send
+  photos, a short video, voice notes, text or location. — Hindi ito emergency hotline. Para sa rescue, tumawag sa
   911. / Not an emergency line. For rescue, call 911. — (the `/start` privacy line)
 
 `/start` and `/help` carry the same prototype notice. A test keeps every public text free of claims that reports
 reach the City DRRM Office.
+
+**Short videos and audio files.** Telegram videos, round video notes, video documents, audio files and audio documents
+join the same report and agent as photos. A mixed photo/video album is one report, with the same caption, location,
+rate, block and spend rules. Files over Telegram's 20 MiB download limit, video over `VIDEO_MAX_SECONDS` (90 seconds
+by default), or audio over `AUDIO_FILE_MAX_SECONDS` (600 seconds by default) are refused before a report is stored.
+The server checks the actual duration as well as Telegram's metadata. ffmpeg extracts up to `VIDEO_KEYFRAMES` (default
+3, maximum 4) evenly spaced frames; the existing photo judge, SAM measurements and photo-reuse checks apply to each.
+Frames are labeled with their timestamp and clip duration in Reports and Review. Audio uses the same Voice Transcribe
+language bias, place keywords and WAV chunking as voice notes. A clip without an audio track skips transcription.
+
+The original video is kept only in a temporary directory while it is processed, and extracted or uploaded audio is
+deleted after successful transcription. If processing is held or fails, the audio needed for a retry follows the
+existing raw-media retention limits (24 hours normally, up to 72 hours for a spend-cap hold). Frames and their
+overlays follow the photo retention rule. Temporary files left by a crash are swept as orphans. No face or voice
+identification is used.
+
+**Why still frames, not SAM video tracking?** [Meta's published standard prices](https://dev.meta.ai/docs/pricing-rate-limits)
+are $0.0025 per image and $0.0002 per video frame, with a minimum of 50 frames per video request. At the default
+three keyframes, roof and floodwater measurements cost **$0.015 per video** (6 image requests), compared with at least
+**$0.020** for two video-tracking requests. For a 23-second clip at 30 fps, tracking all 690 frames for both concepts
+would cost **$0.276**. These are SAM charges only: Spark judgment and any transcription cost extra. Tracking provides
+motion continuity, but this workflow needs a few officer-reviewable stills; we have not established that tracking adds
+enough evidence to justify its extra cost. The comparison changes if the number of stills or tracking frames changes.
 
 **"Here's what we understood."** When a report's assessment finishes, the bot answers in the same chat with what the
 agent took from it, built from the stored facts with no extra model call: the barangay (or "hindi pa alam ang lugar /
@@ -755,6 +778,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 
 | Date | What was built |
 |---|---|
+| 2026-11-03 | Short-video and audio-file Telegram intake through the existing report, agent and officer review: bounded ffmpeg extraction, timestamped photo evidence, audio transcription, retention, admission gates and trace steps |
 | 2026-10-26 | Repo scaffold: AGENTS.md, README.md |
 | 2026-10-27 | Project scope: added floods and PCIC crop/fisheries Notices of Loss as outputs of the reporting agent; chose Biñan, Laguna as the demo area and Python/FastAPI as the stack |
 | 2026-10-27 | Slice 1: Python/uv project; clients for Voice Transcribe, Spark 1.3, SAM 3.1 and Spark Open with a shared response cache and call log; SQLite storage with pseudonymous reporters; intake service and Telegram bot for text, photo, voice and location; raw-media retention purge; `/health` and `/reports` pages; transcription WER eval script; mocked-HTTP tests |

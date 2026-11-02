@@ -159,11 +159,13 @@ def attachments(session: Session, report: Report) -> Attachments:
     """What came with the report's words (photo judgments are added by the assessment)."""
     kinds = session.exec(
         select(Media.kind).where(
-            Media.report_id == report.id, col(Media.kind).in_(("photo", "voice"))
+            Media.report_id == report.id, col(Media.kind).in_(("photo", "voice", "audio"))
         )
     ).all()
     return Attachments(
-        photos=kinds.count("photo"), voice="voice" in kinds, location=report.lat is not None
+        photos=kinds.count("photo"),
+        voice="voice" in kinds or "audio" in kinds,
+        location=report.lat is not None,
     )
 
 
@@ -321,7 +323,11 @@ class AssessmentService:
             if report.status == STATUS_HELD or "raw media expired while held" in (previous or ""):
                 raw_media = session.exec(
                     select(Media).where(
-                        Media.report_id == report_id, col(Media.kind).in_(("photo", "voice"))
+                        Media.report_id == report_id,
+                        or_(
+                            col(Media.kind).in_(("photo", "voice")),
+                            (Media.kind == "audio") & (Media.audio_done == False),  # noqa: E712
+                        ),
                     )
                 ).all()
                 raw_expired = any(
@@ -344,6 +350,7 @@ class AssessmentService:
                 if (self.settings.data_dir / m.path).is_file()
             ]
             photo_ids = self._photo_ids(session, report_id)
+            audio_ids = self._audio_ids(session, report_id)
             untranscribed_voice = not report.transcript and (
                 session.exec(
                     select(Media.id).where(Media.report_id == report_id, Media.kind == "voice")
@@ -384,6 +391,16 @@ class AssessmentService:
                         session.commit()
                     untranscribed_voice = not bool(transcript.strip())
 
+        audio_error = None
+        if audio_ids:
+            try:
+                await self.voice_intake.transcribe_pending_audio(report_id)
+            except (MetaError, AudioConversionError) as exc:
+                logger.warning("audio transcription failed for report %s: %s", report_id, exc)
+                audio_error = "audio file not transcribed"
+            with self._session() as session:
+                report = session.get(Report, report_id)
+
         transcript = clean_transcript(report.transcript) if report.transcript else None
         text = "\n".join(t for t in (report.text, transcript) if t)
         (facts, facts_error), outcomes = await asyncio.gather(
@@ -416,7 +433,15 @@ class AssessmentService:
             # The reporter replied to our summary of an earlier report: a correction by intent,
             # whatever the wording ("Purok 3 po", "dalawa lang").
             facts = {**facts, "is_correction": True}
-        errors = [e for e in (facts_error, *(o.error for o in outcomes)) if e]
+        errors = [e for e in (facts_error, audio_error, *(o.error for o in outcomes)) if e]
+        if (
+            audio_ids
+            and not report.transcript
+            and not report.text
+            and not photos
+            and not audio_error
+        ):
+            errors.append("audio file contained no transcribed speech")
         if raw_expired:
             errors.append("raw media expired while held")
         if untranscribed_voice:  # part of the report is missing: not "assessed"
@@ -424,7 +449,7 @@ class AssessmentService:
         screening = None
         if not errors:
             screening = await self._screen(report, text, facts, found, outcomes)
-        inputs = (report.text, report.lat, report.lon, photo_ids)
+        inputs = (report.text, report.transcript, report.lat, report.lon, photo_ids, audio_ids)
         return self._save(report_id, transcript, facts, geo, outcomes, errors, inputs, screening)
 
     async def _screen(
@@ -509,7 +534,9 @@ class AssessmentService:
         geo: GeoResult,
         outcomes: list[_PhotoOutcome],
         errors: list[str],
-        inputs: tuple[str | None, float | None, float | None, tuple[int, ...]],
+        inputs: tuple[
+            str | None, str | None, float | None, float | None, tuple[int, ...], tuple[int, ...]
+        ],
         screening: Screening | None = None,
     ) -> Report:
         """Store the results. `inputs` are the report's text, pin and photos this pass read: if
@@ -549,7 +576,14 @@ class AssessmentService:
                 report.barangay = geo.barangay.name if geo.barangay else None
             if screening is not None:
                 report.screening = screening.as_dict()
-            current = (report.text, report.lat, report.lon, self._photo_ids(session, report_id))
+            current = (
+                report.text,
+                report.transcript,
+                report.lat,
+                report.lon,
+                self._photo_ids(session, report_id),
+                self._audio_ids(session, report_id),
+            )
             if current != inputs:
                 report.status = STATUS_NEW
             elif screening is not None and screening.filtered:
@@ -581,6 +615,16 @@ class AssessmentService:
             session.exec(
                 select(Media.id)
                 .where(Media.report_id == report_id, Media.kind == "photo")
+                .order_by(Media.id)
+            ).all()
+        )
+
+    @staticmethod
+    def _audio_ids(session: Session, report_id: int) -> tuple[int, ...]:
+        return tuple(
+            session.exec(
+                select(Media.id)
+                .where(Media.report_id == report_id, Media.kind == "audio")
                 .order_by(Media.id)
             ).all()
         )

@@ -56,9 +56,9 @@ PROFILE = BotProfile(
     description=(
         # /start's PROTOTYPE_NOTICE, condensed to fit Telegram's 512 characters.
         "Prototype para sa Biñan, hindi pa opisyal o binabantayan ng LGU: magpadala ng larawan, "
-        "voice note, text o location ng pinsala. / "
-        "A prototype for Biñan's disaster office, not yet official or monitored by the city: "
-        "send photos, voice notes, text or location of the damage.\n\n"
+        "maikling video, voice note, text o location ng pinsala. / "
+        "A Biñan prototype, not yet official or monitored by the city: "
+        "send photos, a short video, voice notes, text or location.\n\n"
         f"{NOT_A_HOTLINE}\n\n"
         f"{NO_NAMES_STORED}"
     ),

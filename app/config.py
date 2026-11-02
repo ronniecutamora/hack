@@ -59,6 +59,9 @@ class Settings(BaseSettings):
     daily_spend_cap_usd: float = Field(default=10.0, gt=0, allow_inf_nan=False)
     photo_max_age_days: int = Field(default=3, ge=0)
     photo_hash_max_distance: int = Field(default=6, ge=0, le=64)
+    video_max_seconds: int = Field(default=90, gt=0, le=600)
+    audio_file_max_seconds: int = Field(default=600, gt=0, le=600)
+    video_keyframes: int = Field(default=3, ge=1, le=4)
 
     data_dir: Path = Path("./var")
     # The live SQLite file; default DATA_DIR/app.db. A deploy keeps it on local disk while

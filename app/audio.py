@@ -9,6 +9,7 @@ import shutil
 from pathlib import Path
 
 CHUNK_SECONDS = 570  # 9.5 minutes, under the 10-minute request limit
+CONVERSION_TIMEOUT_S = 120
 
 
 class AudioConversionError(RuntimeError):
@@ -25,7 +26,7 @@ async def to_wav_chunks(
     out_dir.mkdir(parents=True, exist_ok=True)
     process = await asyncio.create_subprocess_exec(
         ffmpeg,
-        "-nostdin", "-v", "error", "-y",
+        "-nostdin", "-v", "error", "-y", "-protocol_whitelist", "file,pipe",
         "-i", str(source),
         "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", "-map_metadata", "-1",
         "-f", "segment", "-segment_time", str(chunk_seconds), "-reset_timestamps", "1",
@@ -33,7 +34,14 @@ async def to_wav_chunks(
         stdout=asyncio.subprocess.DEVNULL,
         stderr=asyncio.subprocess.PIPE,
     )  # fmt: skip
-    _, stderr = await process.communicate()
+    try:
+        _, stderr = await asyncio.wait_for(process.communicate(), timeout=CONVERSION_TIMEOUT_S)
+    except (TimeoutError, asyncio.CancelledError) as exc:
+        process.kill()
+        await process.communicate()
+        if isinstance(exc, asyncio.CancelledError):
+            raise
+        raise AudioConversionError("ffmpeg audio conversion timed out") from exc
     chunks = sorted(out_dir.glob("chunk_*.wav"))
     if process.returncode != 0 or not chunks:
         detail = stderr.decode(errors="replace").strip()[-300:]

@@ -6,6 +6,7 @@ to derive the pseudonym and is never stored or logged.
 """
 
 import asyncio
+import contextlib
 import logging
 import tempfile
 from collections.abc import Awaitable, Callable
@@ -13,6 +14,7 @@ from datetime import timedelta
 from enum import StrEnum
 from pathlib import Path
 from typing import Protocol
+from uuid import uuid4
 from weakref import WeakValueDictionary
 
 from sqlalchemy import Engine, func
@@ -39,6 +41,7 @@ from app.privacy import pseudonymize
 from app.screening import NUDGE_SKIP_AFTER_REPORT, Attachments, counted, rule_screen
 from app.trace import Step, traced
 from app.trust import HASH_UNAVAILABLE, HOLD_BLOCKED, hold_reason, photo_hash
+from app.video import extract_audio, extract_video, probe
 
 logger = logging.getLogger(__name__)
 
@@ -79,10 +82,13 @@ async def transcribe_file(
     language_bias: list[str] | None = None,
     keywords: list[str] | None = None,
     convert: ConvertFn | None = None,
+    tmp_dir: Path | None = None,
 ) -> str:
     """Convert any audio file to WAV chunks, transcribe each and join the text."""
     parts: list[str] = []
-    with tempfile.TemporaryDirectory() as tmp:  # converted audio is never kept
+    with tempfile.TemporaryDirectory(
+        dir=tmp_dir, prefix="tmp-"
+    ) as tmp:  # converted audio is never kept
         chunks = await (convert or to_wav_chunks)(audio_path, Path(tmp))
         for number, chunk in enumerate(chunks, 1):
             # A long note is several requests; the trace names each part.
@@ -186,12 +192,25 @@ class IntakeService:
             )
             .order_by(col(Report.received_at).desc(), col(Report.id).desc())
         ).first()
-        if latest is None or latest.text or latest.transcript:
+        if latest is None or latest.text:
             return None
-        photo = session.exec(
-            select(Media.id).where(Media.report_id == latest.id, Media.kind == "photo")
+        media = session.exec(
+            select(Media).where(
+                Media.report_id == latest.id, col(Media.kind).in_(("photo", "audio"))
+            )
         ).first()
-        return latest if photo is not None else None
+        if media is None:
+            return None
+        if latest.transcript:
+            av = session.exec(
+                select(Media.id).where(
+                    Media.report_id == latest.id,
+                    (Media.kind == "audio") | col(Media.video_frame_s).is_not(None),
+                )
+            ).first()
+            if av is None:
+                return None
+        return latest
 
     def _album_target(self, session: Session, reporter_id: int, album: str | None) -> Report | None:
         """The reporter's recent report started by an earlier photo of the same album."""
@@ -266,10 +285,13 @@ class IntakeService:
         ext: str,
         *,
         phash: str | None = None,
+        video_duration_s: float | None = None,
+        video_frame_s: float | None = None,
     ):
         assert report.id is not None
         digest = sha256_hex(data)
-        relative = Path("media") / str(report.id) / f"{digest[:16]}.{ext.lstrip('.').lower()}"
+        name = f"{digest[:16]}-{uuid4().hex[:12]}.{ext.lstrip('.').lower()}"
+        relative = Path("media") / str(report.id) / name
         target = self.settings.data_dir / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(data)
@@ -279,6 +301,8 @@ class IntakeService:
             path=str(relative),
             sha256=digest,
             phash=phash,
+            video_duration_s=video_duration_s,
+            video_frame_s=video_frame_s,
         )
         session.add(media)
         return media
@@ -370,6 +394,117 @@ class IntakeService:
             session.commit()
             return report
 
+    async def ingest_av(
+        self,
+        user_ref: int | str,
+        data: bytes,
+        *,
+        video: bool,
+        caption: str | None = None,
+        album: str | None = None,
+        channel: str = "telegram",
+    ) -> Report:
+        """Turn a bounded clip into normal photo/audio evidence, then queue the usual agent.
+
+        Probe before making a report; the original and temporary derivatives live only in a
+        private temporary directory. A crash orphan there is covered by the retention sweep.
+        """
+        self.settings.media_dir.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=self.settings.media_dir, prefix="tmp-") as tmp:
+            folder = Path(tmp)
+            source = folder / "source"
+            source.write_bytes(data)
+            limit = (
+                self.settings.video_max_seconds if video else self.settings.audio_file_max_seconds
+            )
+            info = await probe(source, max_seconds=limit, video=video)
+            if video:
+                frames, audio = await extract_video(
+                    source, folder, info, self.settings.video_keyframes
+                )
+            else:
+                frames, audio = [], await extract_audio(source, folder)
+            hashes = [
+                await asyncio.to_thread(photo_hash, image) or HASH_UNAVAILABLE
+                for _, image in frames
+            ]
+            caption = (caption or "").strip() or None
+            with self._session() as session:
+                reporter = self._reporter(session, user_ref)
+                report = (
+                    None if reporter.blocked else self._album_target(session, reporter.id, album)
+                )
+                if report is None:
+                    report = self._new_report(session, user_ref, channel, text=caption, album=album)
+                else:
+                    if caption and not report.text:
+                        report.text = caption
+                    if report.status in REOPEN_STATUSES:
+                        report.status = STATUS_NEW
+                for (at, image), phash in zip(frames, hashes, strict=True):
+                    self._store_media(
+                        session,
+                        report,
+                        "photo",
+                        image,
+                        "jpg",
+                        phash=phash,
+                        video_duration_s=info.duration,
+                        video_frame_s=at,
+                    )
+                if audio is not None:
+                    self._store_media(
+                        session,
+                        report,
+                        "audio",
+                        audio,
+                        "wav",
+                        video_duration_s=info.duration if video else None,
+                    )
+                reason = hold_reason(session, report, self.settings)
+                if reason:
+                    report.status, report.hold_reason = STATUS_HELD, reason
+                session.add(report)
+                session.commit()
+                return report
+
+    async def transcribe_pending_audio(self, report_id: int) -> None:
+        """Transcribe each new audio attachment once and delete its raw file on success."""
+        with self._session() as session:
+            pending = session.exec(
+                select(Media)
+                .where(
+                    Media.report_id == report_id,
+                    Media.kind == "audio",
+                    Media.audio_done == False,  # noqa: E712
+                )
+                .order_by(Media.id)
+            ).all()
+        for media in pending:
+            path = self.settings.data_dir / media.path
+            if media.purged_at is not None or not path.is_file():
+                raise AudioConversionError("audio expired before transcription")
+            text = await self._transcribe(path)
+            with self._session() as session:
+                current = session.get(Report, report_id)
+                stored = session.get(Media, media.id)
+                if not stored.audio_done:
+                    current.transcript = (
+                        " ".join(t for t in (current.transcript, text) if t) or None
+                    )
+                    stored.audio_done = True
+                    session.add(current)
+                    session.add(stored)
+                    session.commit()
+            path.unlink(missing_ok=True)
+            with contextlib.suppress(OSError):
+                path.parent.rmdir()
+            with self._session() as session:
+                stored = session.get(Media, media.id)
+                stored.purged_at = utcnow()
+                session.add(stored)
+                session.commit()
+
     async def ingest_voice(
         self,
         user_ref: int | str,
@@ -420,6 +555,7 @@ class IntakeService:
                 # 3/10 -> 10/10 once listed), and the 500-name list cost no WER or insertions
                 keywords=transcription_keywords(),
                 convert=self.convert,
+                tmp_dir=self.settings.media_dir,
             )
 
     async def ingest_location(
