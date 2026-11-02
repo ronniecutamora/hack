@@ -368,8 +368,9 @@ deadlines are verified for Biñan.
 
 The officer works in one server-rendered dashboard (FastAPI, Jinja, HTMX; no build step, every page usable with
 JavaScript off). It follows Material Design 3 and is built for a phone first: colour roles generated from one seed
-colour in light and dark, self-hosted Roboto and Material Symbols icons, a bottom navigation bar on phones (Overview,
-Review, Incidents, Drafts and More, which holds Reports, Map, Damaged houses and Accuracy), a navigation rail on
+colour in light and dark, self-hosted Roboto and Material Symbols icons, a bottom navigation bar on phones (Home,
+Review with a count badge, Incidents, Drafts and More, which holds Reports, Map, Damaged houses, Help and, in
+Technical mode, Accuracy), a navigation rail on
 tablets and a drawer on wide screens ([app/nav.py](app/nav.py) is the one list of destinations), tables that become
 cards on a phone, 48 px touch targets and no sideways scrolling at 360 px. Moving between pages swaps only the main
 region (htmx boost with View Transitions), so the live connection stays open, the address bar, Back, Forward and
@@ -380,11 +381,25 @@ data_version`, so it sees the bot's writes from its separate process) and tells 
 events which topics changed (reports, incidents, drafts, model spend), never report text. Each marked section
 re-fetches only itself, keeps the scroll position, highlights new rows briefly and never replaces a section the
 officer is typing in: it shows "New updates. Refresh section" there instead, and a requested refresh keeps the typed
-values. The home page `/` is an overview: open incidents, incidents waiting for officer review, reports in the last
+values. It has two views of the same pages ([app/modes.py](app/modes.py)), decided on the server for each request
+and remembered per browser in a cookie (not personal data): the account menu's **View** switch, or `?mode=technical`
+on any link for a demo; `DASHBOARD_MODE` sets the default. **Simple** (the default, for officers) opens on a to-do
+list in plain words, most urgent first, each item one card with one button: a Notice of Loss with its filing
+countdown ("Make the draft" or "Check and approve"), the reports that need a check ("Review"), drafts ready to
+approve, barangays with new reports for the RDANA form, and new reports; "All caught up" with the latest incidents
+when nothing waits. It names no models, costs, ids, confidence numbers or internal statuses, explains RDANA, DROMIC,
+Notice of Loss and incident in place ("What's this?"), labels buttons by what they do ("Approve for filing", "Not the
+same flood, keep separate"), gives every page a one-line hint and an empty state, shows a dismissible three-step
+"How Ulat works" guide once per browser (again from More, then Help) and hides Accuracy, the agent trace, the model
+strip and raw tables. **Technical** (for developers, judges and the video) shows everything below. The officer's
+actions, forms and permissions are the same in both views (a test compares every form). Messages set aside as not
+reports have their own list with Restore (`/reports/set-aside`); Simple mode shows only a quiet "N messages set
+aside" line. In Technical mode the home page `/` is an overview: open incidents, incidents waiting for officer review, reports in the last
 24 hours (and held ones), drafts awaiting approval, the next filing deadline with its live countdown and model spend
 against the cap, each tile linking to its page and counted with the same helpers as that page
 ([app/dashboard.py](app/dashboard.py)), beside the incidents needing attention, the latest reports and a compact map. Under the tiles, "Meta models at work" lists each model's calls in the last 24 hours, the share answered from the cache, the cost (adding up to the spend tile) and the median time of live calls, from one windowed SQL query, and links to `/accuracy`. `/map` (Leaflet, vendored) draws
-the barangay boundaries and one marker per active incident at the mean of its reports' GPS points inside Biñan, or
+the barangay boundaries and one marker per active incident (every marker a 48 px touch target; markers closer than
+that on screen become one "+N" marker that fans out when tapped) at the mean of its reports' GPS points inside Biñan, or
 at its barangay's centre when no report has GPS (a dashed, hollow "approximate" marker); the marker's shape, a
 number and a legend in words carry the status, not colour alone, and its popup links to the incident. A report
 pinned outside Biñan appears only when the trust checks flagged it, and the map never pans to it. OpenStreetMap
@@ -443,12 +458,14 @@ cross-site posts get a 403.
 
 ### Try it in 2 minutes
 
-1. Open the dashboard and sign in with the passcode (initials are optional). The overview shows the scenario's
+1. Open the dashboard and sign in with the passcode (initials are optional). Home opens in the **Simple** view: the
+   officer's to-do list, most urgent first, with a short "How Ulat works" guide. Then switch to **Technical** from
+   the account menu (top right, View), or open any page with `?mode=technical`: the overview shows the scenario's
    incidents, the review queue, drafts, the filing deadline, a map and "Meta models at work" (the last 24 hours, so
    it fills up once you send a report).
 2. Open **Incidents** and the Malaban flood: its timeline shows the water rising from ankle- to waist-deep and going
-   down again, the agent's reasons for grouping each report, and an **agent trace** per report (which Meta model ran
-   each step, its time and cost).
+   down again, the agent's reasons for grouping each report, and (Technical view) an **agent trace** per report
+   (which Meta model ran each step, its time and cost).
 3. Open **Drafts**: generate the RDANA draft for a barangay (one Spark 1.3 call writes its 1.4 summary; every number is
    checked against the evidence) and approve or reject it. Then generate the San Antonio fish-pen **Notice of
    Loss**: a red "PHOTO REUSED" banner links the De La Paz report that sent the same photo first. The filing clocks
@@ -457,7 +474,8 @@ cross-site posts get a 403.
    photo, voice note or location pin. It answers "received", then a summary of what the agent understood; the report
    appears on the open dashboard live, mapped to its barangay. Reply to the summary to correct it.
 5. **Review** lists what the agent could not settle (an ambiguous place, a reused photo, a fallen tree to confirm);
-   **Accuracy** shows how often each model is right on the labelled sets.
+   **Accuracy** (Technical view) charts how often each model is right on the labelled sets: the roof-damage confusion
+   matrix against hand labels, F1 per flag, the duplicate check, the not-a-report screen and Voice Transcribe.
 
 The synthetic scenario ([data/demo/scenario.json](data/demo/scenario.json), no real people) has 18 Taglish reports
 over two weeks after a fictional typhoon: a Malaban street flooding ankle-, knee-, then waist-deep and receding; a
@@ -485,7 +503,7 @@ cp .env.example .env   # add META_API_KEY, TELEGRAM_BOT_TOKEN, PSEUDONYM_SALT (o
 uv run python -m app.bot                  # Telegram intake bot (long polling; use your own bot's token: @UlatPH_bot is on the production webhook, and polling refuses to start while a webhook is set)
 uv run python -m app.bot_profile --dry-run  # bot name, descriptions and commands: print what would change
 uv run python -m app.bot_profile --photo    # apply only what differs, and upload assets/brand/ulat-avatar.png
-uv run uvicorn app.main:app --reload      # web app: / (overview), /review, /incidents, /reports, /map, /drafts, /damaged-houses (.csv), /accuracy, /media/<id>, /health, live updates at /events (no login on localhost unless OFFICER_PASSCODE is set)
+uv run uvicorn app.main:app --reload      # web app: / (Home: to-do list, or the overview in Technical mode), /help, /reports/set-aside, /review, /incidents, /reports, /map, /drafts, /damaged-houses (.csv), /accuracy, /media/<id>, /health, live updates at /events (no login on localhost unless OFFICER_PASSCODE is set)
 uv run pytest                             # tests (all HTTP is mocked, no API calls)
 uv run ruff check . && uv run ruff format --check .
 ```
@@ -660,6 +678,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | 2026-11-02 | Not-a-report screen (`app/screening.py`): a free rule stores greetings, tests, laughter, emoji and keyboard mash as `not_a_report` before any model call (never a message with a photo, voice note, pin, digit or distress emoji); a Muse Spark yes / no / unsure verdict only for messages whose facts state nothing, where only "no" screens out and "unsure" is flagged for the officer; screened-out messages are kept but out of incidents, counts, drafts, the map and the overview (one shared predicate), with a "Screen the message" trace step, an audited officer restore (`officer_restored`) that re-runs the pipeline, a kind bilingual nudge to the reporter (one per 15 min, also for stickers and GIFs) and `python -m app.assessment --screen` for messages sent before it |
 | 2026-11-02 | Voice Transcribe accuracy in the results file: `scripts.eval_transcribe` runs each voice note through the bot's own audio path under four settings (no hint, language hint, the bot's barangay keywords, and those plus the notes' own place names), scores corpus WER raw and after cleanup and the labelled place names heard, dry-runs the cache and prices uncached audio against the spend cap, and records one `transcribe` entry (metrics only, never audio or text) in `data/eval/results.json`; it reproduced the 2026-10-27 test (WER 19.8% with the hint, 16.3% and 10 of 10 place names with them as keywords) and showed the bot's list helps only for places on it. The accuracy page now leaves out a task it has no table for instead of failing |
 | 2026-11-02 | Material Design 3, mobile-first dashboard: colour roles generated from one seed colour (Material Color Utilities, TonalSpot) in light and dark, the M3 type scale, shapes and state layers in one stylesheet, self-hosted Roboto and a 31-icon Material Symbols sprite (`scripts/build_icons.py`); a bottom navigation bar under 600 px with More as a bottom sheet, a rail up to 1240 px and a drawer above, from one list (`app/nav.py`); an app bar with the live status and an account menu that has room for a mode switch; tables as cards and form tables stacked on phones, 48 px targets, no sideways scrolling at 360 px; in-app navigation (htmx boost into the page region with View Transitions, real URLs, Back / Forward with scroll restored, focus on the heading, a progress bar, the live stream kept open, no report data in session storage, full page loads without JavaScript); snackbars for officer actions; Leaflet loaded only where a map is shown; gzip for pages, styles and scripts; screened-out messages as a chip on `/reports` with a restore form. Lighthouse mobile: performance 99, accessibility 96 (overview) and 100 (draft) |
+| 2026-11-02 | Simple and Technical views (`app/modes.py`): decided on the server per request, remembered per browser in a cookie, switched from the account menu or with `?mode=technical`, default from `DASHBOARD_MODE`. Simple (the default) opens on a to-do list in plain words, most urgent first, one card and one button each (Notices of Loss by filing deadline, reports to check, drafts to approve, barangays with new reports for the RDANA form, new reports; "All caught up" otherwise), names no models, costs, ids, confidence or internal statuses, explains RDANA, DROMIC, Notice of Loss and incident in place, adds a one-line hint and empty state per page, a dismissible "How Ulat works" guide and a Help page, a count badge on Review, and hides Accuracy and the agent internals; Technical shows everything. Same officer actions in both (tested form by form). Screened-out messages get their own list with Restore. Accuracy charts drawn on the server as inline SVG from `data/eval/results.json` (`app/charts.py`): roof-damage confusion matrices, flag F1, the duplicate check, the screen and Voice Transcribe, with number tables. Lighthouse follow-ups: map markers are 48 px targets and close ones fan out, RDANA tables use real captions, and the font and map no longer shift the page (CLS 0.054 to 0.005 on a draft, 0.471 to 0.02 on the map); Lighthouse mobile on Home: 100 / 100 / 100 |
 
 ### Third-party code and assets
 
