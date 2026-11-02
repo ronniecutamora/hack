@@ -47,7 +47,7 @@ Docs: <https://dev.meta.ai/docs/overview>. Check against the live docs before re
 
 - Meta: `META_API_KEY`. Baseten: `BASETEN_API_KEY`. Read them from the environment or a git-ignored `.env`. Commit only `.env.example` with empty values.
 - **Budget:** $150 of Meta credits with a hard $150 spend limit, plus $100 of free Baseten usage for Muse Spark Open. Use Spark 1.3 for bulk calls; cache results during development; don't loop expensive calls in tests (mock them).
-- **Contributor tier** (`*-contributor` models) lets Meta train on the data. Only use it with synthetic or public data, never with user data.
+- **Never use contributor-tier models or contributor mode** (`*-contributor` model IDs, `contributor_mode`, `--contributor-mode on`), for any data, synthetic or public included (Ronnie, 2026-11-02). They let Meta train on what we send. `tests/test_no_contributor_models.py` fails if one appears in `app/`, `scripts/`, `deploy/`, `tests/` or the project config.
 
 ## Privacy
 
