@@ -1,5 +1,5 @@
-"""What the bot tells a reporter it understood: a short bilingual summary built from the stored
-facts, never from a model call, so the reporter can correct a wrong barangay or count.
+"""What the bot tells a reporter it understood: a short bilingual summary built from stored
+facts and photo judgments, never from a model call, so the reporter can correct it.
 
 Only typed fact fields are used (enums and counts) and the place detail goes through the same
 redaction as every other output (`redacted_place`): the reply never repeats a name or a phone
@@ -64,7 +64,11 @@ def _pair(items: list[tuple[str, str]]) -> str:
 
 
 def summary_text(
-    report: Report, facts: dict[str, Any] | None, place: str | None = None
+    report: Report,
+    facts: dict[str, Any] | None,
+    place: str | None = None,
+    *,
+    photo_floodwater: bool = False,
 ) -> str | None:
     """The reply for an assessed report; None for any other status (held, failed, pending):
     those get no facts back. `place` is the barangay to show when the report itself names none
@@ -81,7 +85,13 @@ def summary_text(
         lines.append(f"Lugar / Place: {place}")
     else:
         lines.append(PLACE_UNKNOWN)
-    if (depth := facts.get("flood_depth")) in DEPTHS:
+    depth = facts.get("flood_depth")
+    if photo_floodwater and depth in (None, "none", "unknown"):
+        lines.append(
+            "Baha / Flood: maaaring may baha sa larawan; hindi tiyak ang lalim. / "
+            "The photo may show floodwater; its depth is not confirmed."
+        )
+    elif depth in DEPTHS:
         tagalog, english = DEPTHS[depth]
         lines.append(f"Baha / Flood: {tagalog} / {english}")
     counts = [

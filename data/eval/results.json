@@ -1,5 +1,146 @@
 {
   "schema": 1,
+  "video_reports": {
+    "date": "2026-11-03",
+    "code_commit": "1d4fedb",
+    "models": [
+      "muse-spark-1.3",
+      "sam-3.1"
+    ],
+    "procedure": "Four licensed public videos, manually labeled from sampled frames. Audio removed before processing. Each was sent through the normal video bot handler, report assessment and grouping, with three evenly spaced frames and cached model clients.",
+    "aggregation": "A video is positive when at least one of its three frames is positive.",
+    "limitations": "All four labels are positive for floodwater; there are no negative videos and no assessable roof-damage labels. This small set cannot estimate false positives, roof-damage accuracy, or Philippine field performance.",
+    "n": 4,
+    "spark_floodwater_agreement": 4,
+    "sam_floodwater_agreement": 4,
+    "logged_cost_usd": 0.171651,
+    "clips": [
+      {
+        "id": "hereford",
+        "title": "Hereford Street, Quezon City, Typhoon Ketsana",
+        "source": "https://commons.wikimedia.org/wiki/File:Flooding_in_Hereford_Street,_Project_8,_Quezon_City,_Philippines_from_Typhoon_Ketsana_(Ondoy)_1.webm",
+        "author": "Exec8",
+        "license": "CC BY-SA 4.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "manual_labels": {
+          "floodwater": true,
+          "roof_damage": "unknown"
+        },
+        "label_note": "Floodwater visible; roof damage cannot be established from the sampled view.",
+        "spark_frame_floodwater": [
+          true,
+          true,
+          false
+        ],
+        "spark_frame_roof_damage": [
+          "unknown",
+          "unknown",
+          "none"
+        ],
+        "sam_frame_floodwater": [
+          true,
+          true,
+          false
+        ],
+        "status": "assessed",
+        "latency_seconds": 10.04,
+        "cost_usd": 0.045808
+      },
+      {
+        "id": "ghana",
+        "title": "Flood on the street, Ofankor, Ghana",
+        "source": "https://commons.wikimedia.org/wiki/File:Flood_on_the_street.webm",
+        "author": "Amuzujoe",
+        "license": "CC BY-SA 4.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "manual_labels": {
+          "floodwater": true,
+          "roof_damage": "unknown"
+        },
+        "label_note": "Floodwater visible; roof damage cannot be established from the sampled view.",
+        "spark_frame_floodwater": [
+          true,
+          true,
+          true
+        ],
+        "spark_frame_roof_damage": [
+          "unknown",
+          "unknown",
+          "unknown"
+        ],
+        "sam_frame_floodwater": [
+          true,
+          true,
+          true
+        ],
+        "status": "assessed",
+        "latency_seconds": 12.0,
+        "cost_usd": 0.041324
+      },
+      {
+        "id": "bahrain",
+        "title": "Bahrain Flooding 2024",
+        "source": "https://commons.wikimedia.org/wiki/File:Bahrain_Flooding_2024.webm",
+        "author": "Droodkin",
+        "license": "CC BY-SA 4.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "manual_labels": {
+          "floodwater": true,
+          "roof_damage": "unknown"
+        },
+        "label_note": "Floodwater visible; roof damage cannot be established from the sampled view.",
+        "spark_frame_floodwater": [
+          true,
+          true,
+          true
+        ],
+        "spark_frame_roof_damage": [
+          "unknown",
+          "unknown",
+          "unknown"
+        ],
+        "sam_frame_floodwater": [
+          true,
+          true,
+          true
+        ],
+        "status": "assessed",
+        "latency_seconds": 15.95,
+        "cost_usd": 0.045853
+      },
+      {
+        "id": "nps_path",
+        "title": "Bright Angel Flash Flooding",
+        "source": "https://commons.wikimedia.org/wiki/File:Bright_Angel_Flash_Flooding_(55504926830).webm",
+        "author": "Grand Canyon NPS / K. Hensel",
+        "license": "CC BY 4.0",
+        "license_url": "https://creativecommons.org/licenses/by/4.0/",
+        "manual_labels": {
+          "floodwater": true,
+          "roof_damage": "unknown"
+        },
+        "label_note": "Floodwater visible; roof damage cannot be established from the sampled view.",
+        "spark_frame_floodwater": [
+          true,
+          true,
+          false
+        ],
+        "spark_frame_roof_damage": [
+          "unknown",
+          "unknown",
+          "unknown"
+        ],
+        "sam_frame_floodwater": [
+          true,
+          false,
+          false
+        ],
+        "status": "assessed",
+        "latency_seconds": 8.31,
+        "cost_usd": 0.038666
+      }
+    ]
+  },
   "datasets": {
     "dedupe-pairs-64": {
       "title": "Synthetic report pairs",

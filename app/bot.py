@@ -34,7 +34,15 @@ from app.db import init_db, make_engine, make_recorder
 from app.intake import Admission, IntakeService
 from app.logs import configure_logging
 from app.meta.factory import make_transcriber
-from app.models import STATUS_HELD, STATUS_NOT_A_REPORT, Assessment, Incident, Report, Reporter
+from app.models import (
+    STATUS_HELD,
+    STATUS_NOT_A_REPORT,
+    Assessment,
+    Incident,
+    PhotoAssessment,
+    Report,
+    Reporter,
+)
 from app.reporter_summary import Acknowledgments, summary_text
 from app.retention import purge_loop
 from app.screening import NudgeLimiter
@@ -312,8 +320,19 @@ def reporter_summary(engine: object, report_id: int) -> str | None:
         facts = session.exec(
             select(Assessment.facts).where(Assessment.report_id == report_id)
         ).first()
+        photo_floodwater = any(
+            (judgment or {}).get("floodwater") is True
+            for judgment in session.exec(
+                select(PhotoAssessment.judgment).where(PhotoAssessment.report_id == report_id)
+            ).all()
+        )
         incident = session.get(Incident, report.incident_id) if report.incident_id else None
-        return summary_text(report, facts, incident.barangay if incident else None)
+        return summary_text(
+            report,
+            facts,
+            incident.barangay if incident else None,
+            photo_floodwater=photo_floodwater,
+        )
 
 
 def _admitted(*, attaches: Callable[[IntakeService, int, object], bool] | None = None):

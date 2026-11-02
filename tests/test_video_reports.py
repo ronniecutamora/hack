@@ -389,3 +389,31 @@ async def test_video_with_silent_audio_track_skips_transcription(settings, engin
     await IntakeService(settings, engine).ingest_av(42, path.read_bytes(), video=True)
     assert len([m for m in rows(engine, Media) if m.kind == "photo"]) == 3
     assert not [m for m in rows(engine, Media) if m.kind == "audio"]
+
+
+async def test_simple_reports_and_review_show_video_frames_and_transcript(settings, clip):
+    from fastapi.testclient import TestClient
+
+    from app.assessment import AssessmentService
+    from app.intake import IntakeService
+    from app.main import create_app
+    from tests.test_assessment import FakeLLM, FakeSam
+    from tests.test_intake import FakeTranscriber
+
+    configured = settings.model_copy(update={"dashboard_mode": "simple"})
+    with TestClient(create_app(configured), base_url="http://localhost") as client:
+        engine = client.app.state.engine
+        transcriber = FakeTranscriber()
+        report = await IntakeService(configured, engine, transcriber).ingest_av(
+            42, clip, video=True, caption="Please assess this scene"
+        )
+        await AssessmentService(
+            configured, engine, FakeLLM(), FakeSam(), transcriber=transcriber
+        ).assess(report.id)
+        page = client.get("/reports").text
+        assert "Video" in page and page.count("Frame at") == 3
+        assert "Please assess this scene" in page and "Bumaha na po dito sa amin" in page
+        client.post("/initials", data={"officer": "JDC"})
+        review = client.get("/review").text
+        assert review.count("Frame at") >= 3
+        assert "Bumaha na po dito sa amin" in review

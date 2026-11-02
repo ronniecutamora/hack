@@ -88,6 +88,16 @@ def test_summary_text_is_bilingual_and_built_from_the_facts():
     assert "Recorded as a correction" in text and "none stated" in text
 
 
+async def test_summary_does_not_deny_water_seen_in_a_photo(settings, engine):
+    ctx, tasks, _ = summary_context(settings, engine, facts(flood_depth="none"))
+    update = message(photo=[Downloadable(jpeg())], caption="Please assess this scene")
+    await bot.on_photo(update, ctx)
+    await settle(tasks)
+    (text,) = summaries(update)
+    assert "may show floodwater" in text and "depth is not confirmed" in text
+    assert "no flooding" not in text
+
+
 @pytest.mark.parametrize("status", ["held", "assessment_failed", "new", "assessing"])
 def test_no_facts_go_back_for_a_report_that_is_not_assessed(status):
     report = Report(id=1, reporter_id=1, channel="telegram", barangay="Casile", status=status)

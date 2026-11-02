@@ -99,8 +99,28 @@ would cost **$0.276**. These are SAM charges only: Spark judgment and any transc
 motion continuity, but this workflow needs a few officer-reviewable stills; we have not established that tracking adds
 enough evidence to justify its extra cost. The comparison changes if the number of stills or tracking frames changes.
 
+**Video evaluation (2026-11-03).** Four public videos were labeled from sampled frames and run through the real
+bot handler and agent, with three frames each. Their audio was removed before processing; the image content was not
+changed. The hand label for floodwater was **yes in all four**; roof damage was **unknown in all four**, because the
+sampled views do not establish roof damage. A video counts positive below if at least one frame is positive. Costs
+include the report's Spark and SAM calls, and times are first-run wall time, not cached replay time.
+
+| Video and license | Spark frames with floodwater | SAM frames with floodwater | Time | Estimated cost |
+|---|---:|---:|---:|---:|
+| [Hereford Street, Philippines](https://commons.wikimedia.org/wiki/File:Flooding_in_Hereford_Street,_Project_8,_Quezon_City,_Philippines_from_Typhoon_Ketsana_%28Ondoy%29_1.webm), Exec8, [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) | 2/3 | 2/3 | 10.04 s | $0.045808 |
+| [Ofankor, Ghana](https://commons.wikimedia.org/wiki/File:Flood_on_the_street.webm), Amuzujoe, [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) | 3/3 | 3/3 | 12.00 s | $0.041324 |
+| [Bahrain](https://commons.wikimedia.org/wiki/File:Bahrain_Flooding_2024.webm), Droodkin, [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) | 3/3 | 3/3 | 15.95 s | $0.045853 |
+| [Bright Angel, US](https://commons.wikimedia.org/wiki/File:Bright_Angel_Flash_Flooding_%2855504926830%29.webm), Grand Canyon NPS / K. Hensel, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | 2/3 | 1/3 | 8.31 s | $0.038666 |
+
+Both models agreed with the floodwater label on **4/4 videos** at that video-level threshold. This tiny, all-positive
+set cannot measure false positives or roof-damage accuracy and is not a Philippine field-performance estimate. The
+Hereford report was assessed again with **10/10 calls served from cache, $0 new logged cost**. The first live reply
+incorrectly said there was no flooding despite the photo judgments; the corrected cached reply says the photo may show
+floodwater and its depth is unconfirmed. Per-frame judgments, license links and costs are in
+[data/eval/results.json](data/eval/results.json); the video files are not committed.
+
 **"Here's what we understood."** When a report's assessment finishes, the bot answers in the same chat with what the
-agent took from it, built from the stored facts with no extra model call: the barangay (or "hindi pa alam ang lugar /
+agent took from it, built from stored facts and photo judgments with no extra model call: the barangay (or "hindi pa alam ang lugar /
 place not identified yet: send a location pin"), the flood depth, the counts and the needs, ending "Mali? I-reply ang
 tamang detalye. / Wrong? Reply with the correct details." The place detail goes through the same redaction as every
 output, so the reply never repeats a name or phone number, not even the reporter's own. A report must stay quiet for
@@ -779,6 +799,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 | Date | What was built |
 |---|---|
 | 2026-11-03 | Short-video and audio-file Telegram intake through the existing report, agent and officer review: bounded ffmpeg extraction, timestamped photo evidence, audio transcription, retention, admission gates and trace steps |
+| 2026-11-03 | Evaluated four licensed flood videos and corrected reporter summaries that contradicted floodwater visible in photo evidence; recorded per-clip results, costs and limitations |
 | 2026-10-26 | Repo scaffold: AGENTS.md, README.md |
 | 2026-10-27 | Project scope: added floods and PCIC crop/fisheries Notices of Loss as outputs of the reporting agent; chose Biñan, Laguna as the demo area and Python/FastAPI as the stack |
 | 2026-10-27 | Slice 1: Python/uv project; clients for Voice Transcribe, Spark 1.3, SAM 3.1 and Spark Open with a shared response cache and call log; SQLite storage with pseudonymous reporters; intake service and Telegram bot for text, photo, voice and location; raw-media retention purge; `/health` and `/reports` pages; transcription WER eval script; mocked-HTTP tests |
