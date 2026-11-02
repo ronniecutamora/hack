@@ -173,19 +173,19 @@
       "backend": "Meta Model API",
       "sam": "sam-3.1",
       "date": "2026-11-02",
-      "commit": "d221db5e59b6",
+      "commit": "ea6b05376bd3",
       "n": 25,
       "errors": 0,
       "metrics": {
         "photos": 25,
-        "disagreed": 1,
-        "asked": 0,
+        "disagreed": 2,
+        "asked": 1,
         "checks": {
           "floodwater_not_outlined": {
             "asks": true,
-            "fired": 0,
+            "fired": 1,
             "spark_right": 0,
-            "sam_right": 0
+            "sam_right": 1
           },
           "floodwater_not_judged": {
             "asks": false,
@@ -217,7 +217,7 @@
       "backend": "Baseten",
       "sam": "sam-3.1",
       "date": "2026-11-02",
-      "commit": "d221db5e59b6",
+      "commit": "ea6b05376bd3",
       "n": 25,
       "errors": 0,
       "metrics": {
@@ -261,12 +261,12 @@
       "backend": "Meta Model API",
       "sam": "sam-3.1",
       "date": "2026-11-02",
-      "commit": "d221db5e59b6",
+      "commit": "ea6b05376bd3",
       "n": 40,
       "errors": 0,
       "metrics": {
         "photos": 40,
-        "disagreed": 21,
+        "disagreed": 19,
         "asked": 0,
         "checks": {
           "floodwater_not_outlined": {
@@ -277,8 +277,8 @@
           },
           "floodwater_not_judged": {
             "asks": false,
-            "fired": 21,
-            "spark_right": 21,
+            "fired": 19,
+            "spark_right": 19,
             "sam_right": 0
           },
           "roof_not_outlined": {
@@ -305,7 +305,7 @@
       "backend": "Baseten",
       "sam": "sam-3.1",
       "date": "2026-11-02",
-      "commit": "d221db5e59b6",
+      "commit": "ea6b05376bd3",
       "n": 40,
       "errors": 0,
       "metrics": {

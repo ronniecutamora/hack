@@ -139,13 +139,13 @@ Measured on labeled sets with real (cached) model calls, not mocks. Every number
 | muse-spark-1.3 | Real rice-field photos (real) | 19 | 0.75 | 16 of 19 | 1.00 / 0.80 | "rice field" 12 of 19; "rice plants" 8 of 19 | "rice field" 9 of 12; "rice plants" 6 of 8 | 2026-11-02 |
 | muse-spark-open | Real rice-field photos (real) | 19 | 0.83 | 17 of 19 | 1.00 / 0.80 | "rice field" 12 of 19; "rice plants" 8 of 19 | "rice field" 9 of 12; "rice plants" 6 of 8 | 2026-11-02 |
 
-**Spark and SAM 3.1 check each other** on every photo. When Spark sees floodwater or a partly damaged roof that SAM cannot outline, the report gets a trust signal and Review asks the officer; the other disagreements are only measured (each cell: times it fired, then whose answer matched the hand label). muse-spark-1.3: they disagreed on 22 of 65 photos, and Review asked about 0; muse-spark-open: they disagreed on 23 of 65 photos, and Review asked about 0.
+**Spark and SAM 3.1 check each other** on every photo. When Spark sees floodwater or a partly damaged roof that SAM cannot outline, the report gets a trust signal and Review asks the officer; the other disagreements are only measured (each cell: times it fired, then whose answer matched the hand label). muse-spark-1.3: they disagreed on 21 of 65 photos, and Review asked about 1; muse-spark-open: they disagreed on 23 of 65 photos, and Review asked about 0.
 
 | Model | Dataset | n | Disagreed | Asked the officer | Floodwater: Spark sees it, SAM outlines none (asks) | Floodwater: SAM outlines it, Spark sees none (measured only) | Partly damaged roof: SAM outlines no roof (asks) | Severe roof damage: SAM outlines no roof (measured only) | Date |
 |---|---|---|---|---|---|---|---|---|---|
-| muse-spark-1.3 | Real typhoon photos (real) | 25 | 1 | 0 of 25 | 0 (Spark 0, SAM 0) | 0 (Spark 0, SAM 0) | 0 (Spark 0, SAM 0) | 1 (Spark 1, SAM 0) | 2026-11-02 |
+| muse-spark-1.3 | Real typhoon photos (real) | 25 | 2 | 1 of 25 | 1 (Spark 0, SAM 1) | 0 (Spark 0, SAM 0) | 0 (Spark 0, SAM 0) | 1 (Spark 1, SAM 0) | 2026-11-02 |
 | muse-spark-open | Real typhoon photos (real) | 25 | 1 | 0 of 25 | 0 (Spark 0, SAM 0) | 0 (Spark 0, SAM 0) | 0 (Spark 0, SAM 0) | 1 (Spark 1, SAM 0) | 2026-11-02 |
-| muse-spark-1.3 | Synthetic Biñan-style photos (synthetic) | 40 | 21 | 0 of 40 | 0 (Spark 0, SAM 0) | 21 (Spark 21, SAM 0) | 0 (Spark 0, SAM 0) | 1 (Spark 1, SAM 0) | 2026-11-02 |
+| muse-spark-1.3 | Synthetic Biñan-style photos (synthetic) | 40 | 19 | 0 of 40 | 0 (Spark 0, SAM 0) | 19 (Spark 19, SAM 0) | 0 (Spark 0, SAM 0) | 1 (Spark 1, SAM 0) | 2026-11-02 |
 | muse-spark-open | Synthetic Biñan-style photos (synthetic) | 40 | 22 | 0 of 40 | 0 (Spark 0, SAM 0) | 22 (Spark 22, SAM 0) | 0 (Spark 0, SAM 0) | 2 (Spark 1, SAM 1) | 2026-11-02 |
 
 **Incident pair judge** ("is this new report the same incident?", merge threshold 0.85; below it, or unsure, goes to the officer):
@@ -181,14 +181,15 @@ Read these numbers with their caveats:
 - **The pair set is synthetic and too easy to separate the models.** Both score 1.00 on 64 hand-written pairs. Real reports will be messier; the officer-review path for unsure and low-confidence pairs stays.
 - **Fallen trees are the weak spot on real photos** (F1 0.57 on Spark 1.3, 0.40 on Spark Open), as the 2026-10-27 kill test found. The dashboard therefore asks for confirmation of fallen trees.
 - **SAM calls the lake "floodwater".** On the synthetic lakeshore scenes, SAM's floodwater precision is 0.28: Laguna de Bay itself, fish-pen water and an irrigated paddy are masked as floodwater. For a lakeshore city, the SAM floodwater mask is evidence for the officer; the LLM's judgment (floodwater F1 0.82 / 0.95 there) decides.
-- **When Spark and SAM disagree, the hand label sided with Spark every time.** They disagreed on 22 of the 65
-  photos (Spark 1.3): on 21 synthetic lakeshore photos SAM outlined the lake, a canal or a wet road as
-  floodwater where Spark saw none, and on 1 severely damaged house SAM outlined no roof. So the check asks the
-  officer only the other way round, when Spark sees floodwater or a partly damaged roof that SAM cannot outline,
-  and that happened on 0 of 65 photos: on these sets it costs the officer nothing. Its benefit, catching a Spark
-  judgment the photo does not support, is ⚠️ not measured yet: no labeled photo has one. The officer's answer
-  never changes the counts (they keep Spark's judgment); it clears the flag or keeps the report marked doubtful,
-  like every trust signal.
+- **When Spark and SAM disagree, the hand label mostly sided with Spark.** They disagreed on 21 of the 65
+  photos (Spark 1.3, re-scored on 2026-11-02 from the photo re-run above): on 19 synthetic lakeshore photos SAM
+  outlined the lake, a canal or a wet road as floodwater where Spark saw none, and on 1 severely damaged house
+  SAM outlined no roof; the hand label sided with Spark in those 20. So the check asks the officer only the
+  other way round, when Spark sees floodwater or a partly damaged roof that SAM cannot outline. That happened on
+  1 of 65 photos: Spark 1.3 called floodwater on a dry real photo, SAM outlined none, and the hand label sided
+  with SAM, which is the catch the question exists for (n = 1; the run before the re-run had none). The
+  officer's answer never changes the counts (they keep Spark's judgment); it clears the flag or keeps the
+  report marked doubtful, like every trust signal.
 - **Rice fields: the judge, not SAM.** On 19 real rice-field photos from Wikimedia Commons (IRRI and others, credits under "Third-party code and assets"; labeled by one person, n is small), both models say whether a field is flooded, lodged or not visibly damaged with κ 0.75 (Spark 1.3) and 0.83 (Spark Open), and never called a normally irrigated paddy damaged. SAM 3.1 outlined a "rice field" in only 12 of 19 photos, and in only 2 of the 7 flooded ones, where the water hides the field; so Ulat does not report "water over N % of the field". The field condition is evidence for the PCIC adjuster on the rice claim; the loss figure is the adjusters'.
 - **Spark Open is close to Spark 1.3** on photos and equal on pairs, which is what the open-weight mode needs.
 - **The screen kept every real report** on 60 synthetic Telegram-style messages (30 reports, many very short or
