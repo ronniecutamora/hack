@@ -778,7 +778,8 @@ td.field-label { width: 38%; }
 .q__more > summary { min-height: var(--target); display: flex; align-items: center; font: var(--md-sys-typescale-label-large); color: var(--md-sys-color-primary); cursor: pointer; }
 .ask-once { max-width: 26rem; }
 .ask-once form { display: grid; gap: var(--space-3); }
-.ask-once input { font-size: 1.25rem; text-transform: uppercase; }
+.ask-once input { font-size: 1.25rem; }
+.ask-once input:not(:placeholder-shown) { text-transform: uppercase; }
 .all-drafts > summary { cursor: pointer; }
 .all-drafts > summary h2 { display: inline; }
 .snackbar__action { min-height: var(--target); margin: 0; padding-inline: .75rem; background: transparent; color: var(--md-sys-color-inverse-primary); }
