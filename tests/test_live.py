@@ -7,6 +7,7 @@ from other connections, not in-process signals.
 import asyncio
 import json
 import re
+import threading
 import time
 
 import pytest
@@ -154,6 +155,34 @@ async def test_closing_the_hub_ends_open_streams(db):
     with pytest.raises(StopAsyncIteration):
         await asyncio.wait_for(waiting, WAIT_S)
     assert hub.subscriber_count == 0 and not hub.accepting()
+
+
+async def test_shutdown_waits_for_an_active_database_read(db, monkeypatch):
+    hub = await started_hub(db)
+    entered, release, finished = threading.Event(), threading.Event(), threading.Event()
+    original = hub._check
+
+    def delayed_read():
+        entered.set()
+        try:
+            assert release.wait(WAIT_S)
+            return original()
+        finally:
+            finished.set()
+
+    monkeypatch.setattr(hub, "_check", delayed_read)
+    assert await asyncio.to_thread(entered.wait, WAIT_S)
+    stopping = asyncio.create_task(hub.stop())
+    try:
+        await asyncio.sleep(0.05)
+        assert not stopping.done(), "closed the connection while a worker was still reading"
+    finally:
+        release.set()
+        assert await asyncio.to_thread(finished.wait, WAIT_S)
+        await stopping
+        if hub._connection is not None:  # clean up the unsafe old behavior when this test fails
+            hub._connection.close()
+            hub._connection = None
 
 
 async def test_a_replaced_database_file_is_reopened(db):

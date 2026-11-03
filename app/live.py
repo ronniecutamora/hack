@@ -129,6 +129,7 @@ class ChangeHub:
         self._file_id: tuple[int, int] | None = None
         self._data_version: int | None = None
         self._task: asyncio.Task[None] | None = None
+        self._stop_polling = asyncio.Event()
         self._failing = False
 
     # -- watching (the blocking parts run in a worker thread, one at a time) --
@@ -181,9 +182,10 @@ class ChangeHub:
                 if self._failing:
                     logger.info("live updates resumed")
                 self._failing = False
-            if changed:
+            if changed and not self.closed:
                 self.publish(changed)
-            await asyncio.sleep(self.poll_seconds)
+            with suppress(TimeoutError):
+                await asyncio.wait_for(self._stop_polling.wait(), timeout=self.poll_seconds)
 
     def publish(self, topics: set[str]) -> None:
         self.changed_at = _now()
@@ -193,15 +195,17 @@ class ChangeHub:
     def close(self) -> None:
         """End every stream now (server shutdown); later requests get 503."""
         self.closed = True
+        self._stop_polling.set()
         for subscriber in self._subscribers:
             subscriber.wake()
 
     async def stop(self) -> None:
         self.close()
         if self._task is not None:
-            self._task.cancel()
-            with suppress(asyncio.CancelledError):
-                await self._task
+            # Cancelling to_thread only cancels its awaiter, not the SQLite operation itself.
+            # Let the current read finish before closing the connection it is using.
+            await self._task
+            self._task = None
         if self._connection is not None:
             self._connection.close()
             self._connection = None

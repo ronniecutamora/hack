@@ -813,6 +813,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 
 | Date | What was built |
 |---|---|
+| 2026-11-03 | Live updates now wait for an in-flight SQLite read to finish before closing its connection at shutdown; a regression test covers the race |
 | 2026-11-03 | Submission readiness: judge-first README and guarded evaluation highlights, source and dependency audit, complete configuration template, and a zero-spend local webhook and dashboard smoke test |
 | 2026-11-03 | Short-video and audio-file Telegram intake through the existing report, agent and officer review: bounded ffmpeg extraction, timestamped photo evidence, audio transcription, retention, admission gates and trace steps |
 | 2026-11-03 | Evaluated four licensed flood videos and corrected reporter summaries that contradicted floodwater visible in photo evidence; recorded per-clip results, costs and limitations |
