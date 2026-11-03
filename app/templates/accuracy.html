@@ -52,7 +52,7 @@
     <p class="empty">No accuracy results are recorded yet. They appear here after an evaluation run is recorded (<code>--record</code>; see the README, "How well it works").</p>
   {% else %}
     <p>{{ page.tables|length }} measurement{{ "s" if page.tables|length != 1 }} · latest run {{ page.latest_date }} · {{ page.spend_usd|usd }} spent on the recorded runs at list prices. Each table puts Muse Spark 1.3 beside Muse Spark Open, the open-weight model, on the same items.</p>
-    <p class="muted">Small sets: with 25 to 64 items, one changed answer moves a score by a few hundredths. A score below {{ "%.1f"|format(weak_below) }} is marked weak.</p>
+    <p class="muted">Small sets: one changed answer can noticeably move a score. A score below {{ "%.1f"|format(weak_below) }} is marked weak.</p>
 
     {% for t in page.tables %}
       <section class="card accuracy" id="{{ t.task }}-{{ t.dataset.id }}" aria-labelledby="{{ t.task }}-{{ t.dataset.id }}-title">

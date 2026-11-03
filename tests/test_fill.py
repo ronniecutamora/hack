@@ -772,7 +772,13 @@ def test_personal_fields_say_where_they_are_kept_and_can_be_cleared(client, engi
         assert "data-shared-warning hidden" in page  # app.js shows it once, at the first entry
         assert fillable.PERSONAL_NOTE not in field_block(page, "1.1.1")
     # The save endpoint keeps nothing personal, even when a personal key is posted.
-    v2 = saved_id(fill(client, draft_id, [("1.3.2", "52"), ("1.3.6", "a@b.ph"), ("1.1.1", "T")]))
+    v2 = saved_id(
+        fill(
+            client,
+            draft_id,
+            [("1.3.2", "52"), ("1.3.6", "reporter@example.invalid"), ("1.1.1", "T")],
+        )
+    )
     assert set(stored(engine, v2).entries) == {"1.1.1"}
 
 

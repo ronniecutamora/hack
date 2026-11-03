@@ -132,10 +132,10 @@ printed (the replaced database is kept on the container as `app.db.before-restor
   the next start. Measured on staging (2026-10-30): an update posted 2.5 s before `modal app stop` was in a
   snapshot 0.6 s after it was handled; a stop with an assessment in flight took about 18 s from the stop
   command to the lease release; after the restart both test reports were there and were assessed and grouped.
-- **Loss window:** a graceful stop, redeploy or preemption loses nothing the bot acknowledged. A crash that skips
-  shutdown loses at most about 5 seconds of acknowledged reports (plus a webhook update still in the queue: answered
-  200 but not yet handled, usually under a second) and at most the last 2 minutes of other database writes
-  (assessments, officer actions). Media are committed every few seconds.
+- **Loss window:** a graceful stop attempts to drain queued updates and take a final snapshot; the staging stop
+  test above preserved both test reports. A crash can lose writes since the last successful snapshot, including
+  acknowledged updates still in the queue. Snapshot requests are coalesced and the periodic interval is a target,
+  not a guaranteed upper bound: a failed or delayed backup can extend the window. Media are committed separately.
 - A lease file (`snapshots/LEASE.json`) keeps one writer: a starting container waits up to 45 s for the previous
   one to release it, and takes over a lease that has not been refreshed for 2 intervals + 60 s.
 - Download a snapshot for an offline copy: `modal volume get ulat-data snapshots/<name> .` (it holds personal

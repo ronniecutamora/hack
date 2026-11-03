@@ -247,6 +247,8 @@ class Commodity:
         return self.eligible_words or ", or ".join(words)
 
 
+# Public institutional contact, PCIC Citizen's Charter, regional-office directory:
+# https://pcic.gov.ph/wp-content/uploads/2025/04/PCIC-Citizens-Charter_2025_1st-Edition.pdf
 PCIC_REGION_IV = Office(
     name="PCIC Regional Office No. IV",
     number="IV",

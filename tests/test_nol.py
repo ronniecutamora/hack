@@ -204,7 +204,7 @@ def test_phone_numbers_and_names_in_photo_notes_are_removed(client, engine):
 @pytest.mark.parametrize(
     "text,redacted",
     [
-        ("Email po: pedro.santos+pcic@gmail.com salamat", "Email po: [email] salamat"),
+        ("Email po: reporter@example.invalid salamat", "Email po: [email] salamat"),
         ("I-message nyo po ako @pedrosantos99 sa FB", "I-message nyo po ako [handle] sa FB"),
         ("FB: Pedro Santos Jr, salamat po", "FB: [account], salamat po"),
         ("Messenger name: Nena Salindap. Baha pa", "Messenger name: [account]. Baha pa"),

@@ -18,15 +18,14 @@ finished snapshot files:
 data, named after it (app-…Z-before-reseed.db). Retention never prunes it and a start never
 restores it by itself; `python -m app.deploy restore` can name it to undo the change.
 
-Loss window: a crash that skips the shutdown snapshot loses the database writes since the last
-snapshot: at most about SNAPSHOT_SOON_S of acknowledged reports, and at most one interval
-(default 2 minutes) of everything else (assessments, officer actions). Media files are written
-to the volume directly and are committed with each snapshot (and by Modal's background commits
-every few seconds).
+Loss window: a crash that skips shutdown can lose writes since the last successful snapshot,
+including acknowledged updates still in the queue. SNAPSHOT_SOON_S and the periodic interval
+are scheduling targets, not upper bounds if a backup fails or is delayed. Media files are written
+to the volume directly and committed separately.
 
 **Lease:** one writer at a time. A starting container waits (up to LEASE_WAIT_S) for a previous
-container that still holds a fresh lease to write its final snapshot and release it, so a
-restart or redeploy never restores a snapshot older than the last writes. A crashed holder's
+container that still holds a fresh lease to write its final snapshot and release it. A timeout or
+failed final snapshot can leave newer writes absent from the restored snapshot. A crashed holder's
 lease goes stale and is taken over. A container whose lease was taken over (it hung, then woke
 up) writes no snapshot and never touches the new holder's lease: `backup()` re-reads the lease
 first. On Modal a container sees another's lease only after a volume reload, which is unsafe

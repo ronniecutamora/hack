@@ -1,10 +1,26 @@
 # Ulat
 
-> An entry for the **Meta Global AI Developer Hackathon** (Oct 27 – Nov 4, 2026), built for the Philippines with Meta's Muse models.
+Ulat turns photos, short videos, audio, voice notes and text about typhoon and flood damage into evidence-backed RDANA drafts, damaged-houses tables and PCIC fisheries claims for an officer to review. It is built for Biñan's CDRRMO and fisherfolk; rice claims are a per-office option and are off for Biñan until its rice area is verified.
 
-**Status:** live prototype. Since 2026-10-30 it runs on Modal: the officer dashboard at
-<https://ronniecutamora47--ulat.modal.run>, seeded with a synthetic typhoon scenario, and the Telegram bot
-[@UlatPH_bot](https://t.me/UlatPH_bot) (see [Demo](#demo)). It is a hackathon prototype, not a service of Biñan City. Typhoon and flood damage reporting for Philippine LGUs, plus PCIC insurance claims: one agent turns photos, Taglish voice notes, and texts from barangays, fisherfolk and rice farmers into an officer-approved RDANA report, a damaged-houses table, a PCIC Notice of Loss for each fish cage or pen loss, and a PCIC Claim for Indemnity for each flooded or flattened rice field. Corn and other crops are later work. Demo area: Biñan City, Laguna.
+**Judge links:** [Live dashboard](https://ronniecutamora47--ulat.modal.run) (passcode in the private judging notes) · [Telegram bot @UlatPH_bot](https://t.me/UlatPH_bot) · [YouTube link: added at submission]. Ulat is a prototype, not an official Biñan City service; it is not an emergency hotline.
+
+**Meta models:** Muse Spark 1.3 and Muse Spark Open extract facts, judge photos, group reports and draft summaries; Muse Voice Transcribe reads speech; SAM 3.1 outlines roofs and floodwater as evidence; Muse Image creates synthetic demo imagery.
+
+**Measured on small labeled sets:** [recorded results and limitations](data/eval/results.json); see [How well it works](#how-well-it-works) for full scores and caveats.
+
+<!-- eval-headlines:start -->
+- **0.60 κ** for roof damage on 25 real typhoon photos (Spark 1.3).
+- **1.00 F1** on 64 synthetic incident pairs (Spark 1.3; a small, easy set).
+- **0 of 30** synthetic disaster reports wrongly filtered among 60 test messages.
+- **19.1% word error rate** on 8 Taglish voice notes read by one speaker (the bot's keyword setting).
+<!-- eval-headlines:end -->
+
+## Try it in 2 minutes
+
+1. Open the dashboard with the passcode in the private judging notes. Home shows the officer's work queue.
+2. Open **Review** to inspect uncertain reports, then **Drafts** to open an RDANA or fisheries claim and its print view.
+3. Switch to **Technical** and open **Accuracy** to see the labeled results; inspect a report's agent trace to see the models and their evidence.
+4. Optional: send the bot a synthetic text, photo, voice note, audio file or short video. The bot is not monitored for emergencies.
 
 ---
 
@@ -34,7 +50,7 @@ prototype for that gap; the city has not adopted it.
 
 ## What it does
 
-1. Residents send photos, voice notes, texts and location pins; the agent extracts damage facts and maps the report to a barangay. Reporters often send a photo and then type its words: a text within 2 minutes of the same reporter's caption-less photo, with nothing in between, becomes that photo's caption (the bot answers "Idinugtong sa iyong larawan. / Added to your photo."), and the photo is re-assessed and re-grouped with it, like a late location pin. Photos sent as one Telegram album (one `media_group_id`) are one report: one "received" reply, every photo assessed, and a text after a caption-less album captions all of it.
+1. Residents send photos, short videos, audio files, voice notes, texts and location pins; the agent extracts damage facts and maps the report to a barangay. Reporters often send a photo and then type its words: a text within 2 minutes of the same reporter's caption-less photo, with nothing in between, becomes that photo's caption (the bot answers "Idinugtong sa iyong larawan. / Added to your photo."), and the photo is re-assessed and re-grouped with it, like a late location pin. Photos sent as one Telegram album (one `media_group_id`) are one report: one "received" reply, every photo assessed, and a text after a caption-less album captions all of it.
 2. Deterministic place/time/GPS filters find candidate incidents. A text-only Meta pair judge decides whether reports describe the same situation; uncertainty stays separate for officer review. Every candidate is judged, not just the first, so a correction ("mali po… dalawang bahay lang, hindi tatlo") lands in the incident that holds the figure it corrects.
 3. Officers read incident timelines, depth changes and the stored reasons for grouping, and resolve what the agent could not settle in a review queue: merge, keep separate, set the place, check trust signals, confirm fallen trees, block a reporter (see [Officer review](#officer-review)). Reported totals explicitly warn about double-counting, including corrections.
 4. The agent drafts each barangay's RDANA form and the city's damaged-houses table from that evidence; the officer checks every value against its linked reports, then approves or rejects the draft (see [Officer outputs](#officer-outputs)).
@@ -219,7 +235,7 @@ Measured on labeled sets with real (cached) model calls, not mocks. Every number
 
 Read these numbers with their caveats:
 
-- **The real set is not Biñan.** It is 25 Wikimedia Commons photos of typhoons Haiyan (2013), Ketsana/Ondoy (2009) and Rai/Odette (2021), mostly severe damage, hand-labeled by one person for the 2026-10-27 kill test (credits under "Third-party code and assets"). The 2026-11-02 rows are a re-run after the judge prompt gained its rice-field question (SAM replies cached): roof-damage κ moved from 0.66 to 0.60 (Spark 1.3) and from 0.56 to 0.50 (Spark Open), and Spark 1.3 called floodwater on one dry photo. The same house prompt scored κ 0.78 on 2026-10-27 and 0.66 on 2026-10-28: with 25 photos, one changed answer moves κ by about 0.05, so these shifts are within run-to-run noise.
+- **The real set is not Biñan.** It is 25 Wikimedia Commons photos of typhoons Haiyan (2013), Ketsana/Ondoy (2009) and Rai/Odette (2021), mostly severe damage, hand-labeled by one person for the 2026-10-27 kill test (credits under "Third-party code and assets"). The 2026-11-02 rows are a re-run after the judge prompt gained its rice-field question (SAM replies cached); Spark 1.3 called floodwater on one dry photo. The small set and limited repeat runs do not establish field performance or run-to-run variation.
 - **The synthetic set is synthetic.** Its 40 photos are Muse Image renders of Biñan-style scenes from [a scene table](data/eval/vision_scenes.json), stamped as AI-generated. Their labels were designed per scene and then checked against every image: 3 labels changed (a roof is visible on the far shore of three fish-pen photos) and 4 borderline ones were kept and noted. Accuracy on renders is not accuracy on residents' phone photos.
 - **The pair set is synthetic and too easy to separate the models.** Both score 1.00 on 64 hand-written pairs. Real reports will be messier; the officer-review path for unsure and low-confidence pairs stays.
 - **Fallen trees are the weak spot on real photos** (F1 0.57 on Spark 1.3, 0.40 on Spark Open), as the 2026-10-27 kill test found. The dashboard therefore asks for confirmation of fallen trees.
@@ -235,45 +251,40 @@ Read these numbers with their caveats:
   report marked doubtful, like every trust signal.
 - **Rice fields: the judge, not SAM.** On 19 real rice-field photos from Wikimedia Commons (IRRI and others, credits under "Third-party code and assets"; labeled by one person, n is small), both models say whether a field is flooded, lodged or not visibly damaged with κ 0.75 (Spark 1.3) and 0.83 (Spark Open), and never called a normally irrigated paddy damaged. SAM 3.1 outlined a "rice field" in only 12 of 19 photos, and in only 2 of the 7 flooded ones, where the water hides the field; so Ulat does not report "water over N % of the field". The field condition is evidence for the PCIC adjuster on the rice claim; the loss figure is the adjusters'.
 - **Spark Open is close to Spark 1.3** on photos and equal on pairs, which is what the open-weight mode needs.
-- **The screen kept every real report** on 60 synthetic Telegram-style messages (30 reports, many very short or
-  typo-heavy, and 30 non-reports): 0 real reports wrongly filtered, recall 1.00, precision 0.94. The free rule
+- **The screen kept every synthetic disaster report** on 60 synthetic Telegram-style messages (30 reports, many very short or
+  typo-heavy, and 30 non-reports): 0 synthetic disaster reports wrongly filtered, recall 1.00, precision 0.94. The free rule
   dropped 20 non-reports with no model call; 8 more were screened out by Muse Spark after the facts call found
   nothing. Two were kept because the facts call read them as requests for help ("needs: other"): "Sino may charger
   ng Samsung dyan?" and "pa-load naman po 50". The precision-first policy keeps such messages on purpose. The
-  messages are synthetic; residents' own will be messier.
+  messages are synthetic; residents' own may be messier.
 - **Voice Transcribe was measured on one speaker reading scripts.** The 8 Taglish voice notes (399 words) were
   recorded by the builder on a phone, in the roles of barangay officials, farmers and fisherfolk, with invented
   names and places. They are read speech, not field recordings: no wind, rain, crowd noise or second speaker, so
-  residents' reports will score worse. The audio and the reference texts stay outside the repo; only these metrics
-  are committed. Each setting is one run per note, and identical requests have returned different words, so a gap
-  of 2–3 WER points between rows is within noise.
+  performance on residents' reports is unverified. The audio and the reference texts stay outside the repo; only these metrics
+  are committed. Each setting is one run per note, and identical requests have returned different words, so these small measured gaps cannot establish a reliable difference.
 - **WER is not the share of wrong facts.** It counts every word that differs from the script after lowercasing
   and dropping punctuation, so "seventy" for "70" or "dalawa't kalahati" for "2.5" is an error even when the fact
   is right. The repeated-word cleanup the bot runs before reading facts takes off 1.3–3.3 points. Whether the facts
   survive is a separate measure (`scripts.eval_facts`: transcript, then Spark, then fields), not in this table;
-  the 2026-10-27 test's hand count of 31 of 37 key facts (84%) cannot be reproduced from plain-text references, so
+  ⚠️ the 2026-10-27 test's hand count of 31 of 37 key facts (84%) cannot be reproduced from plain-text references, so
   it is not recorded.
 - **Keywords fix place names only when the place is on the list.** The notes name invented barangays and sitios
   that stand in for real ones. With those names on the keyword list, all 10 were spelled right (WER 18.8%, 14.0%
   after cleanup). With only Biñan's 29 barangay names and aliases it heard the same 3 of 10 as with no list. So
   the list should help with real names (⚠️ not measured: no note names a real barangay or street).
-- **The long street list costs nothing measurable, so the bot sends it.** Voice Transcribe accepts at most 500
+- **The bot sends a long street list; its benefit is unverified.** Voice Transcribe accepts at most 500
   keywords of up to 30 characters each (the API answers HTTP 400 past either; the docs give no limit, tested
   2026-11-02). The bot sends the barangays first, then the OpenStreetMap names (areas, landmarks, then streets
-  by length) up to 500. With 100 or 471 OSM names, WER (20.5% and 19.1%) stayed within noise of the barangays
-  alone (20.3%), and no list put a name in a transcript that the speaker did not say (0 false insertions, counted
+  by length) up to 500. With 100 or 471 OSM names, WER was 20.5% and 19.1%, compared with 20.3% for the barangays
+  alone, and no list put a name in a transcript that the speaker did not say (0 false insertions, counted
   over all 510 keywords any row sends; the notes' own place names inserted 1). The 4 of 10 place names with the
-  long list is noise too: none of the notes' places is on the OSM list. Because no note names a Biñan street,
+  long list does not establish a benefit: none of the notes' places is on the OSM list. Because no note names a Biñan street,
   this measures the cost of the long list, not its benefit (⚠️ follow-up: voice notes that name real streets,
   read by a synthetic voice; Meta offers no text-to-speech).
-- **Rows move between runs.** The barangay rows were re-run on 2026-11-02 (the request changed) and came out 1.3
-  and 2.5 points away from the first run (21.6% and 16.3%); the hint rows are the 2026-10-27 test's cached replies
-  and reproduce its 19.8%. That test counted place names 4 of 9 over notes 1–10; this one scores the 10 labeled
-  barangay and sitio names in notes 3–10.
-- Spend for the photo and pair runs, including the 40 generated images: $1.93 at list prices, from the eval call
-  log; the screen runs added $0.35 and the Voice Transcribe runs $0.08 ($0.02 for the first, $0.06 for the
-  street-name rows). The rice-field kill test cost $0.41 (both models) and the 2026-11-02 photo re-run $1.17
-  (both models; SAM cached).
+- **Rows move between runs.** The barangay rows were re-run on 2026-11-02 after the request changed; the hint
+  rows use cached replies from the earlier test. The current results score the labeled barangay and sitio names
+  in notes 3–10.
+- **Spend:** the [recorded result entries](data/eval/results.json) include estimated model-call costs for each run; those estimates do not include every data-preparation cost.
 
 ## Spam and fake reports
 
@@ -658,10 +669,10 @@ of repeating the forms.
 - **Telegram bot:** [@UlatPH_bot](https://t.me/UlatPH_bot). A prototype, not run or monitored by Biñan City: don't
   use it for emergencies, **call 911**. Real messages are processed by Meta's models; raw photos and voice notes are
   deleted after 24 hours (at most 72 while processing is paused by the spend cap).
-- Video (3 min): _TBD_
+- Demo video: [YouTube link: added at submission]
 - X post: _TBD_
 
-### Try it in 2 minutes
+### Detailed demo path
 
 1. Open the dashboard and sign in with the passcode (initials are optional). Home opens in the **Simple** view: the
    officer's to-do list, most urgent first, with a short "How Ulat works" guide. Then switch to **Technical** from
@@ -676,13 +687,13 @@ of repeating the forms.
    Loss**: a red "PHOTO REUSED" banner links the De La Paz report that sent the same photo first. The filing clocks
    count from when the scenario was seeded, so by now they may read "overdue".
 4. Message @UlatPH_bot from your phone, for example `Baha dito sa Malaban, hanggang tuhod, 3 bahay nasira`, or a
-   photo, voice note or location pin. It answers "received", then a summary of what the agent understood; the report
+   photo, short video, audio file, voice note or location pin. It answers "received", then a summary of what the agent understood; the report
    appears on the open dashboard live, mapped to its barangay. Reply to the summary to correct it.
 5. **Review** lists what the agent could not settle (an ambiguous place, a reused photo, a fallen tree to confirm);
    **Accuracy** (Technical view) charts how often each model is right on the labeled sets: the roof-damage confusion
    matrix against hand labels, F1 per flag, the duplicate check, the not-a-report screen and Voice Transcribe.
 
-The synthetic scenario ([data/demo/scenario.json](data/demo/scenario.json), no real people) has 18 Taglish reports
+The synthetic scenario ([data/demo/scenario.json](data/demo/scenario.json), no real people) has 18 Taglish reports by default (20 when rice is enabled)
 over two weeks after a fictional typhoon: a Malaban street flooding ankle-, knee-, then waist-deep and receding; a
 Casile roof count corrected from five houses to three; an evacuation center in Poblacion; an ambiguous report naming
 two barangays and one with no place at all; a reporter who introduces himself as "Juan dela Cruz" (redacted); a
@@ -710,9 +721,14 @@ uv run python -m app.bot                  # Telegram intake bot (long polling; u
 uv run python -m app.bot_profile --dry-run  # bot name, descriptions and commands: print what would change
 uv run python -m app.bot_profile --photo    # apply only what differs, and upload assets/brand/ulat-avatar.png
 uv run uvicorn app.main:app --reload      # web app: / (Home: to-do list, or the overview in Technical mode), /help, /reports/set-aside, /review, /incidents, /reports, /map, /drafts, /damaged-houses (.csv), /accuracy, /media/<id>, /health, live updates at /events (no login on localhost unless OFFICER_PASSCODE is set)
+uv run python -m scripts.smoke            # isolated local webhook + dashboard, synthetic cached fixtures, no model spend
 uv run pytest                             # tests (all HTTP is mocked, no API calls)
 uv run ruff check . && uv run ruff format --check .
 ```
+
+The smoke test creates a temporary demo and loopback server, sends synthetic webhook updates,
+and checks the draft's embedded print markup. Its model clients are cache-only and use synthetic
+fixtures, so it spends nothing and does not establish live provider or browser print fidelity.
 
 Other commands:
 
@@ -742,7 +758,7 @@ DATA_DIR=var/demo-replay uv run uvicorn app.main:app # dashboard that fills up a
 uv run python -m scripts.eval_transcribe /path/to/recordings   # WER (raw and cleaned) and place names, per setting
 uv run python -m scripts.eval_vision /path/to/photos --sam [--llm muse-spark-open]  # labels.csv + images/
 uv run python -m scripts.make_vision_set /path/to/vision-synthetic   # 40 labeled Muse Image photos from data/eval/vision_scenes.json (~$0.40, idempotent)
-# Record a full run in data/eval/results.json (README tables: uv run python -m app.eval_results)
+# Record a full run in data/eval/results.json (README: uv run python -m app.eval_results; add --headlines for opening figures)
 uv run python -m scripts.eval_vision /path/to/vision-synthetic --sam --record data/eval/results.json --dataset synthetic-40 --out out.json
 uv run python -m scripts.eval_crosscheck /path/to/vision-synthetic --results out.json --model muse-spark-1.3 --record data/eval/results.json --dataset synthetic-40   # free: reuses the run's outputs
 uv run python -m scripts.eval_dedupe --judge muse-spark-open --record data/eval/results.json
@@ -784,20 +800,21 @@ Ulat runs on [Modal](https://modal.com) as **one always-on container** (commands
   RA 10173). Only `/health`, `/login`, `/logout`, the static files and the webhook are open. The passcode opens a signed, HttpOnly,
   Secure, SameSite=Lax cookie for 12 hours; wrong passcodes are limited to 10 per 15 minutes per client address.
   Initials typed at login prefill the review forms; with a shared passcode they are self-declared.
-- **Durability and loss window:** a stop, redeploy or preemption takes a final snapshot first, so nothing the bot
-  acknowledged is lost (measured on staging on 2026-10-30, see [deploy/README.md](deploy/README.md#durability)). A
-  crash that skips shutdown loses at most about 5 seconds of acknowledged reports, since the bot asks for a snapshot
-  after each update it handles, and at most the last 2 minutes of other database writes. Snapshots: the newest 15
-  plus one a day for a week.
+- **Durability and loss window:** orderly shutdown attempts a final snapshot; a staging stop test preserved its
+  two test reports ([details](deploy/README.md#durability)). An unexpected crash can lose writes since the last
+  successful snapshot, including updates acknowledged but still queued. The bot requests a snapshot after handling
+  each update, and periodic snapshots run every 2 minutes, but failures or delays can extend the loss window.
+  Retention keeps the newest 15 snapshots plus one a day for a week.
 - **Judges:** see [Demo](#demo) for the URL, the bot and what to try; the passcode is in the submission's private
   judging notes. Staging (`ulat-staging`, the dev bot) is for testing only and is not a public entry point.
 
 ## Built during the hackathon
 
-Everything in this repository was created during the hackathon (Oct 27 – Nov 4, 2026). This log records what was built and when.
+Everything in this repository was created during the hackathon (Oct 27 – Nov 4, 2026). This log records what was built and when. ⚠️ Historical measurements in this log are developer observations and may be stale; see the [recorded evaluation results](data/eval/results.json) for the current measured scores.
 
 | Date | What was built |
 |---|---|
+| 2026-11-03 | Submission readiness: judge-first README and guarded evaluation highlights, source and dependency audit, complete configuration template, and a zero-spend local webhook and dashboard smoke test |
 | 2026-11-03 | Short-video and audio-file Telegram intake through the existing report, agent and officer review: bounded ffmpeg extraction, timestamped photo evidence, audio transcription, retention, admission gates and trace steps |
 | 2026-11-03 | Evaluated four licensed flood videos and corrected reporter summaries that contradicted floodwater visible in photo evidence; recorded per-clip results, costs and limitations |
 | 2026-10-26 | Repo scaffold: AGENTS.md, README.md |
@@ -905,7 +922,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 
 ### Third-party code and assets
 
-Licenses read from each installed package's metadata. The Python libraries are installed dependencies (see `pyproject.toml` and `uv.lock`); the only third-party code copied into this repository is the vendored, unmodified browser libraries marked below, each with its license file, so the dashboard needs no CDN. The one third-party data file is listed under Data below.
+Licenses read from each installed package's metadata. The Python libraries are installed dependencies (see `pyproject.toml` and `uv.lock`); the only third-party code copied into this repository is the vendored, unmodified browser libraries marked below, each with its license file, so the dashboard needs no CDN. Third-party datasets and evaluation media are listed under Data below.
 
 | Name | License | Used for |
 |---|---|---|
@@ -928,6 +945,13 @@ Licenses read from each installed package's metadata. The Python libraries are i
 | [Roboto](https://github.com/googlefonts/roboto-classic) variable font, weights 400 to 700, Latin subset (vendored in `app/static/vendor/roboto/` with OFL.txt, from Google Fonts) | SIL OFL 1.1 | Dashboard typeface |
 | [Material Symbols](https://github.com/google/material-design-icons) Rounded, 24 px (only the icons the dashboard uses, built into `app/static/vendor/material-symbols/icons.svg` by `scripts/build_icons.py`, with the LICENSE) | Apache-2.0 | Dashboard icons |
 | [Material Color Utilities](https://github.com/material-foundation/material-color-utilities) (build-time only, not in this repository: used once to generate the color values written into `app/static/css/app.css`) | Apache-2.0 | Material Design 3 color roles from the seed color |
+| Transitive Python packages: [annotated-doc](https://pypi.org/project/annotated-doc/), [annotated-types](https://pypi.org/project/annotated-types/), [anyio](https://pypi.org/project/anyio/), [h11](https://pypi.org/project/h11/), [iniconfig](https://pypi.org/project/iniconfig/), [pluggy](https://pypi.org/project/pluggy/), [pydantic](https://pypi.org/project/pydantic/), [pydantic-core](https://pypi.org/project/pydantic-core/), [rapidfuzz](https://pypi.org/project/rapidfuzz/), [sqlalchemy](https://pypi.org/project/sqlalchemy/), [typing-inspection](https://pypi.org/project/typing-inspection/) | MIT | Web, validation, database and test dependencies |
+| Transitive Python packages: [click](https://pypi.org/project/click/), [colorama](https://pypi.org/project/colorama/), [httpcore](https://pypi.org/project/httpcore/), [idna](https://pypi.org/project/idna/), [markupsafe](https://pypi.org/project/markupsafe/), [python-dotenv](https://pypi.org/project/python-dotenv/), [starlette](https://pypi.org/project/starlette/) | BSD-3-Clause | Web, HTTP, templates, configuration and platform-specific console support |
+| Transitive Python package: [pygments](https://pypi.org/project/pygments/) | BSD-2-Clause | Test output |
+| Transitive Python package: [certifi](https://pypi.org/project/certifi/) | MPL-2.0 | Certificate authority bundle |
+| Transitive Python package: [opentelemetry-api](https://pypi.org/project/opentelemetry-api/) | Apache-2.0 | Dependency of FastAPI |
+| Transitive Python package: [packaging](https://pypi.org/project/packaging/) | Apache-2.0 OR BSD-2-Clause | Package and version metadata |
+| Transitive Python package: [typing-extensions](https://pypi.org/project/typing-extensions/) | PSF-2.0 | Typing support |
 | [FFmpeg](https://ffmpeg.org) (external program, not bundled) | LGPL/GPL depending on build | Voice note conversion to WAV |
 | [Modal](https://github.com/modal-labs/modal-client) client and CLI (not a project dependency: installed separately for deploying, and provided by Modal inside the container) | Apache-2.0 | Hosting: `deploy/modal_app.py` |
 | Ulat bot avatar (`assets/brand/ulat-avatar.png`), generated for this project with OpenAI's image model through the Codex CLI ("GPT Terra") | Output owned by the user under OpenAI's [terms of use](https://openai.com/policies/terms-of-use/) | Branding only: the Telegram bot's profile photo. Not part of the report pipeline |
@@ -941,6 +965,8 @@ Data:
 | [OCHA COD-AB Philippines](https://data.humdata.org/dataset/cod-ab-phl) admin level 4 (sources: PSA, NAMRIA), v03, valid on 2025-02-13 | [CC BY-IGO](https://creativecommons.org/licenses/by/3.0/igo/) | Barangay names, codes and boundaries for Biñan in `app/data/binan_barangays.geojson` (24 polygons, clipped and simplified to about 3 m). OCHA notes the boundaries are indicative, not official |
 | 25 Wikimedia Commons photos of Philippine typhoon damage (eval set `kill-test-25`; **not copied into this repository**; only aggregate metrics are) | CC BY 2.0, CC BY-SA 3.0/4.0 or public domain, per photo | Photo-judge and SAM accuracy in "How well it works". Authors and sources: DFID - UK Department for International Development (CC BY 2.0): [img01](https://commons.wikimedia.org/wiki/File:A_car_up-ended_amid_the_wreckage_of_buildings_destroyed_by_Typhoon_Haiyan_in_Tacloban,_Philippines_(11290331544).jpg), [img02](https://commons.wikimedia.org/wiki/File:A_few_palm_trees_remain_standing_amid_the_destruction_caused_by_Typhoon_Haiyan_in_the_city_of_Tacloban,_Philippines_(11290331484).jpg), [img03](https://commons.wikimedia.org/wiki/File:A_man_stands_surrounded_by_the_devastation_wrought_by_Typhoon_Haiyan_in_the_city_of_Tacloban_(11290380063).jpg), [img06](https://commons.wikimedia.org/wiki/File:Rebuilding_after_Typhoon_Haiyan,_in_Guinan,_Philippines_(13943379519).jpg); Trocaire from Ireland (CC BY 2.0): [img04](https://commons.wikimedia.org/wiki/File:Tacloban_Typhoon_Haiyan_2013-11-14.jpg); Master Sgt. Antoine Robinson (Public domain): [img05](https://commons.wikimedia.org/wiki/File:Operation_Damayan_131123-M-IE150-015.jpg); Exec8 (CC BY-SA 4.0): [img07](https://commons.wikimedia.org/wiki/File:Flooding_in_Culiat_Creek_in_Project_8,_Quezon_City_Philippines_from_Typhoon_Ketsana_(Ondoy).webm), [img08](https://commons.wikimedia.org/wiki/File:Flooding_in_Hereford_Street,_Project_8,_Quezon_City,_Philippines_from_Typhoon_Ketsana_(Ondoy)_1.webm); Exec8 (Public domain): [img09](https://commons.wikimedia.org/wiki/File:Ketsana_002.jpg); Philippinepresidency (CC BY-SA 3.0): [img10](https://commons.wikimedia.org/wiki/File:Ondoy4.jpg); The Philippine Online Chronicles from The Philippines (CC BY 2.0): [img11](https://commons.wikimedia.org/wiki/File:Ondoy_(3967857165).jpg); IRRI Images (CC BY 2.0): [img12](https://commons.wikimedia.org/wiki/File:Typhoon_Ketsana_flood_near_Laguna_de_Bay.jpg); PaulGorduiz106 (CC BY-SA 4.0): [img13](https://commons.wikimedia.org/wiki/File:Damaged_tree_(12-24-2021).jpg), [img16](https://commons.wikimedia.org/wiki/File:Damaged_trees_(12-17-2021).jpg); ALFRED FRIAS / PRESIDENTIAL PHOTO (Public domain): [img14](https://commons.wikimedia.org/wiki/File:Photo_of_Typhoon_Odette-battered_areas_in_Tisa,_Cebu_City_01.jpg), [img15](https://commons.wikimedia.org/wiki/File:Photo_of_Typhoon_Odette-battered_areas_in_Tisa,_Cebu_City_02.jpg); Martin Michlmayr (CC BY-SA 4.0): [img17](https://commons.wikimedia.org/wiki/File:Aftermath_of_Typhoon_Rai_in_Cebu_City_2021_12_022.jpg), [img18](https://commons.wikimedia.org/wiki/File:Aftermath_of_Typhoon_Rai_on_Mactan_island_2021_12_001.jpg), [img19](https://commons.wikimedia.org/wiki/File:Aftermath_of_Typhoon_Rai_on_Mactan_island_2021_12_005.jpg), [img20](https://commons.wikimedia.org/wiki/File:Aftermath_of_Typhoon_Rai_on_Mactan_island_2021_12_006.jpg), [img21](https://commons.wikimedia.org/wiki/File:Aftermath_of_Typhoon_Rai_on_Mactan_island_2021_12_009.jpg), [img22](https://commons.wikimedia.org/wiki/File:Aftermath_of_Typhoon_Rai_on_Mactan_island_2021_12_025.jpg), [img23](https://commons.wikimedia.org/wiki/File:Aftermath_of_Typhoon_Rai_on_Mactan_island_2021_12_016.jpg), [img24](https://commons.wikimedia.org/wiki/File:Aftermath_of_Typhoon_Rai_on_Mactan_island_2021_12_018.jpg), [img25](https://commons.wikimedia.org/wiki/File:Aftermath_of_Typhoon_Rai_on_Mactan_island_2021_12_020.jpg) |
 | 19 Wikimedia Commons photos of flooded, flattened and normal rice fields (eval set `rice-field-19`; **not copied into this repository**; only aggregate metrics are) | CC BY 2.0, CC BY 3.0, CC BY-SA 3.0, CC BY-SA 4.0, CC0, Public domain, per photo | Rice-field judge and SAM accuracy in "How well it works". Photos: [Typhoon Ketsana flooded rice field.jpg](https://commons.wikimedia.org/wiki/File:Typhoon_Ketsana_flooded_rice_field.jpg) by Chris Quintana (CC BY 2.0); [Typhoon Ketsana flooded rice field2.jpg](https://commons.wikimedia.org/wiki/File:Typhoon_Ketsana_flooded_rice_field2.jpg) by IRRI Images (CC BY 2.0); [Typhoon Ketsana submerged rice plants just before harvest.jpg](https://commons.wikimedia.org/wiki/File:Typhoon_Ketsana_submerged_rice_plants_just_before_harvest.jpg) by IRRI Images (CC BY 2.0); [Rice fields submerged in flooding in Naga, Camarines Sur.jpg](https://commons.wikimedia.org/wiki/File:Rice_fields_submerged_in_flooding_in_Naga,_Camarines_Sur.jpg) by Naga City Government (Public domain); [Flooded Philippines.jpg](https://commons.wikimedia.org/wiki/File:Flooded_Philippines.jpg) by Sir Mervs from Metro Sta. Rosa, Philippines (CC BY 2.0); [Flood-in-Odisha 2011.jpg](https://commons.wikimedia.org/wiki/File:Flood-in-Odisha_2011.jpg) by Ansuman (CC BY-SA 3.0); [Senja di Sawah kebanjiran.jpg](https://commons.wikimedia.org/wiki/File:Senja_di_Sawah_kebanjiran.jpg) by Aabimut27 (CC BY-SA 4.0); [Blown Rice Field, Bulacan, Philippines - panoramio.jpg](https://commons.wikimedia.org/wiki/File:Blown_Rice_Field,_Bulacan,_Philippines_-_panoramio.jpg) by Andrew Martin (CC BY 3.0); [令和8年8月千葉豪雨によりなぎ倒されたイネ.jpg](https://commons.wikimedia.org/wiki/File:%E4%BB%A4%E5%92%8C8%E5%B9%B48%E6%9C%88%E5%8D%83%E8%91%89%E8%B1%AA%E9%9B%A8%E3%81%AB%E3%82%88%E3%82%8A%E3%81%AA%E3%81%8E%E5%80%92%E3%81%95%E3%82%8C%E3%81%9F%E3%82%A4%E3%83%8D.jpg) by Misei sen (CC0); [倒伏した稲.JPG](https://commons.wikimedia.org/wiki/File:%E5%80%92%E4%BC%8F%E3%81%97%E3%81%9F%E7%A8%B2.JPG) by 多摩に暇人 (talk) (CC BY-SA 3.0); [Rice Field Panorama, Bulacan, Philippines - panoramio.jpg](https://commons.wikimedia.org/wiki/File:Rice_Field_Panorama,_Bulacan,_Philippines_-_panoramio.jpg) by Andrew Martin (CC BY 3.0); [Rice Field Orchard, Bulacan, Philippines - panoramio.jpg](https://commons.wikimedia.org/wiki/File:Rice_Field_Orchard,_Bulacan,_Philippines_-_panoramio.jpg) by Andrew Martin (CC BY 3.0); [Rice Paddy at Calabanga.jpg](https://commons.wikimedia.org/wiki/File:Rice_Paddy_at_Calabanga.jpg) by MarvinBikolano (CC BY-SA 4.0); [Paddy fields in North-Palawan - panoramio.jpg](https://commons.wikimedia.org/wiki/File:Paddy_fields_in_North-Palawan_-_panoramio.jpg) by Tuderna (CC BY 3.0); [Rice Field Irrigation, Bulacan, Philippines - panoramio.jpg](https://commons.wikimedia.org/wiki/File:Rice_Field_Irrigation,_Bulacan,_Philippines_-_panoramio.jpg) by Andrew Martin (CC BY 3.0); [Green Cultivation.jpg](https://commons.wikimedia.org/wiki/File:Green_Cultivation.jpg) by ViaViaL (CC BY-SA 4.0); [Rice seedlings in a flooded paddy, Tsuruga, May 2016.jpg](https://commons.wikimedia.org/wiki/File:Rice_seedlings_in_a_flooded_paddy,_Tsuruga,_May_2016.jpg) by NevinThompson (CC BY-SA 4.0); [Flooded paddy field Raichur Karnataka India monsoon irrigation July 2025.jpg](https://commons.wikimedia.org/wiki/File:Flooded_paddy_field_Raichur_Karnataka_India_monsoon_irrigation_July_2025.jpg) by Vraj Acharya, WELL Labs (CC BY-SA 4.0); [Paddy fields in Dinajpur District 01.jpg](https://commons.wikimedia.org/wiki/File:Paddy_fields_in_Dinajpur_District_01.jpg) by Kritzolina (CC BY-SA 4.0) |
+
+| Four Wikimedia Commons flood videos: [Hereford Street](https://commons.wikimedia.org/wiki/File:Flooding_in_Hereford_Street,_Project_8,_Quezon_City,_Philippines_from_Typhoon_Ketsana_%28Ondoy%29_1.webm) (Exec8), [Ofankor](https://commons.wikimedia.org/wiki/File:Flood_on_the_street.webm) (Amuzujoe), [Bahrain](https://commons.wikimedia.org/wiki/File:Bahrain_Flooding_2024.webm) (Droodkin), and [Bright Angel](https://commons.wikimedia.org/wiki/File:Bright_Angel_Flash_Flooding_%2855504926830%29.webm) (Grand Canyon NPS / K. Hensel) | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) for the first three; [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) for Bright Angel | Video evaluation; audio removed before processing. Files are not committed; per-frame results and license details are in [results.json](data/eval/results.json) |
 
 ## Repo structure
 

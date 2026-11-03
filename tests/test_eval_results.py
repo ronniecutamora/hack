@@ -199,6 +199,13 @@ def test_the_readme_tables_are_generated_from_the_results_file():
     )
 
 
+def test_the_readme_headlines_are_generated_from_the_results_file():
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    assert eval_results.headline_block(readme) == eval_results.render_headlines(
+        eval_results.load()
+    ), "README headlines are stale: run `uv run python -m app.eval_results --headlines`"
+
+
 @pytest.mark.parametrize("model", ["muse-spark-1.3", "muse-spark-open"])
 def test_both_llms_are_measured_on_every_set(model):
     results = eval_results.load()
