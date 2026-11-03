@@ -45,7 +45,7 @@ Muse Image also created [synthetic demo photos](data/demo/scenario.json) and a [
 
 In a local setup, set [`AGENT_LLM`](app/config.py) to `muse-spark-open` to switch both jobs to Spark Open on Baseten. `PAIR_JUDGE_LLM` can select the report-matching model separately. Spark Open on Fireworks has mocked tests, with no live call recorded. Muse Glimmer is also implemented on Fireworks, but its live availability is unverified.
 
-[Production](app/deploy_targets.py) runs Spark 1.3 for both the agent and report matching.
+[Production](app/deploy_targets.py) runs Spark 1.3 for the agent and Muse Spark Open on Baseten for report matching.
 
 These agreement scores account for chance; higher is better. The labels and sets are small:
 
@@ -98,6 +98,7 @@ Everything in this repository was created during the hackathon (Oct 27 – Nov 4
 
 | Date | What was built |
 |---|---|
+| 2026-11-03 | Daily, single-writer demo refresh with ready RDANA and fisheries drafts, a guarded filing-deadline margin, and Muse Spark Open on Baseten for report matching. |
 | 2026-11-03 | Rewrote the judge-facing README, preserved the technical guides and credits, and checked model results and agent evidence against the code. |
 | 2026-11-03 | Live updates now wait for an in-flight SQLite read to finish before closing its connection at shutdown; a regression test covers the race<br><br>Submission readiness: judge-first README and guarded evaluation highlights, source and dependency audit, complete configuration template, and a zero-spend local webhook and dashboard smoke test<br><br>Short-video and audio-file Telegram intake through the existing report, agent and officer review: bounded ffmpeg extraction, timestamped photo evidence, audio transcription, retention, admission gates and trace steps<br><br>Evaluated four licensed flood videos and corrected reporter summaries that contradicted floodwater visible in photo evidence; recorded per-clip results, costs and limitations |
 | 2026-10-26 | Repo scaffold: AGENTS.md, README.md |

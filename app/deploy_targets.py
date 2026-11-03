@@ -27,6 +27,7 @@ WEB_CLASS = "Web"
 SHARED_KEYS = ("META_API_KEY", "BASETEN_API_KEY", "FIREWORKS_API_KEY")
 REQUIRED_KEYS = (
     "META_API_KEY",
+    "BASETEN_API_KEY",
     "TELEGRAM_BOT_TOKEN",
     "TELEGRAM_WEBHOOK_SECRET",
     "PSEUDONYM_SALT",
@@ -57,6 +58,8 @@ class Target:
     sources: dict[str, str]  # container key -> .env name
     generated: frozenset[str]  # .env names the secrets command may create
     daily_spend_cap_usd: float  # model spend cap for the public bot (<= 10)
+    reseed_cron: str = "0 5 * * *"
+    reseed_timezone: str = "Asia/Manila"
     seed_demo: bool = True  # seed the synthetic demo when the volume has no snapshot
     needs_confirmation: bool = False  # webhook and deploy commands ask for --yes
     env: dict[str, str] = field(default_factory=dict)  # extra non-secret settings
@@ -76,6 +79,7 @@ TARGETS = {
         sources=_sources("STAGING_", "TELEGRAM_DEV_BOT_TOKEN", "STAGING_PSEUDONYM_SALT"),
         generated=frozenset("STAGING_" + key for key in (*PER_TARGET_KEYS, "PSEUDONYM_SALT")),
         daily_spend_cap_usd=2.0,
+        env={"PAIR_JUDGE_LLM": "muse-spark-open"},
     ),
     "production": Target(
         name="production",
@@ -88,6 +92,7 @@ TARGETS = {
         generated=frozenset("PRODUCTION_" + key for key in PER_TARGET_KEYS),
         daily_spend_cap_usd=10.0,
         needs_confirmation=True,
+        env={"PAIR_JUDGE_LLM": "muse-spark-open"},
     ),
 }
 

@@ -27,6 +27,7 @@ replaced demo's photo files stay on the volume, so restoring the pinned snapshot
 Live dashboards update on their own: the swap is a commit their watcher sees (app.live).
 """
 
+import asyncio
 import contextlib
 import hashlib
 import json
@@ -40,24 +41,31 @@ from pathlib import Path
 from typing import Any
 
 from sqlalchemy import MetaData, create_engine
-from sqlmodel import Session, SQLModel
+from sqlmodel import Session, SQLModel, select
 
 from app.config import Settings
-from app.db import AUDIT_TRIGGERS, SQLITE_BUSY_TIMEOUT_S, make_engine
+from app.db import AUDIT_TRIGGERS, SQLITE_BUSY_TIMEOUT_S, make_engine, make_recorder
+from app.demo.loader import MANIFEST_NAME
+from app.drafts import KIND_RDANA, DraftService
 from app.incidents import refresh_incidents
+from app.meta.factory import make_agent_llm
 from app.models import (
     CHANNEL_DEMO,
     DRAFT_APPROVED,
     DRAFT_REJECTED,
     STATUS_ASSESSING,
+    Draft,
+    Report,
     manila_time,
 )
+from app.nol_form import COMMODITIES
 
 logger = logging.getLogger(__name__)
 
 # Fresh ids start this far above the live database's highest id, so the real reports and model
 # calls that arrive during the minutes of the fresh load never take an id the load also used.
 ID_GAP = 1000
+DEMO_DRAFTS = Path(__file__).resolve().parent.parent / "data" / "demo" / "drafts.json"
 
 # What the swap deletes from each table, as a condition on the staged id sets (temp tables
 # named after the DemoPlan fields). Every table of the schema must be listed (a test checks):
@@ -388,6 +396,71 @@ def _copy_media(scratch_media: Path, media_dir: Path) -> list[Path]:
     return copied
 
 
+def draft_plan() -> dict[str, Any]:
+    """The scenario's selected officer outputs, independent of database ids."""
+    return json.loads(DEMO_DRAFTS.read_text(encoding="utf-8"))
+
+
+def draft_plan_line(plan: dict[str, Any]) -> str:
+    claims = ", ".join(f"{c['commodity']} ({c['report_key']})" for c in plan["claims"])
+    return (
+        f"prepares 1 RDANA draft for {plan['barangay']} and "
+        f"{len(plan['claims'])} claim draft(s): {claims}"
+    )
+
+
+def prepare_drafts(settings: Settings, work: Path, plan: dict[str, Any]) -> None:
+    """Generate the configured drafts in scratch, using the officer's draft service.
+
+    Summary requests are cache-only: fresh ids usually change the prompt, so a miss uses the
+    service's deterministic fallback and a daily job cannot create unbounded model spend.
+    """
+    manifest = json.loads((work / MANIFEST_NAME).read_text(encoding="utf-8"))
+    scratch_settings = settings.model_copy(
+        update={"data_dir": work, "database_path": work / "app.db"}
+    )
+    engine = make_engine(scratch_settings)
+    llm = make_agent_llm(scratch_settings, make_recorder(engine))
+    llm.cache_only = True
+    service = DraftService(scratch_settings, engine, llm)
+
+    async def generate() -> None:
+        try:
+            with Session(engine) as session:
+                rdana = session.exec(
+                    select(Draft)
+                    .where(Draft.kind == KIND_RDANA, Draft.barangay == plan["barangay"])
+                    .order_by(Draft.version.desc())
+                ).first()
+            if rdana is None or service.is_stale(rdana):
+                await service.generate_rdana(plan["barangay"])
+            for claim in plan["claims"]:
+                commodity = COMMODITIES[claim["commodity"]]
+                with Session(engine) as session:
+                    report = session.get(Report, manifest[claim["report_key"]])
+                    if (
+                        report is None
+                        or report.channel != CHANNEL_DEMO
+                        or report.incident_id is None
+                    ):
+                        raise ReseedRefused("the configured demo claim report has no incident")
+                    incident_id = report.incident_id
+                    existing = session.exec(
+                        select(Draft)
+                        .where(Draft.kind == commodity.kind, Draft.incident_id == incident_id)
+                        .order_by(Draft.version.desc())
+                    ).first()
+                if existing is None or service.is_stale(existing):
+                    service.generate_nol(commodity.key, incident_id)
+        finally:
+            await llm.aclose()
+
+    try:
+        asyncio.run(generate())
+    finally:
+        engine.dispose()
+
+
 def reseed(
     settings: Settings,
     load_demo: Callable[[Path], bool],
@@ -409,7 +482,8 @@ def reseed(
         before = summary(connection)
     finally:
         connection.close()
-    lines = [summary_line("before", before), *plan_lines(found)]
+    outputs = draft_plan()
+    lines = [summary_line("before", before), *plan_lines(found), draft_plan_line(outputs)]
     if found.conflicts:
         raise ReseedRefused("; ".join(found.conflicts))
     if dry_run:
@@ -425,6 +499,7 @@ def reseed(
         connection.close()
     if not load_demo(work):
         raise ReseedRefused("the fresh demo load failed (see the logs); nothing changed")
+    prepare_drafts(settings, work, outputs)
     copied = _copy_media(work / "media", settings.media_dir)
     try:
         done = swap(db_path, work / "app.db")

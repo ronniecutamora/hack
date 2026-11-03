@@ -42,7 +42,7 @@ from app.nol import countdowns, deadline_rows
 from app.nol_form import FISHERIES
 from app.reseed import DELETES, ID_GAP, cited_report_ids
 from app.snapshots import PINNED_NAME, SnapshotStore, copy_database, is_snapshot_file_name
-from tests.test_assessment import FakeLLM, FakeSam
+from tests.test_assessment import FakeLLM, FakeSam, facts
 from tests.test_demo_loader import FIXTURE, write_fixture_images
 from tests.test_snapshots import FakeVolume
 
@@ -65,12 +65,22 @@ def load_into(work: Path, **kwargs) -> bool:
     settings = scratch_settings(work)
     engine = make_engine(settings)
     try:
-        assessor = AssessmentService(settings, engine, FakeLLM(), FakeSam())
+        assessor = AssessmentService(
+            settings,
+            engine,
+            FakeLLM(facts_reply=facts(livelihood_damage=["fish_pens_or_cages"])),
+            FakeSam(),
+        )
         code = load_command(
             settings, scenario_path=FIXTURE, assessor=assessor, anchor_now=True, **kwargs
         )
     finally:
         engine.dispose()
+    if code == 0:
+        manifest = work / "manifest.json"
+        mapping = json.loads(manifest.read_text())
+        mapping["r05"] = mapping["k1"]  # the compact fixture's eligible fisheries report
+        manifest.write_text(json.dumps(mapping))
     return code == 0
 
 
@@ -259,7 +269,12 @@ def test_reseed_replaces_only_the_demo_with_a_fresh_load(deployed):
         for media in session.exec(select(Media).where(col(Media.report_id).in_(fresh))).all():
             assert (deployed.settings.data_dir / media.path).is_file()
         assert session.get(Draft, deployed.demo_draft) is None
-        assert session.exec(select(DraftEvent)).all() == []
+        new_drafts = session.exec(select(Draft).where(Draft.id != deployed.mixed_draft)).all()
+        assert {d.kind for d in new_drafts} == {"rdana", FISHERIES.kind}
+        assert all(d.version == 1 and d.evidence_fingerprint for d in new_drafts)
+        assert {e.draft_id for e in session.exec(select(DraftEvent)).all()} == {
+            d.id for d in new_drafts
+        }
         assert session.get(Draft, deployed.mixed_draft) is not None  # cites a real report
         assert session.exec(select(OfficerAction)).all() == []
         calls = session.exec(select(ModelCall.report_id)).all()
@@ -279,6 +294,10 @@ def test_reseed_replaces_only_the_demo_with_a_fresh_load(deployed):
 
 def test_reseed_is_idempotent(deployed):
     first = deployed.run()
+    with Session(deployed.engine) as session:
+        first_ids = {
+            d.id for d in session.exec(select(Draft)).all() if d.id != deployed.mixed_draft
+        }
     real_after_first = deployed.real_rows()
     count = len(demo_ids(deployed.engine))
     second = deployed.run()
@@ -286,6 +305,10 @@ def test_reseed_is_idempotent(deployed):
     assert len(demo_ids(deployed.engine)) == count
     assert deployed.real_rows() == real_after_first
     assert len(pinned(deployed)) == 2
+    with Session(deployed.engine) as session:
+        drafts = [d for d in session.exec(select(Draft)).all() if d.id != deployed.mixed_draft]
+        assert len(drafts) == 2 and {d.kind for d in drafts} == {"rdana", FISHERIES.kind}
+        assert all(d.version == 1 for d in drafts) and not first_ids & {d.id for d in drafts}
 
 
 def test_dry_run_changes_nothing(deployed):
@@ -297,6 +320,7 @@ def test_dry_run_changes_nothing(deployed):
     assert not called and not pinned(deployed)
     output = "\n".join(result["lines"])
     assert "dry run: nothing changed" in output
+    assert "prepares 1 RDANA draft for Malaban and 1 claim draft(s): fisheries (r05)" in output
     assert f"replaces {len(deployed.old_demo)} demo report(s)" in output
 
 
@@ -312,6 +336,18 @@ def test_a_mixed_incident_refuses_and_is_listed(deployed):
     assert f"#{deployed.demo_incident}" in result["lines"][0]
     assert "both demo and real reports" in result["lines"][0]
     assert dump(deployed.settings.db_path) == before and not pinned(deployed)
+
+
+def test_scheduled_reseed_logs_refusal_without_ids(deployed, caplog):
+    with Session(deployed.engine) as session:
+        row = session.get(Report, deployed.real)
+        row.incident_id = deployed.demo_incident
+        session.add(row)
+        session.commit()
+    result = deployed.run(counts_only=True)
+    assert not result["ok"] and not pinned(deployed)
+    assert "scheduled reseed refused" in caplog.text
+    assert f"#{deployed.demo_incident}" not in caplog.text
 
 
 def test_an_incident_mixed_during_the_load_rolls_back(deployed):
@@ -341,6 +377,18 @@ def test_a_failed_load_changes_nothing(deployed):
     before = dump(deployed.settings.db_path)
     result = deployed.run(load_demo=lambda work: False)
     assert not result["ok"] and "nothing changed" in result["lines"][0]
+    assert dump(deployed.settings.db_path) == before
+
+
+def test_a_failed_draft_preparation_changes_nothing(deployed, monkeypatch):
+    before = dump(deployed.settings.db_path)
+
+    def fail(*_args):
+        raise RuntimeError("draft preparation failed")
+
+    monkeypatch.setattr("app.reseed.prepare_drafts", fail)
+    result = deployed.run()
+    assert not result["ok"] and pinned(deployed)
     assert dump(deployed.settings.db_path) == before
 
 
@@ -463,7 +511,10 @@ def test_admin_calls_the_live_container_through_the_modal_python(monkeypatch, tm
 def test_the_modal_class_and_its_admin_method_match_the_client():
     source = (REPO_ROOT / "deploy" / "modal_app.py").read_text(encoding="utf-8")
     assert f"class {WEB_CLASS}:" in source
-    assert "def admin(self, command: str, dry_run: bool = False)" in source
+    assert (
+        "def admin(self, command: str, dry_run: bool = False, counts_only: bool = False)" in source
+    )
+    assert 'Web().admin.remote("reseed", counts_only=True)' in source
     client = (REPO_ROOT / "deploy" / "admin_call.py").read_text(encoding="utf-8")
     assert "web.admin.remote(args.command, dry_run=args.dry_run)" in client
     assert set(deploy.ADMIN_COMMANDS) == set(admin.COMMANDS)

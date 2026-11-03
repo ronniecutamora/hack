@@ -87,7 +87,7 @@ class Web:  # = app.deploy_targets.WEB_CLASS
         return create_app(self.settings, snapshots=self.store)
 
     @modal.method()
-    def admin(self, command: str, dry_run: bool = False) -> dict:
+    def admin(self, command: str, dry_run: bool = False, counts_only: bool = False) -> dict:
         """An admin command (app.admin: reseed, screen) in this live container, called by
         `python -m app.deploy reseed|screen` through deploy/admin_call.py. It runs here, in the
         process that holds the lease, beside the web app: max_containers=1 means a call can
@@ -101,8 +101,17 @@ class Web:  # = app.deploy_targets.WEB_CLASS
             dry_run=dry_run,
             images_dir=Path(VOLUME_MOUNT) / DEMO_IMAGES_SUBDIR,
             demo_allowed=TARGET.seed_demo,
+            counts_only=counts_only,
         )
 
     @modal.exit()
     def stop(self) -> None:
         self.store.close()
+
+
+@app.function(
+    schedule=modal.Cron(TARGET.reseed_cron, timezone=TARGET.reseed_timezone), timeout=60 * 60
+)
+def daily_reseed() -> None:
+    """The scheduler is only a caller; all SQLite work stays in the leased Web container."""
+    Web().admin.remote("reseed", counts_only=True)

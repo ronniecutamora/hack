@@ -20,6 +20,7 @@ def env_file(tmp_path):
     path = tmp_path / ".env"
     path.write_text(
         "META_API_KEY=meta-value-123\n"
+        "BASETEN_API_KEY=baseten-value-123\n"
         "TELEGRAM_BOT_TOKEN=111:prod-token-value\n"
         "TELEGRAM_DEV_BOT_TOKEN=222:dev-token-value\n"
         "PSEUDONYM_SALT=prod-salt-value\n",
@@ -40,6 +41,9 @@ def test_targets_are_isolated_and_capped():
         assert float(env["DAILY_SPEND_CAP_USD"]) <= 10  # the public bot's 24 h spend cap
         assert env["TELEGRAM_MODE"] == "webhook" and env["ALLOWED_HOSTS"] == target.host("ws")
         assert env["DATABASE_PATH"].startswith("/var/") and env["DATA_DIR"] == "/data"
+        assert env["PAIR_JUDGE_LLM"] == "muse-spark-open"
+        assert target.reseed_cron == "0 5 * * *" and target.reseed_timezone == "Asia/Manila"
+        assert "BASETEN_API_KEY" in REQUIRED_KEYS
     assert not STAGING.needs_confirmation and PROD.needs_confirmation
 
 

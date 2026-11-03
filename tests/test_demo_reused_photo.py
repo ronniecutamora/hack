@@ -57,9 +57,12 @@ def test_r18_resends_the_de_la_paz_fish_pen_photo_from_another_barangay():
 def test_the_fisherfolk_report_and_follow_up_fall_inside_the_two_day_window():
     r05, r15, r18 = BY_KEY["r05"], BY_KEY["r15"], BY_KEY["r18"]
     assert (r05.day, r15.day, r18.day) == (13, 14, 14)
-    assert 12 <= r05.hour < 18 and r15.hour < 12 and r18.hour >= 12  # afternoon, morning
+    assert 12 <= r05.hour <= 18 and r15.hour < 12 and r18.hour >= 12
     assert received_at(r05) < received_at(r15) < received_at(r18)
     assert received_at(r18) - received_at(r05) < timedelta(days=2)
+    # The first fisheries deadline must remain open through the next daily run, with a margin.
+    remaining = timedelta(days=2) - ANCHOR_LEAD - (received_at(r18) - received_at(r05))
+    assert remaining >= timedelta(days=1, hours=1)
 
 
 def test_r18_is_its_own_fish_pen_place_not_the_san_antonio_roof_reports():
@@ -226,6 +229,26 @@ def test_an_anchored_load_gives_the_de_la_paz_notice_a_live_clock(tmp_path):
     assert len(de_la_paz.incident.report_ids) == 2  # the damage report and its follow-up
     (nl, clock), _claim = de_la_paz.clocks
     assert clock.due_at > now and not clock.overdue and clock.text.startswith("due in 2")
+
+
+def test_configured_drafts_use_the_full_scenario_and_are_idempotent(tmp_path):
+    from app.models import Draft, DraftEvent
+    from app.reseed import draft_plan, prepare_drafts
+
+    settings, engine = fake_load(tmp_path, anchor_now=True)
+    prepare_drafts(settings, settings.data_dir, draft_plan())
+    prepare_drafts(settings, settings.data_dir, draft_plan())
+    with Session(engine) as session:
+        drafts = session.exec(select(Draft)).all()
+        assert len(drafts) == 2
+        rdana = next(d for d in drafts if d.kind == "rdana")
+        claim = next(d for d in drafts if d.kind != "rdana")
+        r05 = session.exec(select(Report).where(Report.text == BY_KEY["r05"].text)).one()
+        assert rdana.barangay == "Malaban" and rdana.summary_fallback
+        assert claim.barangay == "De La Paz" and claim.incident_id == r05.incident_id
+        assert all(d.version == 1 and d.evidence_fingerprint for d in drafts)
+        assert len(session.exec(select(DraftEvent)).all()) == 2
+    engine.dispose()
 
 
 def test_a_fake_load_flags_r18_only_and_its_notice_of_loss_shows_the_red_banner(tmp_path):

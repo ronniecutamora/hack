@@ -12,6 +12,7 @@ places or pseudonyms.
   messages that arrived before the screen existed.
 """
 
+import contextlib
 import logging
 import tempfile
 import threading
@@ -22,13 +23,14 @@ from typing import Any
 from app.assessment import screen_existing
 from app.config import Settings
 from app.db import make_engine
-from app.reseed import ReseedRefused, reseed
+from app.reseed import ReseedRefused, connect, reseed, summary
 from app.seed import run_demo_load
 from app.snapshots import SnapshotStore
 
 logger = logging.getLogger(__name__)
 
 COMMANDS = ("reseed", "screen")
+RESEED_SPEND_CAP_USD = 0.50
 # One admin command at a time per container: the class serves many inputs at once.
 _running = threading.Lock()
 
@@ -37,12 +39,14 @@ class AdminRefused(Exception):
     """The command did not run, or ran and changed nothing; the reason is safe to print."""
 
 
-def _pinner(store: SnapshotStore, command: str, pinned: list[str]) -> Callable[[], str]:
+def _pinner(
+    store: SnapshotStore, command: str, pinned: list[str], *, quiet: bool = False
+) -> Callable[[], str]:
     """Pins a snapshot named after the command and records its name in `pinned`."""
 
     def pin() -> str:
         try:
-            name = store.pin(f"before-{command}").name
+            name = store.pin(f"before-{command}", log=not quiet).name
         except (RuntimeError, FileNotFoundError) as exc:
             raise AdminRefused(f"no snapshot could be taken ({exc}); nothing changed") from exc
         pinned.append(name)
@@ -80,12 +84,17 @@ def _reseed(
     *,
     dry_run: bool,
     load_demo: Callable[[Path], bool] | None,
+    counts_only: bool,
 ) -> list[str]:
     if not images_dir.is_dir():
         raise AdminRefused(
             f"no demo photos at {images_dir}: run python -m app.deploy seed-assets first"
         )
-    load = load_demo or (lambda work: run_demo_load(settings, images_dir, work))
+    load = load_demo or (
+        lambda work: run_demo_load(
+            settings, images_dir, work, quiet=counts_only, spend_cap_usd=RESEED_SPEND_CAP_USD
+        )
+    )
     with tempfile.TemporaryDirectory(prefix="ulat-reseed-") as scratch:
         try:
             return reseed(
@@ -112,6 +121,7 @@ def run(
     images_dir: Path,
     demo_allowed: bool = True,
     load_demo: Callable[[Path], bool] | None = None,
+    counts_only: bool = False,
 ) -> dict[str, Any]:
     """Run one admin command; returns {"ok": bool, "lines": [str]} for the CLI to print. A
     failure after the snapshot rolls its change back; the snapshot stays."""
@@ -120,28 +130,53 @@ def run(
     if not _running.acquire(blocking=False):
         return {"ok": False, "lines": ["refused: another admin command is running"]}
     pinned: list[str] = []
-    pin = _pinner(store, command, pinned)
+    pin = _pinner(store, command, pinned, quiet=counts_only)
     try:
         mode = " (dry run)" if dry_run else ""
-        logger.info("admin %s%s started", command, mode)
+        if not counts_only:
+            logger.info("admin %s%s started", command, mode)
         if not store.holds_lease():
             raise AdminRefused("this container does not hold the database lease")
         if command == "reseed":
             if not demo_allowed:
                 raise AdminRefused("this target has no synthetic demo (seed_demo is off)")
-            lines = _reseed(settings, pin, images_dir, dry_run=dry_run, load_demo=load_demo)
+            lines = _reseed(
+                settings,
+                pin,
+                images_dir,
+                dry_run=dry_run,
+                load_demo=load_demo,
+                counts_only=counts_only,
+            )
         else:
             lines = _screen(settings, pin, dry_run=dry_run)
         if not dry_run:
             store.backup()  # the change is durable now, not at the next tick
-        for line in lines:
-            logger.info("admin %s: %s", command, line)
+        if counts_only:
+            with contextlib.closing(connect(settings.db_path)) as connection:
+                counts = summary(connection)
+            logger.info(
+                "scheduled reseed: %d demo reports, %d real reports, %d incidents, %d drafts",
+                counts["demo_reports"],
+                counts["real_reports"],
+                counts["incidents"],
+                counts["drafts"],
+            )
+        else:
+            for line in lines:
+                logger.info("admin %s: %s", command, line)
         return {"ok": True, "lines": [f"{command}{mode}", *lines]}
     except AdminRefused as exc:
-        logger.warning("admin %s refused: %s", command, exc)
+        if counts_only:
+            logger.warning("scheduled reseed refused; no change")
+        else:
+            logger.warning("admin %s refused: %s", command, exc)
         return {"ok": False, "lines": [f"refused: {exc}", *_kept(pinned)]}
     except Exception as exc:
-        logger.exception("admin %s failed", command)
+        if counts_only:
+            logger.error("scheduled reseed failed; inspect the admin command")
+        else:
+            logger.exception("admin %s failed", command)
         return {
             "ok": False,
             "lines": [

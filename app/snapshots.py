@@ -345,7 +345,7 @@ class SnapshotStore:
         with self._lock:
             return not self.closed and not self._lost_lease()
 
-    def pin(self, label: str) -> Path:
+    def pin(self, label: str, *, log: bool = True) -> Path:
         """A kept snapshot of the live database, taken now and committed to the volume, for an
         admin change to be undone with `restore` (PINNED_NAME: never pruned, never restored on
         its own). Raises when this container no longer holds the lease (its database is not
@@ -366,7 +366,8 @@ class SnapshotStore:
             os.replace(tmp, final)
             self._write_lease(released=False)
             self.volume.commit()
-        logger.info("pinned snapshot %s", name)
+        if log:
+            logger.info("pinned snapshot %s", name)
         return final
 
     def request(self) -> None:

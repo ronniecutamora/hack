@@ -83,6 +83,13 @@ lock). One admin command runs at a time; the output is counts and ids, never mes
   is being assessed. An incident a real grouping decision or officer action points at is kept, emptied and
   retired; a draft that cites real reports too is kept as it was decided (it shows as out of date). The old
   demo's photo files stay on the volume (about 5 MB per reseed), so restoring the pinned snapshot shows them.
+  Before the swap, the ordinary draft services prepare a Malaban RDANA and the fisheries Notice of Loss for the
+  scenario's selected report ([drafts.json](../data/demo/drafts.json)); the dry run names them. Summary calls
+  use cached answers only and otherwise fall back to the deterministic summary. The scratch demo load has a
+  $0.50 estimated model-spend cap, checked by the existing spend guard.
+- **Daily refresh.** Each target schedules a 05:00 Asia/Manila Modal function. It calls the same `Web.admin`
+  method in the leased live container; the scheduler itself never opens SQLite. It pins a snapshot first, logs
+  counts on success and a refusal on conflict, and leaves mixed demo/real incidents untouched.
 - **`screen`** runs the free not-a-report rule (`python -m app.assessment --screen`) over every stored message,
   for the ones that arrived before the screen existed. With nothing to set aside it changes nothing and takes no
   snapshot. An officer can restore any message from the Set aside list.
@@ -93,8 +100,8 @@ lock). One admin command runs at a time; the output is counts and ids, never mes
 ## Before a demo
 
 A fisheries Notice of Loss is due 2 days after the first report. Right after a reseed the demo's latest report
-is an hour old and its earlier fisheries report about 26 hours old (scenario r05 and r18), so its countdown stays
-live for about 22 hours. Reseed the morning of a demo:
+is an hour old and its earlier fisheries report about 22 hours old (scenario r05 and r18), so its countdown stays
+live for about 26 hours, covering the next scheduled run. Check it before a demo or refresh manually:
 
 1. `uv run python -m app.deploy reseed --target production --dry-run`: read the plan (no refusal, real report
    count as expected).

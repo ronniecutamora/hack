@@ -30,7 +30,14 @@ SEED_TIMEOUT_S = 30 * 60
 _SCRUBBED = ("DATABASE_PATH", "SNAPSHOT_DIR", "TELEGRAM_MODE", "ALLOWED_HOSTS", "OFFICER_PASSCODE")
 
 
-def run_demo_load(settings: Settings, images_dir: Path, work: Path) -> bool:
+def run_demo_load(
+    settings: Settings,
+    images_dir: Path,
+    work: Path,
+    *,
+    quiet: bool = False,
+    spend_cap_usd: float | None = None,
+) -> bool:
     """Run `python -m app.demo load --anchor-now` with `work` (a directory named "demo") as its
     DATA_DIR, reading the volume's demo photos and sharing the deploy's model cache. A database
     already at work/app.db is loaded into (app.reseed prepares one). Returns whether it
@@ -43,7 +50,10 @@ def run_demo_load(settings: Settings, images_dir: Path, work: Path) -> bool:
     (work / "model_cache").symlink_to(settings.cache_dir, target_is_directory=True)
     env = {k: v for k, v in os.environ.items() if k not in _SCRUBBED}
     env["DATA_DIR"] = str(work)
-    logger.info("loading the synthetic demo (python -m app.demo load --anchor-now)")
+    if spend_cap_usd is not None:
+        env["DAILY_SPEND_CAP_USD"] = str(min(settings.daily_spend_cap_usd, spend_cap_usd))
+    if not quiet:
+        logger.info("loading the synthetic demo (python -m app.demo load --anchor-now)")
     result = subprocess.run(
         [sys.executable, "-m", "app.demo", "load", "--anchor-now"],
         cwd=REPO_ROOT,
@@ -52,8 +62,9 @@ def run_demo_load(settings: Settings, images_dir: Path, work: Path) -> bool:
         capture_output=True,
         text=True,
     )
-    for line in (result.stdout + result.stderr).splitlines()[-20:]:
-        logger.info("demo load: %s", line)
+    if not quiet:
+        for line in (result.stdout + result.stderr).splitlines()[-20:]:
+            logger.info("demo load: %s", line)
     if result.returncode != 0 or not (work / "app.db").is_file():
         logger.error("demo load failed (exit %s)", result.returncode)
         return False
