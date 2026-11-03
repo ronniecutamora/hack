@@ -41,9 +41,9 @@ def test_targets_are_isolated_and_capped():
         assert float(env["DAILY_SPEND_CAP_USD"]) <= 10  # the public bot's 24 h spend cap
         assert env["TELEGRAM_MODE"] == "webhook" and env["ALLOWED_HOSTS"] == target.host("ws")
         assert env["DATABASE_PATH"].startswith("/var/") and env["DATA_DIR"] == "/data"
-        assert env["PAIR_JUDGE_LLM"] == "muse-spark-open"
+        assert "PAIR_JUDGE_LLM" not in env  # inherit the agent until staging grouping is stable
         assert target.reseed_cron == "0 5 * * *" and target.reseed_timezone == "Asia/Manila"
-        assert "BASETEN_API_KEY" in REQUIRED_KEYS
+        assert target.sources["BASETEN_API_KEY"] == "BASETEN_API_KEY"
     assert not STAGING.needs_confirmation and PROD.needs_confirmation
 
 

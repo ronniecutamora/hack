@@ -27,7 +27,6 @@ WEB_CLASS = "Web"
 SHARED_KEYS = ("META_API_KEY", "BASETEN_API_KEY", "FIREWORKS_API_KEY")
 REQUIRED_KEYS = (
     "META_API_KEY",
-    "BASETEN_API_KEY",
     "TELEGRAM_BOT_TOKEN",
     "TELEGRAM_WEBHOOK_SECRET",
     "PSEUDONYM_SALT",
@@ -79,7 +78,6 @@ TARGETS = {
         sources=_sources("STAGING_", "TELEGRAM_DEV_BOT_TOKEN", "STAGING_PSEUDONYM_SALT"),
         generated=frozenset("STAGING_" + key for key in (*PER_TARGET_KEYS, "PSEUDONYM_SALT")),
         daily_spend_cap_usd=2.0,
-        env={"PAIR_JUDGE_LLM": "muse-spark-open"},
     ),
     "production": Target(
         name="production",
@@ -92,7 +90,6 @@ TARGETS = {
         generated=frozenset("PRODUCTION_" + key for key in PER_TARGET_KEYS),
         daily_spend_cap_usd=10.0,
         needs_confirmation=True,
-        env={"PAIR_JUDGE_LLM": "muse-spark-open"},
     ),
 }
 
