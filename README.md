@@ -45,7 +45,7 @@ Muse Image also created [synthetic demo photos](data/demo/scenario.json) and a [
 
 In a local setup, set [`AGENT_LLM`](app/config.py) to `muse-spark-open` to switch both jobs to Spark Open on Baseten. `PAIR_JUDGE_LLM` can select the report-matching model separately. Spark Open on Fireworks has mocked tests, with no live call recorded. Muse Glimmer is also implemented on Fireworks, but its live availability is unverified.
 
-[Production](app/deploy_targets.py) runs Spark 1.3 for both the agent and report matching. A staging switch to Spark Open was held after two demo follow-ups grouped differently.
+[Production](app/deploy_targets.py) runs Spark 1.3 for both the agent and report matching.
 
 These agreement scores account for chance; higher is better. The labels and sets are small:
 
