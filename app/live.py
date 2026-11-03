@@ -202,7 +202,7 @@ class ChangeHub:
     async def stop(self) -> None:
         self.close()
         if self._task is not None:
-            # Cancelling to_thread only cancels its awaiter, not the SQLite operation itself.
+            # Canceling to_thread only cancels its awaiter, not the SQLite operation itself.
             # Let the current read finish before closing the connection it is using.
             await self._task
             self._task = None
