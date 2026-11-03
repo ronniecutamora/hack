@@ -392,6 +392,23 @@ def test_a_failed_draft_preparation_changes_nothing(deployed, monkeypatch):
     assert dump(deployed.settings.db_path) == before
 
 
+def test_a_failed_fresh_grouping_refuses_before_the_swap(deployed):
+    before = dump(deployed.settings.db_path)
+
+    def fail_grouping(work):
+        assert load_into(work)
+        with sqlite3.connect(work / "app.db") as connection:
+            connection.execute(
+                "UPDATE report SET grouping_error = 'judge unavailable' WHERE id = "
+                "(SELECT min(id) FROM report)"
+            )
+        return True
+
+    result = deployed.run(load_demo=fail_grouping)
+    assert not result["ok"] and "failed assessment or grouping" in result["lines"][0]
+    assert dump(deployed.settings.db_path) == before
+
+
 def test_reseed_refuses_without_the_lease_or_without_a_demo(deployed):
     assert not deployed.run(demo_allowed=False)["ok"]
     lease = deployed.store.dir / "LEASE.json"

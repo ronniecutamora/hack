@@ -53,6 +53,7 @@ from app.models import (
     CHANNEL_DEMO,
     DRAFT_APPROVED,
     DRAFT_REJECTED,
+    STATUS_ASSESSED,
     STATUS_ASSESSING,
     Draft,
     Report,
@@ -461,6 +462,30 @@ def prepare_drafts(settings: Settings, work: Path, plan: dict[str, Any]) -> None
         engine.dispose()
 
 
+def fresh_load_lines(db_path: Path) -> list[str]:
+    """Refuse an incomplete load and summarize logged model calls without report data."""
+    with contextlib.closing(connect(db_path)) as connection:
+        incomplete = connection.execute(
+            "SELECT count(*) FROM report WHERE channel = ? AND "
+            "(status != ? OR (grouping_error IS NOT NULL AND grouping_error != ''))",
+            (CHANNEL_DEMO, STATUS_ASSESSED),
+        ).fetchone()[0]
+        if incomplete:
+            raise ReseedRefused(f"{incomplete} fresh demo report(s) failed assessment or grouping")
+        count, cost = connection.execute(
+            "SELECT count(*), coalesce(sum(cost_estimate), 0) FROM modelcall"
+        ).fetchone()
+        pairs = connection.execute(
+            "SELECT model, count(*), sum(cached) FROM modelcall WHERE step = ? GROUP BY model",
+            ("pair_judge",),
+        ).fetchall()
+    lines = [f"fresh model calls: {count}, estimated cost ${cost:.4f}"]
+    lines.extend(
+        f"pair judge {model}: {n} call(s), {cached or 0} cached" for model, n, cached in pairs
+    )
+    return lines
+
+
 def reseed(
     settings: Settings,
     load_demo: Callable[[Path], bool],
@@ -500,6 +525,7 @@ def reseed(
     if not load_demo(work):
         raise ReseedRefused("the fresh demo load failed (see the logs); nothing changed")
     prepare_drafts(settings, work, outputs)
+    lines.extend(fresh_load_lines(work / "app.db"))
     copied = _copy_media(work / "media", settings.media_dir)
     try:
         done = swap(db_path, work / "app.db")

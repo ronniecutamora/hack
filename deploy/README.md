@@ -86,7 +86,8 @@ lock). One admin command runs at a time; the output is counts and ids, never mes
   Before the swap, the ordinary draft services prepare a Malaban RDANA and the fisheries Notice of Loss for the
   scenario's selected report ([drafts.json](../data/demo/drafts.json)); the dry run names them. Summary calls
   use cached answers only and otherwise fall back to the deterministic summary. The scratch demo load has a
-  $0.50 estimated model-spend cap, checked by the existing spend guard.
+  $0.50 estimated model-spend cap, checked by the existing spend guard. An incomplete assessment or failed
+  grouping refuses the swap. Manual runs log model-call counts, pair-judge backend and estimated scratch cost.
 - **Daily refresh.** Each target schedules a 05:00 Asia/Manila Modal function. It calls the same `Web.admin`
   method in the leased live container; the scheduler itself never opens SQLite. It pins a snapshot first, logs
   counts on success and a refusal on conflict, and leaves mixed demo/real incidents untouched.
