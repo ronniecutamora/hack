@@ -3,7 +3,7 @@
 ## Demo
 
 - **Live officer dashboard:** <https://ronniecutamora47--ulat.modal.run> (production, on Modal since 2026-10-30).
-  It needs the officer passcode: judges get it in the submission's private judging notes. It starts with the
+  It needs the officer passcode: judges get it on request from the developer. It starts with the
   synthetic typhoon scenario below (no real people), plus whatever has been sent to the bot since.
 - **Telegram bot:** [@UlatPH_bot](https://t.me/UlatPH_bot). A prototype, not run or monitored by Biñan City: don't
   use it for emergencies, **call 911**. Real messages are processed by Meta's models; raw photos and voice notes are

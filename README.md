@@ -3,7 +3,7 @@
 Ulat turns typhoon and flood reports into draft damage assessments and insurance forms.
 It is a prototype for residents, fish farmers and the city's disaster office in Biñan, Philippines.
 
-[Live dashboard](https://ronniecutamora47--ulat.modal.run) (passcode in the private judging notes) · [Telegram bot @UlatPH_bot](https://t.me/UlatPH_bot) · [Demo video (YouTube)](https://www.youtube.com/watch?v=caQcSKOwagw)
+[Live dashboard](https://ronniecutamora47--ulat.modal.run) (passcode on request: send a direct message to [@CutamoraRonnie on X](https://x.com/CutamoraRonnie)) · [Telegram bot @UlatPH_bot](https://t.me/UlatPH_bot) · [Demo video (YouTube)](https://www.youtube.com/watch?v=caQcSKOwagw)
 
 ## The problem
 
@@ -71,7 +71,7 @@ The [full evaluation](docs/evaluation.md) explains the scores, test sets and lim
 
 ## Try it in 2 minutes
 
-1. Open the [dashboard](https://ronniecutamora47--ulat.modal.run) using the passcode in the private judging notes.
+1. Open the [dashboard](https://ronniecutamora47--ulat.modal.run) using the passcode (on request: send a direct message to [@CutamoraRonnie on X](https://x.com/CutamoraRonnie)). Without it, the video and the bot show the full flow.
 2. Open **Review**, then **Drafts** to inspect a form and its linked reports.
 3. Switch to **Technical** and open **Accuracy**; expand a report's agent record to see its steps and costs.
 4. Try [@UlatPH_bot](https://t.me/UlatPH_bot) with a synthetic report. For an emergency, call 911.

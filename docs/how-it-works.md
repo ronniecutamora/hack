@@ -2,7 +2,7 @@
 
 Ulat turns photos, short videos, audio, voice notes and text about typhoon and flood damage into evidence-backed RDANA drafts, damaged-houses tables and PCIC fisheries claims for an officer to review. It is built for Biñan's CDRRMO and fisherfolk; rice claims are a per-office option and are off for Biñan until its rice area is verified.
 
-**Judge links:** [Live dashboard](https://ronniecutamora47--ulat.modal.run) (passcode in the private judging notes) · [Telegram bot @UlatPH_bot](https://t.me/UlatPH_bot) · [Demo video (YouTube)](https://www.youtube.com/watch?v=caQcSKOwagw). Ulat is a prototype, not an official Biñan City service; it is not an emergency hotline.
+**Judge links:** [Live dashboard](https://ronniecutamora47--ulat.modal.run) (passcode on request: send a direct message to [@CutamoraRonnie on X](https://x.com/CutamoraRonnie)) · [Telegram bot @UlatPH_bot](https://t.me/UlatPH_bot) · [Demo video (YouTube)](https://www.youtube.com/watch?v=caQcSKOwagw). Ulat is a prototype, not an official Biñan City service; it is not an emergency hotline.
 
 **Meta models:** Muse Spark 1.3 and Muse Spark Open extract facts, judge photos, group reports and draft summaries; Muse Voice Transcribe reads speech; SAM 3.1 outlines roofs and floodwater as evidence; Muse Image creates synthetic demo imagery.
 
@@ -11,7 +11,7 @@ Ulat turns photos, short videos, audio, voice notes and text about typhoon and f
 
 ## Try it in 2 minutes
 
-1. Open the dashboard with the passcode in the private judging notes. Home shows the officer's work queue.
+1. Open the dashboard with the passcode (on request from the developer). Home shows the officer's work queue.
 2. Open **Review** to inspect uncertain reports, then **Drafts** to open an RDANA or fisheries claim and its print view.
 3. Switch to **Technical** and open **Accuracy** to see the labeled results; inspect a report's agent trace to see the models and their evidence.
 4. Optional: send the bot a synthetic text, photo, voice note, audio file or short video. The bot is not monitored for emergencies.

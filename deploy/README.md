@@ -174,7 +174,7 @@ completed. Keep the list for a re-run, for example after rolling back to the loc
 5. Stop the local polling bot (Ctrl+C on `uv run python -m app.bot`).
 6. `uv run python -m app.deploy webhook set --target production --yes`, then `webhook info`: no last error.
 7. Send @UlatPH_bot a test message from a phone; it answers "received" and the report appears on the overview.
-8. Put the URL in the README's Demo section and the passcode in the submission's private judging notes.
+8. Put the URL in the README's Demo section and share the passcode with judges on request.
 9. Watch `logs` for a few minutes. To undo: Rollback above.
 
 ## Gotchas
