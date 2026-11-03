@@ -2,7 +2,7 @@
 name = "hackathon-app"
 version = "0.1.0"
 requires-python = ">=3.12"
-# PEP 639: SPDX expression; third-party code and data keep their own terms (README).
+# PEP 639: SPDX expression; third-party code and data keep their own terms (CREDITS.md).
 license = "MIT"
 license-files = ["LICENSE"]
 dependencies = [

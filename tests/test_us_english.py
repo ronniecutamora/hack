@@ -115,6 +115,10 @@ def test_no_british_spelling_in_the_repository():
     files = list(_files())
     assert any(f.parts[0] == "app" and f.suffix == ".html" for f in files)  # templates scanned
     assert Path("README.md") in files
+    assert Path("CREDITS.md") in files
+    assert {
+        Path("docs") / name for name in ("how-it-works.md", "evaluation.md", "developer.md")
+    } <= set(files)
     found = [
         f"{relative}:{number}: {word} -> {BRITISH[word.lower()]}"
         for relative in files

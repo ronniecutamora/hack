@@ -1,7 +1,8 @@
-"""The results file: schema, typed loader, upsert and the README tables generated from it."""
+"""The results file: schema, loader, upsert and the documents generated from it."""
 
 import copy
 import json
+from dataclasses import replace
 
 import pytest
 
@@ -192,11 +193,11 @@ def test_git_commit_names_the_checkout():
 # --- the recorded runs ----------------------------------------------------------------------
 
 
-def test_the_readme_tables_are_generated_from_the_results_file():
-    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
-    assert eval_results.readme_block(readme) == eval_results.render_markdown(eval_results.load()), (
-        "README eval tables are stale: paste the output of `uv run python -m app.eval_results`"
-    )
+def test_the_evaluation_tables_are_generated_from_the_results_file():
+    evaluation = (REPO_ROOT / "docs/evaluation.md").read_text(encoding="utf-8")
+    assert eval_results.readme_block(evaluation) == eval_results.render_markdown(
+        eval_results.load()
+    ), "Evaluation tables are stale: paste the output of `uv run python -m app.eval_results`"
 
 
 def test_the_readme_headlines_are_generated_from_the_results_file():
@@ -204,6 +205,36 @@ def test_the_readme_headlines_are_generated_from_the_results_file():
     assert eval_results.headline_block(readme) == eval_results.render_headlines(
         eval_results.load()
     ), "README headlines are stale: run `uv run python -m app.eval_results --headlines`"
+
+
+@pytest.mark.parametrize(
+    ("start", "end", "render"),
+    [
+        (eval_results.MODELS_START, eval_results.MODELS_END, eval_results.render_models),
+        (
+            eval_results.COMPARISON_START,
+            eval_results.COMPARISON_END,
+            eval_results.render_comparison,
+        ),
+    ],
+)
+def test_the_readme_model_evidence_is_generated_from_the_results_file(start, end, render):
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    assert eval_results.marked_block(readme, start, end) == render(eval_results.load())
+
+
+def test_judge_model_tables_follow_changed_results():
+    results = copy.deepcopy(eval_results.load())
+    photo = results.find("photo_judge", "kill-test-25", "muse-spark-open")
+    crop = results.find("crop_photo", "rice-field-19", "muse-spark-open")
+    assert photo is not None and crop is not None
+    photo.metrics["roof_damage"].update(agreement=15, kappa=0.42)
+    crop.metrics["crop_field"]["kappa"] = 0.71
+    results.entries[results.entries.index(photo)] = replace(photo, n=photo.n - 1)
+    assert f"15 of {photo.n - 1} roof judgments" in eval_results.render_models(results)
+    comparison = eval_results.render_comparison(results)
+    assert f"0.42 ({photo.n - 1} photos)" in comparison
+    assert f"0.71 ({crop.n} photos)" in comparison
 
 
 @pytest.mark.parametrize("model", ["muse-spark-1.3", "muse-spark-open"])
