@@ -3,7 +3,7 @@
 Ulat turns typhoon and flood reports into draft damage assessments and insurance forms.
 It is a prototype for residents, fish farmers and the city's disaster office in Biñan, Philippines.
 
-[Live dashboard](https://ronniecutamora47--ulat.modal.run) (passcode in the private judging notes) · [Telegram bot @UlatPH_bot](https://t.me/UlatPH_bot) · [YouTube link: added at submission]
+[Live dashboard](https://ronniecutamora47--ulat.modal.run) (passcode in the private judging notes) · [Telegram bot @UlatPH_bot](https://t.me/UlatPH_bot) · [Demo video (YouTube)](https://www.youtube.com/watch?v=caQcSKOwagw)
 
 ## The problem
 

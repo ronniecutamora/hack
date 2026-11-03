@@ -8,7 +8,7 @@
 - **Telegram bot:** [@UlatPH_bot](https://t.me/UlatPH_bot). A prototype, not run or monitored by Biñan City: don't
   use it for emergencies, **call 911**. Real messages are processed by Meta's models; raw photos and voice notes are
   deleted after 24 hours (at most 72 while processing is paused by the spend cap).
-- Demo video: [YouTube link: added at submission]
+- Demo video: [Demo video (YouTube)](https://www.youtube.com/watch?v=caQcSKOwagw)
 - X post: _TBD_
 
 ### Detailed demo path

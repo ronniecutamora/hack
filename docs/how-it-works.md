@@ -2,7 +2,7 @@
 
 Ulat turns photos, short videos, audio, voice notes and text about typhoon and flood damage into evidence-backed RDANA drafts, damaged-houses tables and PCIC fisheries claims for an officer to review. It is built for Biñan's CDRRMO and fisherfolk; rice claims are a per-office option and are off for Biñan until its rice area is verified.
 
-**Judge links:** [Live dashboard](https://ronniecutamora47--ulat.modal.run) (passcode in the private judging notes) · [Telegram bot @UlatPH_bot](https://t.me/UlatPH_bot) · [YouTube link: added at submission]. Ulat is a prototype, not an official Biñan City service; it is not an emergency hotline.
+**Judge links:** [Live dashboard](https://ronniecutamora47--ulat.modal.run) (passcode in the private judging notes) · [Telegram bot @UlatPH_bot](https://t.me/UlatPH_bot) · [Demo video (YouTube)](https://www.youtube.com/watch?v=caQcSKOwagw). Ulat is a prototype, not an official Biñan City service; it is not an emergency hotline.
 
 **Meta models:** Muse Spark 1.3 and Muse Spark Open extract facts, judge photos, group reports and draft summaries; Muse Voice Transcribe reads speech; SAM 3.1 outlines roofs and floodwater as evidence; Muse Image creates synthetic demo imagery.
 
