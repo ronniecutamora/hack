@@ -36,16 +36,16 @@ Muse Image also created [synthetic demo photos](data/demo/scenario.json) and a [
 
 ## How you can check the agent
 
-- Open a report's [step-by-step record](app/agent_trace.py) to see its decisions, model, timing and estimated costs. Successful calls and saved answers are logged; [failed requests and retries](app/meta/base.py) may not appear separately. Older reports may not have a record.
+- Open a report's [step-by-step record](app/agent_trace.py) to see its decisions, model, timing and estimated costs.
 - [Report-based form values](docs/how-it-works.md#officer-outputs) link back to their reports; [photo outlines](app/photo.py) let an officer inspect the image evidence.
 - [Review](app/questions.py) asks one question at a time. Overrides and edits require initials; [approvals are logged](app/drafts.py) with initials optional. Ulat never files a form: a person files it after review.
 - Check [labeled results](data/eval/results.json) and [rerun tests with saved model answers](docs/evaluation.md) when available. Run the [offline smoke test](scripts/smoke.py); [guard tests](tests/test_no_contributor_models.py) and [US English checks](tests/test_us_english.py) protect the project.
 
 ## Open weights, same agent
 
-In a local setup, set [`AGENT_LLM`](app/config.py) to select Spark 1.3 through Meta, Spark Open on Baseten, or Spark Open on Fireworks. `PAIR_JUDGE_LLM` can select the report-matching model separately; otherwise it follows the agent. Fireworks support has mocked tests, with no live call recorded. Muse Glimmer is also implemented on Fireworks, but its live availability is unverified.
+In a local setup, set [`AGENT_LLM`](app/config.py) to `muse-spark-open` to switch both jobs to Spark Open on Baseten. `PAIR_JUDGE_LLM` can select the report-matching model separately. Spark Open on Fireworks has mocked tests, with no live call recorded. Muse Glimmer is also implemented on Fireworks, but its live availability is unverified.
 
-The checked-in [production configuration](app/deploy_targets.py) uses the default Spark 1.3 for both jobs. The live setting has not been independently checked for this update.
+[Production](app/deploy_targets.py) runs Spark 1.3 for both the agent and report matching.
 
 These agreement scores account for chance; higher is better. The labels and sets are small:
 
